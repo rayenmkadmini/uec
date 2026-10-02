@@ -1,0 +1,17 @@
+{
+  "name": "login.ueclubistes.tn",
+  "private": true,
+  "version": "1.0.0",
+  "description": "UE Clubiste static site — Supabase CLI tooling only (no frontend build step)",
+  "scripts": {
+    "supabase": "supabase",
+    "test": "node --test",
+    "check:js": "node --check js/common.js && node --check js/auth.js && node --check js/admin-users.js"
+  },
+  "devDependencies": {
+    "supabase": "^2.117.0"
+  },
+  "dependencies": {
+    "@supabase/server": "^1.9.0"
+  }
+}

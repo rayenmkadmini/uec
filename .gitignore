@@ -1,0 +1,25 @@
+# Secrets
+.env
+.env.*
+!.env.example
+supabaseconfig.txt
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.log
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+
+# Test / local files
+coverage/

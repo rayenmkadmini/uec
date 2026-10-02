@@ -1,0 +1,7 @@
+ARCHIVED EMPTY LOCAL PLACEHOLDER
+
+Original path: supabase/migrations/20260930124251_remote_schema.sql
+The original file was empty. At the 2026-10-01 live audit, Supabase migration list showed this version as local-only and not applied remotely.
+
+This note is intentionally outside supabase/migrations and is not executable SQL. It preserves the history without allowing `supabase db push` to treat the empty placeholder as a migration.
+No production database action was performed.

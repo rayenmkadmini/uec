@@ -1,0 +1,24 @@
+# Supabase Edge Function configuration
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-import-users]
+verify_jwt = true
+
+[functions.admin-create-admin]
+verify_jwt = true
+
+[functions.admin-update-admin]
+verify_jwt = true
+
+[functions.admin-delete-admin]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+-- WARNING: This schema is for context only and is not meant to be run.
+-- Table order and constraints may not be valid for execution.
+
