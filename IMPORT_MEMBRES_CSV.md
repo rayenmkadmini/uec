@@ -17,7 +17,7 @@ Colonnes reconnues (l'ordre n'est pas obligatoire). Les CSV séparés par `,` ou
 ## Exemple
 ```csv
 mail,Nom,prenom,numero d'abonnement,CIN,sexe,Téléphone,address,FACULTÉ,zone
-membre@example.com,DOE,Jean,10001,12345678,M,22123456,1 Rue Exemple,FSEG,Tunis
+test.member001@example.invalid,TEST,SYNTHETIC_MEMBER_001,TEST-0001,00000001,M,+216 00 000 001,1 Rue Fictive Test,FSEG Tunis — Faculté des Sciences Economiques et de Gestion de Tunis,ZONE A
 ```
 
 Maximum : 500 lignes par import.

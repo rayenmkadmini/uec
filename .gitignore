@@ -23,3 +23,30 @@ Thumbs.db
 
 # Test / local files
 coverage/
+# Database dumps, backups and incident evidence (never commit; keep outside the repo)
+*.dump
+*.pgdump
+*.backup
+*.bundle
+*.sql.gz
+*.sql.zip
+/backups/
+/uec-backups/
+**/restore-work/
+/roles.sql
+/schema.sql
+/data.sql
+/platform_objects*.sql
+/MANIFEST.json
+
+# Credentials and keys
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+
+# Local Supabase CLI state
+supabase/.temp/
+supabase/.branches/
