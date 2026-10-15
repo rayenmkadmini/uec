@@ -8,8 +8,9 @@ let currentCtx = null;
 let canManageMembers = false;
 let canMarkCard = false;
 let canViewDetails = false;
+let canViewIdentity = false;
 const pendingCardToggles = new Set();
-const { csvField, parseCsv } = window.UE_CSV;
+const { parseMemberCsv } = window.UE_CSV;
 
 function stripAccents(s) {
   return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -81,24 +82,42 @@ async function loadRefs() {
     (zonesResult.data || []).map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join("");
 }
 
+// Columns any staff reader may select. CIN, address, date of birth and notes are
+// withheld by the database (column privileges); "*" would be refused.
+const MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,email,phone,gender,photo_url," +
+  "faculty_id,zone_id,status,card_paid,card_paid_at,subscription_start,subscription_end,created_at,updated_at," +
+  "faculties(name),zones(name)";
+
 function columnCount() {
-  return canViewDetails ? 11 : 7;
+  if (!canViewDetails) return 7;
+  return canViewIdentity ? 11 : 10;
 }
 
-// SUPERADMIN / ADMIN read the full member records. TREASURER receives only
-// identification + payment fields from list_payment_members() (no CIN, address,
-// phone, email, gender, zone or photo) — the database refuses anything more.
+// SUPERADMIN / ADMIN read member records without protected identity fields.
+// SUPERADMIN additionally loads CIN / address / date of birth through
+// get_member_private_fields(). TREASURER receives only identification + payment
+// fields from list_payment_members() — the database refuses anything more.
 async function loadSubs() {
-  const { data, error } = canViewDetails
-    ? await sb.from("subscribers").select("*,faculties(name),zones(name)").order("nom", { ascending: true })
-    : await sb.rpc("list_payment_members");
+  const [result, identity] = await Promise.all([
+    canViewDetails
+      ? sb.from("subscribers").select(MEMBER_COLUMNS).order("nom", { ascending: true })
+      : sb.rpc("list_payment_members"),
+    canViewIdentity ? sb.rpc("get_member_private_fields") : Promise.resolve({ data: [], error: null })
+  ]);
+  const error = result.error || identity.error;
 
   if (error) {
+    allSubs = [];
     $("#rows").innerHTML = `<tr><td colspan="${columnCount()}" class="empty">Impossible de charger les membres. Réessayez.</td></tr>`;
     return showAlert("#pageAlert", error.message, "error");
   }
-  allSubs = (data || []).map(s => canViewDetails
-    ? { ...s, is_self: Boolean(s.user_id) && s.user_id === currentCtx?.user?.id }
+  const privateById = new Map((identity.data || []).map(p => [p.subscriber_id, p]));
+  allSubs = (result.data || []).map(s => canViewDetails
+    ? {
+        ...s,
+        ...(canViewIdentity ? { cin: privateById.get(s.id)?.cin ?? null, adresse: privateById.get(s.id)?.adresse ?? null } : {}),
+        is_self: Boolean(s.user_id) && s.user_id === currentCtx?.user?.id
+      }
     : { ...s, faculties: s.faculty_name ? { name: s.faculty_name } : null });
   apply();
 }
@@ -170,7 +189,7 @@ async function render() {
       <td>${escapeHtml(s.prenom)}</td>
       ${canViewDetails ? `<td>${genderLabel(s.gender)}</td>` : ""}
       <td>${escapeHtml(s.numero_abonnement || "—")}</td>
-      ${canViewDetails ? `<td>${escapeHtml(s.cin)}</td>` : ""}
+      ${canViewIdentity ? `<td>${escapeHtml(s.cin || "—")}</td>` : ""}
       <td>${escapeHtml(facultyShort(s.faculties?.name) || "—")}</td>
       ${canViewDetails ? `<td>${escapeHtml(s.zones?.name || "—")}</td>` : ""}
       <td>${statusBadge(s.status)}</td>
@@ -212,13 +231,13 @@ async function openMemberCard(subscriber) {
       </div>
       <div class="member-card-grid">
         <div><span>N° abonnement</span><strong>${escapeHtml(user.numero_abonnement || "—")}</strong></div>
-        ${canViewDetails ? `<div><span>CIN</span><strong>${escapeHtml(user.cin || "—")}</strong></div>
+        ${canViewDetails ? `${canViewIdentity ? `<div><span>CIN</span><strong>${escapeHtml(user.cin || "—")}</strong></div>` : ""}
         <div><span>Téléphone</span><strong>${escapeHtml(user.phone || "—")}</strong></div>
         <div><span>Email</span><strong>${escapeHtml(user.email || "—")}</strong></div>
         <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>
         <div><span>Zone</span><strong>${escapeHtml(user.zones?.name || "—")}</strong></div>
         <div><span>Sexe</span><strong>${escapeHtml(user.gender === "FEMALE" ? "Femme" : user.gender === "MALE" ? "Homme" : "Non défini")}</strong></div>
-        <div><span>Adresse</span><strong>${escapeHtml(user.adresse || "—")}</strong></div>` : `
+        ${canViewIdentity ? `<div><span>Adresse</span><strong>${escapeHtml(user.adresse || "—")}</strong></div>` : ""}` : `
         <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>`}
         <div><span>Carte membre</span><strong>${user.card_paid ? "Payée" : "Non payée"}</strong></div>
       </div>
@@ -274,7 +293,7 @@ function openModal(s = null) {
     fNom: s?.nom || "",
     fPrenom: s?.prenom || "",
     fNumero: s?.numero_abonnement || "",
-    fLogin: s?.login_name || "DHIASOUDA",
+    fLogin: s?.login_name || "",
     fCin: s?.cin || "",
     fPhone: s?.phone || "",
     fEmail: s?.email || "",
@@ -347,16 +366,32 @@ window.toggleCard = async id => {
   showAlert("#pageAlert", nextPaid ? "Carte marquée comme payée." : "Carte marquée comme non payée.");
 };
 
+// Shows a server-generated temporary password exactly once. It is not stored in
+// the page and the member must replace it at first login (verified server-side).
+async function showTemporaryPassword(title, password) {
+  if (window.Swal) {
+    await Swal.fire({
+      ...swalBase(),
+      title,
+      html: `<p>Remettez ce mot de passe temporaire au membre par un canal sûr. Il ne sera plus affiché.</p>
+        <p><code class="temp-password">${escapeHtml(password)}</code></p>
+        <p class="hint">Le membre devra le remplacer à sa première connexion.</p>`,
+      icon: "success",
+      showDenyButton: Boolean(navigator.clipboard),
+      denyButtonText: "Copier",
+      confirmButtonText: "Terminé",
+      preDeny: async () => { await navigator.clipboard.writeText(password); return false; }
+    });
+  } else {
+    window.prompt(`${title} — mot de passe temporaire (affiché une seule fois) :`, password);
+  }
+}
+
+// Activation / reset: the Edge Function generates a random temporary password
+// (never derived from member data) and flags the account for a first-login change.
 window.resetPassword = async userId => {
-  if (!canManageMembers) return;
-  const password = await promptDialog("Nouveau mot de passe", {
-    input: "password",
-    placeholder: "12 caractères min. : majuscule, minuscule, chiffre, spécial",
-    confirmText: "Réinitialiser"
-  });
-  if (!password) return;
-  if (password.length < 12) return showAlert("#pageAlert", "Le mot de passe doit contenir au moins 12 caractères.", "error");
-  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) return showAlert("#pageAlert", "Utilisez une majuscule, une minuscule, un chiffre et un caractère spécial.", "error");
+  if (!canManageMembers || !userId) return;
+  if (!(await confirmDialog("Générer un nouveau mot de passe temporaire pour ce membre ? L’ancien ne fonctionnera plus.", { confirmText: "Générer", icon: "question" }))) return;
 
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return showAlert("#pageAlert", "Session administrateur expirée.", "error");
@@ -368,17 +403,17 @@ window.resetPassword = async userId => {
       apikey: UE_CONFIG.SUPABASE_ANON_KEY,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ user_id: userId, new_password: password })
+    body: JSON.stringify({ user_id: userId, generate: true })
   });
 
   let result = {};
   try { result = await response.json(); } catch (_) {}
 
-  if (!response.ok) {
+  if (!response.ok || !result.temporary_password) {
     return showAlert("#pageAlert", result.error || "Réinitialisation impossible.", "error");
   }
 
-  showAlert("#pageAlert", "Mot de passe réinitialisé. Le changement sera demandé à la prochaine connexion.");
+  await showTemporaryPassword("Mot de passe réinitialisé", result.temporary_password);
 };
 
 window.deleteSub = async id => {
@@ -406,55 +441,76 @@ window.deleteSub = async id => {
 };
 
 
+const MEMBER_FIELD_LABELS = {
+  nom: "Nom", prenom: "Prénom", cin: "CIN", gender: "Sexe", login: "Login", email: "Email",
+  numero_abonnement: "N° abonnement", faculty: "Faculté", zone: "Zone", phone: "Téléphone", adresse: "Adresse"
+};
+
+function importErrorListHtml(errors) {
+  const shown = errors.slice(0, 50);
+  return `<ul class="csv-errors">${shown.map(e => `<li>${escapeHtml(e.message || e)}</li>`).join("")}</ul>` +
+    (errors.length > shown.length ? `<p class="muted-text">… et ${errors.length - shown.length} autre(s) erreur(s).</p>` : "");
+}
+
+async function showImportErrors(title, intro, errors) {
+  if (window.Swal) {
+    await Swal.fire({ ...swalBase(), title, html: `<p>${escapeHtml(intro)}</p>${importErrorListHtml(errors)}`, icon: "error", width: 760, confirmButtonText: "Fermer" });
+  } else {
+    alert(`${title}\n${intro}\n\n${errors.slice(0, 20).map(e => e.message || e).join("\n")}`);
+  }
+}
+
+// The import is all-or-nothing: the file is refused if a required column is
+// missing, a column is ambiguous or any row is invalid. The Edge Function
+// re-validates everything (including faculty / zone names and duplicates)
+// before writing.
 async function importMembersCsv(file) {
   if (!canManageMembers) return;
-  let rows;
+  let parsed;
   try {
-    rows = parseCsv(await file.text());
+    parsed = parseMemberCsv(await file.text());
   } catch (_) {
     return showAlert("#pageAlert", "Impossible de lire ce fichier CSV. Vérifiez son format puis réessayez.", "error");
   }
+  const { analysis, rows } = parsed;
   if (!rows.length) return showAlert("#pageAlert", "Le fichier CSV est vide.", "error");
 
-  const payload = rows.map(r => ({
-    email: csvField(r, ["mail", "email", "e-mail", "البريد الإلكتروني", "البريد الالكتروني"]),
-    nom: csvField(r, ["nom", "name", "اللقب", "اسم العائلة", "الاسم العائلي"]),
-    prenom: csvField(r, ["prenom", "prénom", "first name", "firstname", "الاسم", "الإسم", "الاسم الأول", "الاسم الشخصي"]),
-    numero_abonnement: csvField(r, ["numero d abonnement", "numero abonnement", "n abonnement", "numero", "abonnement", "رقم الاشتراك", "رقم المنخرط"]),
-    login: csvField(r, ["login", "identifiant", "username", "اسم الدخول"]),
-    cin: csvField(r, ["cin", "بطاقة التعريف الوطنية", "رقم بطاقة التعريف"]),
-    gender: csvField(r, ["sexe", "gender", "الجنس"]),
-    phone: csvField(r, ["telephone", "téléphone", "phone", "tel", "الهاتف", "رقم الهاتف"]),
-    adresse: csvField(r, ["address", "adresse", "العنوان"]),
-    faculty: csvField(r, ["faculte", "faculté", "faculty", "الكلية", "المؤسسة"]),
-    zone: csvField(r, ["zone", "المنطقة"])
-  }));
+  if (!analysis.ok) {
+    const problems = [
+      ...analysis.missing.map(field => `Colonne obligatoire absente : ${MEMBER_FIELD_LABELS[field] || field}.`),
+      ...analysis.duplicates.map(d => `Colonnes en double pour ${MEMBER_FIELD_LABELS[d.field] || d.field} : ${d.headers.map(h => `« ${h} »`).join(", ")}. Gardez-en une seule.`)
+    ];
+    return showImportErrors("En-têtes CSV invalides", "Corrigez les en-têtes puis réimportez le fichier. Aucune donnée n’a été modifiée.", problems);
+  }
+  if (rows.length > 500) return showAlert("#pageAlert", "Maximum 500 lignes par import. Divisez le fichier.", "error");
 
-  const validRows = payload.filter(x => x.nom && x.prenom && x.cin && x.gender);
-  const invalidCount = payload.length - validRows.length;
-  const withoutSubscription = validRows.filter(x => !x.numero_abonnement).length;
-  const withSubscription = validRows.length - withoutSubscription;
-  const previewRows = payload.slice(0, 8).map((row, index) => {
-    const valid = row.nom && row.prenom && row.cin && row.gender;
-    return `<tr><td>${index + 2}</td><td>${escapeHtml(`${row.prenom} ${row.nom}`.trim() || "—")}</td><td>${escapeHtml(row.gender || "—")}</td><td>${escapeHtml(row.numero_abonnement || "—")}</td><td><span class="status-badge ${valid ? "success" : "warning"}">${valid ? "Valide" : "À corriger"}</span></td></tr>`;
-  }).join("");
-
-  if (!validRows.length) {
-    return showAlert("#pageAlert", "Aucune ligne valide. Nom, prénom, CIN et sexe sont obligatoires; le numéro d’abonnement reste optionnel.", "error");
+  const rowProblems = row => ["nom", "prenom", "cin", "gender"].filter(field => !row[field]);
+  const invalid = rows.filter(row => rowProblems(row).length);
+  if (invalid.length) {
+    return showImportErrors(
+      "Import refusé",
+      `${invalid.length} ligne(s) incomplète(s). Corrigez le fichier puis réimportez-le : aucune ligne n’est importée tant qu’une ligne est invalide.`,
+      invalid.map(row => `Ligne ${row.line} : ${rowProblems(row).map(f => MEMBER_FIELD_LABELS[f]).join(", ")} manquant(s).`)
+    );
   }
 
+  const withoutSubscription = rows.filter(x => !x.numero_abonnement).length;
+  const withSubscription = rows.length - withoutSubscription;
+  const previewRows = rows.slice(0, 8).map(row =>
+    `<tr><td>${row.line}</td><td>${escapeHtml(`${row.prenom} ${row.nom}`.trim() || "—")}</td><td>${escapeHtml(row.gender || "—")}</td><td>${escapeHtml(row.numero_abonnement || "—")}</td></tr>`
+  ).join("");
+
   const previewHtml = `
-    <p>Les membres existants seront mis à jour. Aucune ligne existante ne sera remplacée ou supprimée.</p>
+    <p>Les membres existants (retrouvés par CIN puis par N° d’abonnement) seront mis à jour ; aucun membre n’est supprimé.
+    Les nouveaux comptes reçoivent un mot de passe aléatoire inconnu : activez-les ensuite avec « Réinitialiser le mot de passe ».</p>
     <div class="csv-summary">
-      <div><strong>${payload.length}</strong><span>Total des lignes</span></div>
-      <div><strong>${validRows.length}</strong><span>Lignes valides</span></div>
-      <div><strong>${invalidCount}</strong><span>Lignes à corriger</span></div>
+      <div><strong>${rows.length}</strong><span>Lignes</span></div>
       <div><strong>${withSubscription}</strong><span>Avec numéro d’abonnement</span></div>
       <div><strong>${withoutSubscription}</strong><span>Sans numéro d’abonnement</span></div>
     </div>
-    <div class="table-wrap csv-preview"><table><thead><tr><th>Ligne</th><th>Membre</th><th>Sexe</th><th>N° abonnement</th><th>Validation</th></tr></thead><tbody>${previewRows}</tbody></table></div>
-    ${payload.length > 8 ? `<p class="muted-text">Aperçu des 8 premières lignes sur ${payload.length}.</p>` : ""}
-    ${invalidCount ? `<p class="hint">Les ${invalidCount} ligne(s) invalides seront ignorées. Les champs requis sont Nom, Prénom, CIN et Sexe.</p>` : ""}
+    <div class="table-wrap csv-preview"><table><thead><tr><th>Ligne</th><th>Membre</th><th>Sexe</th><th>N° abonnement</th></tr></thead><tbody>${previewRows}</tbody></table></div>
+    ${rows.length > 8 ? `<p class="muted-text">Aperçu des 8 premières lignes sur ${rows.length}.</p>` : ""}
+    ${analysis.unknown.length ? `<p class="hint">Colonnes ignorées : ${analysis.unknown.map(h => escapeHtml(h)).join(", ")}.</p>` : ""}
   `;
 
   let confirmed = false;
@@ -465,14 +521,14 @@ async function importMembersCsv(file) {
       html: previewHtml,
       width: 760,
       showCancelButton: true,
-      confirmButtonText: `Importer ${validRows.length} ligne(s) valide(s)`,
+      confirmButtonText: `Importer ${rows.length} ligne(s)`,
       cancelButtonText: "Annuler",
       reverseButtons: true,
       focusCancel: true
     });
     confirmed = preview.isConfirmed;
   } else {
-    confirmed = await confirmDialog(`Total : ${payload.length}\nValides : ${validRows.length}\nInvalides : ${invalidCount}\nAvec numéro d’abonnement : ${withSubscription}\nSans numéro d’abonnement : ${withoutSubscription}\n\nImporter uniquement les lignes valides ?`, { confirmText: "Importer" });
+    confirmed = await confirmDialog(`Lignes : ${rows.length}\nAvec numéro d’abonnement : ${withSubscription}\nSans numéro d’abonnement : ${withoutSubscription}\n\nImporter ?`, { confirmText: "Importer" });
   }
   if (!confirmed) return;
 
@@ -495,34 +551,36 @@ async function importMembersCsv(file) {
         apikey: UE_CONFIG.SUPABASE_ANON_KEY,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ rows: validRows })
+      body: JSON.stringify({ rows })
     });
 
     let result = {};
     try { result = await response.json(); } catch (_) {}
-    if (!response.ok) return showAlert("#pageAlert", result.error || "Import impossible. Vérifiez le fichier puis réessayez.", "error");
-
     const errors = Array.isArray(result.errors) ? result.errors : [];
+    if (!response.ok) {
+      if (errors.length) return showImportErrors("Import refusé", result.error || "Aucune donnée n’a été modifiée.", errors);
+      return showAlert("#pageAlert", result.error || "Import impossible. Vérifiez le fichier puis réessayez.", "error");
+    }
+
     const metric = value => Number.isFinite(Number(value)) ? String(Number(value)) : "Non communiqué";
     const report = [
-      ["Total des lignes", payload.length],
-      ["Lignes valides", validRows.length],
-      ["Lignes invalides ignorées", invalidCount],
-      ["Nouveaux membres", metric(result.created)],
+      ["Lignes", rows.length],
+      ["Nouveaux membres (à activer)", metric(result.created)],
       ["Membres mis à jour", metric(result.updated)],
-      ["Doublons signalés", metric(result.duplicates)],
+      ["Échecs d’écriture", metric(result.failed)],
       ["Avec numéro d’abonnement", withSubscription],
-      ["Sans numéro d’abonnement", withoutSubscription],
-      ["Erreurs signalées", errors.length]
+      ["Sans numéro d’abonnement", withoutSubscription]
     ];
-    const reportHtml = `<div class="csv-summary">${report.map(([label, value]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("")}</div>`;
+    const reportHtml = `<div class="csv-summary">${report.map(([label, value]) => `<div><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span></div>`).join("")}</div>` +
+      (errors.length ? importErrorListHtml(errors) : "");
 
     if (window.Swal) {
       await Swal.fire({
         ...swalBase(),
-        title: errors.length || invalidCount ? "Import terminé avec des éléments à vérifier" : "Import terminé",
+        title: errors.length ? "Import terminé avec des erreurs" : "Import terminé",
         html: reportHtml,
-        icon: errors.length || invalidCount ? "warning" : "success",
+        icon: errors.length ? "warning" : "success",
+        width: 760,
         confirmButtonText: "Terminé"
       });
     } else {
@@ -548,10 +606,12 @@ async function init() {
   canManageMembers = can(ctx, "manageMembers");
   canMarkCard = can(ctx, "manageCardPayments");
   canViewDetails = can(ctx, "viewMemberDetails");
+  canViewIdentity = can(ctx, "viewMemberIdentity");
   if (!canViewDetails) {
     $$(".col-private").forEach(th => th.remove());
     $("#genderFilter")?.remove();
   }
+  if (!canViewIdentity) $$(".col-identity").forEach(th => th.remove());
 
   setupShell(ctx);
   setupFacultyCombo();
@@ -650,6 +710,7 @@ $("#subscriberForm").addEventListener("submit", async e => {
 
     if (!response.ok) return showAlert("#pageAlert", result.error || "Création impossible.", "error");
     showAlert("#pageAlert", "Abonné créé avec succès.");
+    if (result.temporary_password) await showTemporaryPassword("Compte membre créé", result.temporary_password);
   }
 
   $("#modal").classList.add("hidden");

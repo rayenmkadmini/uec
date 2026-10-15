@@ -17,21 +17,19 @@ function loadCsvUtils() {
   return context.window.UE_CSV;
 }
 
-// Same aliases as importMembersCsv() in js/subscribers.js.
-function mapRow(r, csvField) {
-  return {
-    email: csvField(r, ["mail", "email", "e-mail", "البريد الإلكتروني", "البريد الالكتروني"]),
-    nom: csvField(r, ["nom", "name", "اللقب", "اسم العائلة", "الاسم العائلي"]),
-    prenom: csvField(r, ["prenom", "prénom", "first name", "firstname", "الاسم", "الإسم", "الاسم الأول", "الاسم الشخصي"]),
-    numero_abonnement: csvField(r, ["numero d abonnement", "numero abonnement", "n abonnement", "numero", "abonnement", "رقم الاشتراك", "رقم المنخرط"]),
-    login: csvField(r, ["login", "identifiant", "username", "اسم الدخول"]),
-    cin: csvField(r, ["cin", "بطاقة التعريف الوطنية", "رقم بطاقة التعريف"]),
-    gender: csvField(r, ["sexe", "gender", "الجنس"]),
-    phone: csvField(r, ["telephone", "téléphone", "phone", "tel", "الهاتف", "رقم الهاتف"]),
-    adresse: csvField(r, ["address", "adresse", "العنوان"]),
-    faculty: csvField(r, ["faculte", "faculté", "faculty", "الكلية", "المؤسسة"]),
-    zone: csvField(r, ["zone", "المنطقة"])
-  };
+// The import page maps rows with UE_CSV.parseMemberCsv (explicit alias table).
+function parseTemplate() {
+  const { parseMemberCsv } = loadCsvUtils();
+  return JSON.parse(JSON.stringify(parseMemberCsv(fs.readFileSync(path.join(root, "CSV_MEMBRES_TEMPLATE.csv"), "utf8"))));
+}
+
+// Faculty names from the repository seed; zone names are synthetic (production
+// zone names were not inspected — schema-only backup).
+function referenceRows() {
+  const seed = fs.readFileSync(path.join(root, "supabase", "faculties_seed.sql"), "utf8");
+  const faculties = [...new Set([...seed.matchAll(/'([^']+ — [^']+)'/g)].map(m => m[1]))].map((name, i) => ({ id: `f${i}`, name }));
+  const zones = ["ZONE A", "ZONE B", "ZONE C"].map((name, i) => ({ id: `z${i}`, name }));
+  return { faculties, zones };
 }
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
@@ -47,13 +45,13 @@ function assertOnlySyntheticIdentifiers(text, label) {
 }
 
 test("CSV template keeps the 13 Google Forms headers and parses into synthetic rows", () => {
-  const { parseCsv, csvField } = loadCsvUtils();
-  const text = fs.readFileSync(path.join(root, "CSV_MEMBRES_TEMPLATE.csv"), "utf8");
-  const rows = parseCsv(text);
-  assert.equal(Object.keys(rows[0]).length, 13);
+  const { headers, analysis, rows } = parseTemplate();
+  assert.equal(headers.length, 13);
+  assert.equal(analysis.ok, true);
+  assert.equal(analysis.unknown.length, 2, "Google Forms timestamp + collected email address are ignored");
   assert.ok(rows.length >= 1 && rows.length <= 10);
 
-  for (const row of rows.map(r => mapRow(r, csvField))) {
+  for (const row of rows) {
     assert.match(row.prenom, /^SYNTHETIC_MEMBER_\d{3}$/);
     assert.equal(row.nom, "TEST");
     assert.match(row.cin, /^0000000\d$/);
@@ -64,10 +62,12 @@ test("CSV template keeps the 13 Google Forms headers and parses into synthetic r
   }
 });
 
-test("every template row passes the importer's required-field validation", async () => {
-  const { hasRequiredMemberFields, normalizeGender, normalizeOptionalSubscriptionNumber } = await utilsPromise;
-  const { parseCsv, csvField } = loadCsvUtils();
-  const rows = parseCsv(fs.readFileSync(path.join(root, "CSV_MEMBRES_TEMPLATE.csv"), "utf8")).map(r => mapRow(r, csvField));
+test("the whole template passes the server-side batch validation", async () => {
+  const { hasRequiredMemberFields, normalizeGender, normalizeOptionalSubscriptionNumber, validateImportBatch } = await utilsPromise;
+  const { rows } = parseTemplate();
+  const batch = validateImportBatch(rows, referenceRows());
+  assert.equal(batch.ok, true, JSON.stringify(batch.errors));
+  assert.ok(batch.prepared.every(r => r.faculty_id && r.zone_id));
 
   for (const row of rows) {
     assert.equal(hasRequiredMemberFields(row), true);
@@ -82,8 +82,8 @@ test("committed CSV template and import documentation contain only synthetic ide
   assertOnlySyntheticIdentifiers(fs.readFileSync(path.join(root, "IMPORT_MEMBRES_CSV.md"), "utf8"), "IMPORT_MEMBRES_CSV.md");
 });
 
-test("D7: login column header 'Login (FOULENFOULENI)' maps to the login field", { todo: "fixed in Phase B (header normalization)" }, () => {
-  const { parseCsv, csvField } = loadCsvUtils();
-  const rows = parseCsv(fs.readFileSync(path.join(root, "CSV_MEMBRES_TEMPLATE.csv"), "utf8")).map(r => mapRow(r, csvField));
+test("D7: login column header 'Login (FOULENFOULENI)' maps to the login field", () => {
+  const { analysis, rows } = parseTemplate();
+  assert.equal(analysis.columns.login, "Login (FOULENFOULENI)");
   assert.ok(rows.every(row => /^SYNTHETIC_MEMBER_\d{3}$/.test(row.login)));
 });

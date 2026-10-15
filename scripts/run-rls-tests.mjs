@@ -1,26 +1,22 @@
-// Runs supabase/tests/rls_role_matrix.sql against the linked project INSIDE a
+// Runs supabase/tests/rls_role_matrix.sql (local test container by default,
+// --linked for the linked project — approval required) INSIDE a
 // transaction that always ends in a forced error, so nothing is ever committed.
 //
 //   node scripts/run-rls-tests.mjs            # migration + tests (pre-apply check)
 //   node scripts/run-rls-tests.mjs --no-migration   # tests only (after applying)
 //
-// Requires: `npx supabase login` and `npx supabase link --project-ref <ref>`.
-import { execFileSync } from "node:child_process";
+// --linked requires `npx supabase login` and `npx supabase link --project-ref <ref>`.
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { describeTarget, runSqlFile } from "./lib/sql-target.mjs";
+import { PENDING, migrationPath } from "./lib/pending-migrations.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const withMigration = !process.argv.includes("--no-migration");
 
-// Only the migration(s) not yet in the remote history (20261001194746 and
-// 20261001194845 are already applied on qwlbbfyhjdeekmrxtzjf).
-const PENDING = ["20261015120000_role_permissions_repair.sql"];
-const migrationsDir = join(root, "supabase", "migrations");
-const migrations = withMigration
-  ? PENDING.map(name => readFileSync(join(migrationsDir, name), "utf8"))
-  : [];
+const migrations = withMigration ? PENDING.map(name => readFileSync(join(root, migrationPath(name)), "utf8")) : [];
 
 const report = `
 do $report$
@@ -37,18 +33,13 @@ end
 $report$;
 `;
 
-const sql = ["begin;", ...migrations, readFileSync(join(root, "supabase", "tests", "rls_role_matrix.sql"), "utf8"), report].join("\n");
+const test = rel => readFileSync(join(root, "supabase", "tests", rel), "utf8");
+const sql = ["begin;", test("pre_migration_fixtures.sql"), ...migrations, test("rls_role_matrix.sql"), report].join("\n");
 const file = join(mkdtempSync(join(tmpdir(), "ue-rls-")), "run.sql");
 writeFileSync(file, sql);
 
-let output = "";
-try {
-  output = execFileSync("npx", ["supabase", "db", "query", "--linked", "-f", file], {
-    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: process.platform === "win32"
-  });
-} catch (error) {
-  output = `${error.stdout || ""}${error.stderr || ""}`;
-}
+console.log(`Target: ${describeTarget()}`);
+const output = runSqlFile(file, { root });
 
 const match = output.match(/RLS_TEST_REPORT total=(\d+) failed=(\d+) :: (.*?)(?:"|\\n|$)/s);
 if (!match) {

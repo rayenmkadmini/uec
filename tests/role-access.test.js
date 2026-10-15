@@ -292,15 +292,54 @@ test("TREASURER never receives member personal data in the UI", () => {
   assert.equal(PERMS.can({ roles: ["TREASURER"] }, "viewMemberDetails"), false);
   assert.equal(PERMS.can({ roles: ["ADMIN"] }, "viewMemberDetails"), true);
   const members = read("js/subscribers.js");
-  assert.match(members, /canViewDetails\s*\?\s*await sb\.from\("subscribers"\)/);
-  assert.match(members, /: await sb\.rpc\("list_payment_members"\)/);
+  assert.match(members, /canViewDetails\s*\?\s*sb\.from\("subscribers"\)\.select\(MEMBER_COLUMNS\)/);
+  assert.match(members, /:\s*sb\.rpc\("list_payment_members"\)/);
   assert.match(members, /\$\$\("\.col-private"\)\.forEach\(th => th\.remove\(\)\)/);
   const payments = read("js/admin-payments.js");
   assert.match(payments, /rpc\("list_payment_members"\)/);
   assert.doesNotMatch(payments, /from\("subscribers"\)/, "payments page must not read the members table");
   for (const header of ["Photo", "Sexe", "CIN", "Zone"]) {
-    assert.match(read("subscribers.html"), new RegExp(`<th class="col-private">${header}</th>`));
+    assert.match(read("subscribers.html"), new RegExp(`<th class="col-private[^"]*">${header}</th>`));
   }
+});
+
+test("only SUPERADMIN sees protected identity fields (CIN, address) in the UI", () => {
+  for (const role of ["ADMIN", "TREASURER", "MEMBER"]) {
+    assert.equal(PERMS.can({ roles: [role] }, "viewMemberIdentity"), false, role);
+  }
+  assert.equal(PERMS.can({ roles: ["SUPERADMIN"] }, "viewMemberIdentity"), true);
+  assert.equal(PERMS.can({ roles: ["ADMIN", "TREASURER", "MEMBER"] }, "viewMemberIdentity"), false);
+
+  const members = read("js/subscribers.js");
+  assert.match(members, /canViewIdentity \? sb\.rpc\("get_member_private_fields"\)/);
+  assert.match(members, /\$\$\("\.col-identity"\)\.forEach\(th => th\.remove\(\)\)/);
+  assert.match(read("subscribers.html"), /<th class="col-private col-identity">CIN<\/th>/);
+  // Every CIN / address cell in the staff list and member card is gated by canViewIdentity.
+  const cells = [...members.matchAll(/\$\{escapeHtml\((s|user)\.(cin|adresse)\b/g)];
+  assert.ok(cells.length >= 3, "expected the CIN / address cells to be found");
+  for (const match of cells) {
+    const before = members.slice(Math.max(0, match.index - 120), match.index);
+    assert.match(before, /canViewIdentity \?/, `${match[0]} must be inside a canViewIdentity branch`);
+  }
+});
+
+test("no page selects protected member columns or * from the members table", () => {
+  const PROTECTED = /\b(cin|adresse|date_naissance|notes)\b/;
+  for (const file of fs.readdirSync(path.join(root, "js")).filter(f => f.endsWith(".js"))) {
+    const source = read(`js/${file}`);
+    for (const match of source.matchAll(/from\("(subscribers|v_member_cards)"\)[\s\S]{0,80}?\.select\(([^)]*)\)/g)) {
+      const columns = match[2].trim();
+      assert.doesNotMatch(columns, /"\*|\*"/, `${file}: select("*") on ${match[1]} is refused by the database`);
+      if (columns.startsWith('"')) assert.doesNotMatch(columns, PROTECTED, `${file}: protected column in ${columns}`);
+    }
+  }
+  for (const constant of ["MEMBER_COLUMNS", "OWN_MEMBER_COLUMNS"]) {
+    for (const file of ["js/subscribers.js", "js/subscriber.js"]) {
+      const match = read(file).match(new RegExp(`const ${constant} = ([^;]+);`));
+      if (match) assert.doesNotMatch(match[1], PROTECTED, `${file}: ${constant}`);
+    }
+  }
+  assert.doesNotMatch(read("js/subscriber.js"), /from\("subscribers"\)\.select\("\*/);
 });
 
 test("own payment rows are locked for a treasurer in the UI (database enforces it too)", () => {

@@ -1,16 +1,19 @@
-// Proves, against the linked project, that:
+// Proves, for EACH pending migration applied on top of the ones before it
+// (local test container by default; --linked = linked project, approval required):
 //   1. the migration changes no data (every table's full content hash is unchanged), and
-//   2. the rollback script restores every policy, function, ACL, default privilege,
-//      trigger and bucket setting to its exact pre-migration state.
-// Everything runs in ONE transaction that always ends in a forced error, so
+//   2. its rollback restores every policy, function, table/column ACL, default
+//      privilege, private table, trigger and bucket setting to the exact
+//      pre-migration state.
+// Each check runs in ONE transaction that always ends in a forced error, so
 // nothing is ever committed.
 //
 //   node scripts/run-rollback-check.mjs
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { describeTarget, runSqlFile } from "./lib/sql-target.mjs";
+import { PENDING, migrationPath, rollbackPath } from "./lib/pending-migrations.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const file = rel => readFileSync(join(root, rel), "utf8");
@@ -40,37 +43,39 @@ end
 $report$;
 `;
 
-const sql = [
-  "begin;",
-  file("supabase/tests/rollback_fingerprint.sql"),
-  "select pg_temp.snap('before');",
-  file("supabase/migrations/20261015120000_role_permissions_repair.sql"),
-  "select pg_temp.snap('migrated');",
-  file("supabase/rollback/20261015120000_role_permissions_repair_rollback.sql"),
-  "select pg_temp.snap('rolled_back');",
-  report
-].join("\n");
+console.log(`Target: ${describeTarget()}`);
+let failures = 0;
 
-const path = join(mkdtempSync(join(tmpdir(), "ue-rollback-")), "run.sql");
-writeFileSync(path, sql);
+PENDING.forEach((name, index) => {
+  const sql = [
+    "begin;",
+    ...PENDING.slice(0, index).map(earlier => file(migrationPath(earlier))),
+    file("supabase/tests/rollback_fingerprint.sql"),
+    "select pg_temp.snap('before');",
+    file(migrationPath(name)),
+    "select pg_temp.snap('migrated');",
+    file(rollbackPath(name)),
+    "select pg_temp.snap('rolled_back');",
+    report
+  ].join("\n");
 
-let output = "";
-try {
-  output = execFileSync("npx", ["supabase", "db", "query", "--linked", "-f", path], {
-    cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], shell: process.platform === "win32"
-  });
-} catch (error) {
-  output = `${error.stdout || ""}${error.stderr || ""}`;
-}
+  const path = join(mkdtempSync(join(tmpdir(), "ue-rollback-")), "run.sql");
+  writeFileSync(path, sql);
+  const output = runSqlFile(path, { root });
 
-const match = output.match(/ROLLBACK_CHECK items=(\d+) data_changed_by_migration=\[(.*?)\] not_restored_by_rollback=\[(.*?)\]/s);
-if (!match) {
-  console.error("Could not find the check report. Raw output:\n" + output);
-  process.exit(2);
-}
-const [, items, dataChanged, notRestored] = match;
-console.log(`Fingerprinted objects: ${items}`);
-console.log(`Data changed by migration: ${dataChanged || "none"}`);
-console.log(`Not restored by rollback: ${notRestored || "none"}`);
-console.log("(Transaction rolled back — no changes were committed.)");
-process.exit(dataChanged || notRestored ? 1 : 0);
+  console.log(`\n${name}`);
+  const match = output.match(/ROLLBACK_CHECK items=(\d+) data_changed_by_migration=\[(.*?)\] not_restored_by_rollback=\[(.*?)\]/s);
+  if (!match) {
+    console.error("  Could not find the check report. Raw output:\n" + output);
+    failures += 1;
+    return;
+  }
+  const [, items, dataChanged, notRestored] = match;
+  console.log(`  Fingerprinted objects: ${items}`);
+  console.log(`  Data changed by migration: ${dataChanged || "none"}`);
+  console.log(`  Not restored by rollback: ${notRestored || "none"}`);
+  if (dataChanged || notRestored) failures += 1;
+});
+
+console.log("\n(Every check ran in a transaction that was rolled back — no changes were committed.)");
+process.exit(failures ? 1 : 0);

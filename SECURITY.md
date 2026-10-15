@@ -8,7 +8,7 @@
 ## Current role/function code
 - The intended canonical role table is `public.user_roles`, supporting `SUPERADMIN`, `ADMIN`, `TREASURER`, and `MEMBER` with role-union behavior.
 - Local Edge Function sources use shared Superadmin authorization derived from an authenticated bearer token and `user_roles`; they must not trust browser-supplied roles.
-- The standalone copies under `SUPABASE_DASHBOARD_FUNCTIONS/` are deprecated; deploy from `supabase/functions/` only.
+- The former standalone copies under `SUPABASE_DASHBOARD_FUNCTIONS/` were removed (unsafe: CIN as password, wrong schema); deploy from `supabase/functions/` only.
 - The local `supabase/config.toml` sets `verify_jwt = true` for protected functions. The older `uec` project snapshot recorded six deployed admin functions with `verify_jwt = false`; the currently configured `login.uec` project was separately verified below.
 
 ## Read-only verification — 2026-10-14

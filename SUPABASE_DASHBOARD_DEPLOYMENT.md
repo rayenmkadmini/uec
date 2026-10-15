@@ -1,7 +1,7 @@
 # UE Clubiste — Supabase Dashboard deployment
 
 The canonical Edge Function source is under `supabase/functions/`. The files in
-`SUPABASE_DASHBOARD_FUNCTIONS/` are deprecated snapshots and must not be deployed.
+The former `SUPABASE_DASHBOARD_FUNCTIONS/` snapshots were removed and must not be restored or deployed.
 The canonical functions share authorization and audit code from their local
 `_shared/` modules, so deploy them from the repository with the Supabase CLI or
 copy the complete function directory when using an editor.
@@ -37,7 +37,7 @@ Deploy these functions from `supabase/functions/` one by one with the Supabase C
 - `admin-import-users`
 
 The canonical functions import their matching `_shared` files. Do not deploy the
-deprecated standalone copies from `SUPABASE_DASHBOARD_FUNCTIONS/`.
+the removed standalone copies from `SUPABASE_DASHBOARD_FUNCTIONS/`.
 
 The checked-in `supabase/config.toml` enables platform JWT verification and the
 function code independently validates the bearer token and Superadmin role.

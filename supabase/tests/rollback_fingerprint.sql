@@ -33,6 +33,19 @@ begin
   from pg_class c
   where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v', 'S') and c.relname not like 'clubs%';
 
+  -- Column-level ACLs (used to withhold protected identity columns)
+  insert into fp
+  select p_stage, 'column-acl ' || c.relname || '.' || a.attname, md5(pg_temp.acl(a.attacl))
+  from pg_attribute a join pg_class c on c.oid = a.attrelid
+  where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v')
+    and a.attnum > 0 and not a.attisdropped and a.attacl is not null and c.relname not like 'clubs%';
+
+  -- Tables in the private schema (existence + ACL)
+  insert into fp
+  select p_stage, 'private-table ' || c.relname, md5(concat_ws('|', pg_temp.acl(c.relacl), c.relrowsecurity))
+  from pg_class c
+  where c.relnamespace = 'private'::regnamespace and c.relkind = 'r';
+
   -- Default privileges
   insert into fp
   select p_stage, 'default-acl ' || defaclrole::regrole::text || ' ' || defaclobjtype::text, md5(pg_temp.acl(defaclacl))

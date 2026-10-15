@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     button.innerHTML = "Connexion…";
 
     // Admins can use their normal email. Subscribers may use their login_name
-    // (for example DHIASOUDA), which is mapped to the internal Auth email.
+    // (for example FOULENFOULENI), which is mapped to the internal Auth email.
     const authEmail = login.includes("@") ? login.toLowerCase() : syntheticEmail(login);
     let signInResult;
     try {

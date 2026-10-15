@@ -1,5 +1,9 @@
-import { requireSuperAdmin, json, options, rateLimit, audit } from "./_shared/security.ts";
-import { normalizeOptionalSubscriptionNumber } from "./_shared/import-utils.mjs";
+import { requireSuperAdmin, json, options, rateLimit, audit, corsHeaders } from "./_shared/security.ts";
+import { generateTemporaryPassword, normalizeOptionalSubscriptionNumber } from "./_shared/import-utils.mjs";
+
+// New member accounts get a random temporary password (never the CIN). It is
+// returned once to the calling SUPERADMIN (no-store) and must be changed at the
+// first login; complete_password_change() verifies the change server-side.
 
 
 Deno.serve(async (req) => {
@@ -23,9 +27,10 @@ Deno.serve(async (req) => {
     const loginName = b.login_name.trim().toUpperCase();
     if (!/^[A-Z0-9_-]{3,40}$/.test(loginName)) return json(req, { error: "Login invalide." }, 400);
     const email = `${loginName.toLowerCase()}@login.ueclubiste.local`;
+    const temporaryPassword = generateTemporaryPassword();
     const { data: newUser, error: createError } = await ctx.admin.auth.admin.createUser({
-      email, password: String(b.cin).trim(), email_confirm: true,
-      user_metadata: { display_name: `${b.prenom.trim()} ${b.nom.trim()}`, role: "SUBSCRIBER", gender }
+      email, password: temporaryPassword, email_confirm: true,
+      user_metadata: { display_name: `${b.prenom.trim()} ${b.nom.trim()}`, gender }
     });
     if (createError || !newUser?.user) return json(req, { error: createError?.message || "Impossible de créer le compte." }, 400);
     const { error: subError } = await ctx.admin.from("subscribers").insert({
@@ -61,7 +66,12 @@ Deno.serve(async (req) => {
     }
     await audit(ctx.admin, ctx.caller.id, "CREATE_SUBSCRIBER", newUser.user.id, true);
     const { data: createdSubscriber } = await ctx.admin.from("subscribers").select("id").eq("user_id", newUser.user.id).maybeSingle();
-    return json(req, { ok: true, user_id: newUser.user.id, subscriber_id: createdSubscriber?.id || null });
+    return new Response(JSON.stringify({
+      ok: true,
+      user_id: newUser.user.id,
+      subscriber_id: createdSubscriber?.id || null,
+      temporary_password: temporaryPassword
+    }), { status: 200, headers: { ...corsHeaders(req), "Cache-Control": "no-store" } });
   } catch (e) {
     if (e instanceof Response) return e;
     if (ctx) await audit(ctx.admin, ctx.caller.id, "CREATE_SUBSCRIBER", null, false, { error: String(e) });

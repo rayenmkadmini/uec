@@ -27,6 +27,7 @@ begin
     when 'admin'      then '00000000-0000-4000-8000-0000000000a2'
     when 'treasurer'  then '00000000-0000-4000-8000-0000000000a3'
     when 'member'     then '00000000-0000-4000-8000-0000000000a4'
+    when 'legacy'     then '00000000-0000-4000-8000-0000000000a6'
     else null end;
 
   if p_who = 'anon' then
@@ -79,6 +80,13 @@ insert into public.subscribers (id, user_id, nom, prenom, login_name, gender, st
   ('00000000-0000-4000-8000-0000000000b4', '00000000-0000-4000-8000-0000000000a4', 'Membre', 'Test', 'RLSMEMBER', 'MALE', 'ACTIVE', false),
   ('00000000-0000-4000-8000-0000000000b5', null, 'Autre', 'Membre', 'RLSOTHER', 'FEMALE', 'ACTIVE', false),
   ('00000000-0000-4000-8000-0000000000b3', '00000000-0000-4000-8000-0000000000a3', 'Tresorier', 'Membre', 'RLSTREAS', 'MALE', 'ACTIVE', false);
+-- Synthetic protected identity values (never real data).
+update public.subscribers set cin = '0000000' || right(id::text, 1), adresse = 'Rue Fictive', date_naissance = date '2000-01-01', notes = 'note'
+where id in ('00000000-0000-4000-8000-0000000000b4', '00000000-0000-4000-8000-0000000000b5', '00000000-0000-4000-8000-0000000000b3');
+
+-- Production has one settings row; an empty schema-only test database has none.
+insert into public.site_settings (site_name) select 'UE Clubiste' where not exists (select 1 from public.site_settings);
+
 -- Existing seat choice + photo of another member (privacy checks)
 insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'RLSOTHER/existing.jpg');
 
@@ -91,6 +99,13 @@ update public.match_zones set capacity = 0 where match_id = '00000000-0000-4000-
 insert into public.match_participations (match_id, subscriber_id, zone_id)
 select '00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000b5', id
 from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE';
+
+-- A match that has already been played, with the member's seat recorded.
+insert into public.matches (id, sport, home_team, away_team, match_date, is_active) values
+  ('00000000-0000-4000-8000-0000000000d2', 'FOOTBALL', 'Club Africain', 'RLS PAST FC', current_date - 3, true);
+insert into public.match_participations (match_id, subscriber_id, zone_id)
+select '00000000-0000-4000-8000-0000000000d2', '00000000-0000-4000-8000-0000000000b4', id
+from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d2' and zone_key = 'PELOUSE';
 
 -- ---------------- ANON ----------------
 select pg_temp.t('read members',            'anon', $q$select 1 from public.subscribers$q$, 'deny');
@@ -109,6 +124,10 @@ select pg_temp.t('event payment RPC',       'superadmin', $q$select public.set_e
 select pg_temp.t('edit own profile',        'superadmin', $q$update public.profiles set display_name = 'SA renamed' where id = '00000000-0000-4000-8000-0000000000a1'$q$, 'allow');
 select pg_temp.t('update site settings',    'superadmin', $q$update public.site_settings set site_name = site_name$q$, 'allow');
 select pg_temp.t('mark treasurer own card (authorizes)', 'superadmin', $q$select public.set_card_payment_status('00000000-0000-4000-8000-0000000000b3', true)$q$, 'allow');
+select pg_temp.t('private fields RPC (one member)', 'superadmin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5') where cin is not null$q$, 'allow');
+select pg_temp.t('private fields RPC (all members)', 'superadmin', $q$select * from public.get_member_private_fields() where cin is not null$q$, 'allow');
+select pg_temp.t('direct CIN column read (RPC only)', 'superadmin', $q$select cin from public.subscribers$q$, 'deny');
+select pg_temp.t('correct a member CIN',    'superadmin', $q$update public.subscribers set cin = '00000009' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
 select pg_temp.t('upload match logo',       'superadmin', $q$insert into storage.objects (bucket_id, name) values ('match-logos', 'rls/sa.png')$q$, 'allow');
 
 -- ---------------- ADMIN (read-only) ----------------
@@ -116,7 +135,21 @@ select pg_temp.t('read members',            'admin', $q$select 1 from public.sub
 select pg_temp.t('read events',             'admin', $q$select 1 from public.events$q$, 'allow');
 select pg_temp.t('read cotisations',        'admin', $q$select 1 from public.event_payments$q$, 'allow');
 select pg_temp.t('read matches',            'admin', $q$select 1 from public.matches$q$, 'allow');
-select pg_temp.t('read member CIN/address', 'admin', $q$select cin, adresse from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
+select pg_temp.t('read member CIN (column)', 'admin', $q$select cin from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
+select pg_temp.t('read address / birth date', 'admin', $q$select adresse, date_naissance from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
+select pg_temp.t('read internal notes',     'admin', $q$select notes from public.subscribers$q$, 'deny');
+select pg_temp.t('select * on members',     'admin', $q$select * from public.subscribers$q$, 'deny');
+select pg_temp.t('filter members by CIN',   'admin', $q$select id from public.subscribers where cin = '00000005'$q$, 'deny');
+select pg_temp.t('CIN via member-card view','admin', $q$select cin from public.v_member_cards$q$, 'deny');
+select pg_temp.t('private fields RPC (other member)', 'admin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5')$q$, 'deny');
+select pg_temp.t('private fields RPC (all members)',  'admin', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('read allowed member fields', 'admin', $q$select nom, prenom, numero_abonnement, phone, email, gender, status, card_paid from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
+select pg_temp.t('read member-card view (exposes CIN)', 'admin', $q$select nom, prenom from public.v_member_cards$q$, 'deny');
+select pg_temp.t('change a user role',      'admin', $q$update public.user_roles set role = 'SUPERADMIN' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('delete a user role',      'admin', $q$delete from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('change profile app_role', 'admin', $q$update public.profiles set app_role = 'SUPERADMIN' where id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('deactivate a user',       'admin', $q$update public.profiles set is_active = false where id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('delete a member',         'admin', $q$delete from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
 select pg_temp.t('read payment member list','admin', $q$select * from public.list_payment_members()$q$, 'allow');
 select pg_temp.t('read member photos',      'admin', $q$select 1 from storage.objects where bucket_id = 'subscriber-photos' and name = 'RLSOTHER/existing.jpg'$q$, 'allow');
 select pg_temp.t('read seat choices',       'admin', $q$select 1 from public.match_participations$q$, 'allow');
@@ -171,6 +204,14 @@ select pg_temp.t('insert cotisation row',   'treasurer', $q$insert into public.e
 select pg_temp.t('delete cotisation',       'treasurer', $q$delete from public.event_payments$q$, 'deny');
 select pg_temp.t('grant self SUPERADMIN',   'treasurer', $q$insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000a3', 'SUPERADMIN')$q$, 'deny');
 select pg_temp.t('update site settings',    'treasurer', $q$update public.site_settings set site_name = 'X'$q$, 'deny');
+select pg_temp.t('private fields RPC (other member)', 'treasurer', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5')$q$, 'deny');
+select pg_temp.t('edit event title',        'treasurer', $q$update public.events set title = 'X' where id = '00000000-0000-4000-8000-0000000000c1'$q$, 'deny');
+select pg_temp.t('edit event active flag',  'treasurer', $q$update public.events set is_active = false where id = '00000000-0000-4000-8000-0000000000c1'$q$, 'deny');
+select pg_temp.t('edit cotisation paid_at', 'treasurer', $q$update public.event_payments set paid_at = now()$q$, 'deny');
+select pg_temp.t('edit card payment row',   'treasurer', $q$update public.card_payments set amount = 0$q$, 'deny');
+select pg_temp.t('change a user role',      'treasurer', $q$update public.user_roles set role = 'SUPERADMIN' where user_id = '00000000-0000-4000-8000-0000000000a3'$q$, 'deny');
+select pg_temp.t('delete a user role',      'treasurer', $q$delete from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('deactivate a user',       'treasurer', $q$update public.profiles set is_active = false where id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
 select pg_temp.t('create match',            'treasurer', $q$insert into public.matches (sport, home_team, away_team, match_date) values ('FOOTBALL','A','B', current_date)$q$, 'deny');
 
 -- ---------------- MEMBER ----------------
@@ -204,7 +245,24 @@ select pg_temp.t('read own seat',           'member', $q$select 1 from public.ma
 select pg_temp.t('remove seat (RPC)',       'member', $q$select public.remove_match_participation('00000000-0000-4000-8000-0000000000d1')$q$, 'allow');
 select pg_temp.t('upload own photo',        'member', $q$insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'RLSMEMBER/p.jpg')$q$, 'allow');
 select pg_temp.t('upload into other folder','member', $q$insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'RLSOTHER/p.jpg')$q$, 'deny');
-select pg_temp.t('complete password change','member', $q$select public.complete_password_change()$q$, 'allow');
+select pg_temp.t('own private fields (RPC)', 'member', $q$select * from public.get_member_private_fields() where cin is not null$q$, 'allow');
+select pg_temp.t('own private fields by id (RPC)', 'member', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b4')$q$, 'allow');
+select pg_temp.t('other member private fields (RPC)', 'member', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5')$q$, 'deny');
+select pg_temp.t('own CIN via table (RPC only)', 'member', $q$select cin from public.subscribers where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('edit own CIN',            'member', $q$update public.subscribers set cin = '00000001' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('delete own MEMBER role',  'member', $q$delete from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('choose seat on past match', 'member', $q$select public.set_match_participation('00000000-0000-4000-8000-0000000000d2', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d2' and zone_key = 'ENCEINTE_SUP'))$q$, 'deny');
+select pg_temp.t('remove seat after kick-off', 'member', $q$select public.remove_match_participation('00000000-0000-4000-8000-0000000000d2')$q$, 'deny');
+select pg_temp.t('clear own password flag (table)', 'member', $q$update public.profiles set must_change_password = false where id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('complete password change before changing it', 'member', $q$select public.complete_password_change()$q$, 'deny');
+select pg_temp.t('legacy account: complete without changing', 'legacy', $q$select public.complete_password_change()$q$, 'deny');
+select pg_temp.t('call password digest helper', 'member', $q$select private.password_digest('00000000-0000-4000-8000-0000000000a4')$q$, 'deny');
+select pg_temp.t('read password marks table', 'superadmin', $q$select 1 from private.password_change_marks$q$, 'deny');
+
+-- What Supabase Auth does on a successful password update (as postgres, outside any JWT).
+update auth.users set encrypted_password = 'rls-new-hash-' || gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000a4';
+
+select pg_temp.t('complete password change after changing it', 'member', $q$select public.complete_password_change()$q$, 'allow');
 
 -- Postconditions (checked as postgres)
 insert into rls_results (test, passed, detail)
@@ -236,3 +294,36 @@ from storage.buckets where id = 'subscriber-photos';
 insert into rls_results (test, passed, detail)
 select 'POST: anon has no table grants', count(*) = 0, count(*)::text
 from information_schema.role_table_grants where table_schema = 'public' and grantee = 'anon';
+
+insert into rls_results (test, passed, detail)
+select 'POST: password mark removed after verified change', count(*) = 0, count(*)::text
+from private.password_change_marks where user_id = '00000000-0000-4000-8000-0000000000a4';
+
+insert into rls_results (test, passed, detail)
+select 'POST: legacy flagged account still flagged', must_change_password, must_change_password::text
+from public.profiles where id = '00000000-0000-4000-8000-0000000000a6';
+
+insert into rls_results (test, passed, detail)
+select 'POST: every flagged account has a password mark', count(*) = 0, count(*)::text
+from public.profiles p
+where p.must_change_password and not exists (select 1 from private.password_change_marks m where m.user_id = p.id);
+
+insert into rls_results (test, passed, detail)
+select 'POST: past-match seat kept', count(*) = 1, count(*)::text
+from public.match_participations where match_id = '00000000-0000-4000-8000-0000000000d2';
+
+insert into rls_results (test, passed, detail)
+select 'POST: member CIN unchanged by member', cin = '00000004', coalesce(cin, 'null')
+from public.subscribers where id = '00000000-0000-4000-8000-0000000000b4';
+
+insert into rls_results (test, passed, detail)
+select 'POST: no table-level SELECT on subscribers for authenticated',
+       not has_table_privilege('authenticated', 'public.subscribers', 'SELECT'), '';
+
+insert into rls_results (test, passed, detail)
+select 'POST: authenticated cannot select protected columns',
+       not (has_column_privilege('authenticated', 'public.subscribers', 'cin', 'SELECT')
+         or has_column_privilege('authenticated', 'public.subscribers', 'adresse', 'SELECT')
+         or has_column_privilege('authenticated', 'public.subscribers', 'date_naissance', 'SELECT')
+         or has_column_privilege('authenticated', 'public.subscribers', 'notes', 'SELECT')
+         or has_column_privilege('authenticated', 'public.v_member_cards', 'cin', 'SELECT')), '';

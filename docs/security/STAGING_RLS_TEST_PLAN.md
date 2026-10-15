@@ -120,7 +120,7 @@ Platform JWT verification disabled remotely does not by itself prove endpoint un
 - `supabase/functions/_shared/security.ts`: current local shared Superadmin gate calls `auth.getUser()` and requires `SUPERADMIN` in `user_roles`; missing/failed role lookup denies the request.
 - Local `admin-create-admin`, `admin-create-user`, and `admin-import-users` write compatibility fields in `profiles.role`/`is_treasurer` while also assigning canonical roles. `admin-update-admin` uses the role array and mirrors primary role/treasurer flag. Do not drop those columns until every deployed consumer is verified.
 - `schema.sql`, `roles_migration.sql`, `permissions_v2.sql`, `multi_role_permissions.sql`, `security_hardening.sql`, `matchs.sql`, `payments.sql`, and `fix_existing_installation.sql` retain older profile-role/RLS assumptions. They are historical inputs to compare, not a safe run list. The SQL role/multi-role files are marked deprecated; the current authority migration is separately marked unapproved.
-- `SUPABASE_DASHBOARD_FUNCTIONS/` contains standalone duplicate Edge Function copies. Its README marks them deprecated; do not deploy them.
+- `SUPABASE_DASHBOARD_FUNCTIONS/` (standalone duplicate Edge Function copies using the CIN as password and a non-existent `profiles.role` column) was removed on 2026-10-15; it remains in Git history. Deploy only from `supabase/functions/`.
 
 ### Grant inventory summary
 

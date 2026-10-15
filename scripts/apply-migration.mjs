@@ -1,4 +1,6 @@
-// Guarded production apply for 20261015120000_role_permissions_repair.sql.
+// Guarded production apply for the pending migrations (scripts/lib/pending-migrations.mjs):
+//   20261015120000_role_permissions_repair
+//   20261015140000_member_identity_and_password_hardening
 //
 //   node scripts/apply-migration.mjs --dry-run                 # checks + prints the SQL, writes nothing
 //   node scripts/apply-migration.mjs --confirm-production      # applies (requires explicit approval)
@@ -6,22 +8,22 @@
 // Steps when confirmed:
 //   1. Refuses unless the target is exactly qwlbbfyhjdeekmrxtzjf (login.uec): checks the
 //      linked ref, js/config.js and the remote migration history.
-//   2. Applies the migration in ONE transaction with lock/statement timeouts. Inside the
+//   2. Applies ALL pending migrations, in order, in ONE transaction with lock/statement timeouts. Inside the
 //      same transaction it verifies invariants (row counts unchanged, new functions/table
 //      present, old staff write policies gone, anon has no grants, photo bucket private);
 //      any failure raises and the whole transaction rolls back.
 //   3. Runs the full role matrix against the live schema (in a rolled-back transaction).
-//   4. Only if step 3 passes, records the version with `migration repair --status applied`.
+//   4. Only if step 3 passes, records each version with `migration repair --status applied`.
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PENDING, migrationPath, rollbackPath } from "./lib/pending-migrations.mjs";
 
 const PROJECT_REF = "qwlbbfyhjdeekmrxtzjf";
 const FORBIDDEN_REF = "astsvxyqyyzqvuioqsnq";
-const VERSION = "20261015120000";
-const MIGRATION = `supabase/migrations/${VERSION}_role_permissions_repair.sql`;
+const VERSIONS = PENDING.map(name => name.split("_")[0]);
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dryRun = process.argv.includes("--dry-run");
@@ -51,8 +53,10 @@ const history = supabase(["migration", "list", "--project-ref", PROJECT_REF]);
 if (!history.includes('"remote":"20261001194746"') || !history.includes('"remote":"20261001194845"')) {
   fail("remote migration history is not the expected one (20261001194746, 20261001194845).");
 }
-if (history.includes(`"remote":"${VERSION}"`)) fail(`${VERSION} is already recorded as applied.`);
-console.log(`Target OK: ${PROJECT_REF} (login.uec); remote history as expected; ${VERSION} pending.`);
+for (const version of VERSIONS) {
+  if (history.includes(`"remote":"${version}"`)) fail(`${version} is already recorded as applied.`);
+}
+console.log(`Target OK: ${PROJECT_REF} (login.uec); remote history as expected; pending: ${VERSIONS.join(", ")}.`);
 
 // 2) Build the self-verifying transaction
 const sql = `
@@ -70,7 +74,7 @@ select 'matches', count(*) from public.matches union all
 select 'match_participations', count(*) from public.match_participations union all
 select 'auth_users', count(*) from auth.users;
 
-${read(MIGRATION)}
+${PENDING.map(name => `-- ==== ${name}\n${read(migrationPath(name))}`).join("\n")}
 
 do $verify$
 declare
@@ -94,7 +98,8 @@ begin
 
   if (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in
       ('set_card_payment_status','set_event_payment_status','set_match_participation',
-       'remove_match_participation','complete_password_change','list_payment_members')) <> 6 then
+       'remove_match_participation','complete_password_change','list_payment_members',
+       'get_member_private_fields')) <> 7 then
     raise exception 'VERIFY: RPC functions missing';
   end if;
 
@@ -109,6 +114,18 @@ begin
 
   if (select public from storage.buckets where id = 'subscriber-photos') then
     raise exception 'VERIFY: subscriber-photos bucket still public';
+  end if;
+
+  if has_table_privilege('authenticated', 'public.subscribers', 'SELECT')
+     or has_column_privilege('authenticated', 'public.subscribers', 'cin', 'SELECT')
+     or has_column_privilege('authenticated', 'public.subscribers', 'adresse', 'SELECT') then
+    raise exception 'VERIFY: protected member columns still selectable by authenticated';
+  end if;
+
+  if to_regclass('private.password_change_marks') is null
+     or exists (select 1 from public.profiles p where p.must_change_password
+                and not exists (select 1 from private.password_change_marks m where m.user_id = p.id)) then
+    raise exception 'VERIFY: password-change marks missing';
   end if;
 end
 $verify$;
@@ -125,7 +142,7 @@ if (dryRun) {
   process.exit(0);
 }
 
-console.log("Applying migration in a single transaction...");
+console.log(`Applying ${PENDING.length} migration(s) in a single transaction...`);
 try {
   const out = supabase(["db", "query", "--linked", "--project-ref", PROJECT_REF, "-f", file]);
   console.log(out.trim());
@@ -137,15 +154,17 @@ try {
 // 3) Full role matrix against the live schema (rolled back)
 console.log("Running role matrix against the applied schema...");
 try {
-  console.log(execFileSync(process.execPath, [join(root, "scripts", "run-rls-tests.mjs"), "--no-migration"], {
+  console.log(execFileSync(process.execPath, [join(root, "scripts", "run-rls-tests.mjs"), "--no-migration", "--linked"], {
     cwd: root, encoding: "utf8"
   }).split("\n").slice(-2).join("\n"));
 } catch (error) {
   console.error(error.stdout || "");
-  fail(`migration is APPLIED but the role matrix FAILED. Do not mark it applied; run the rollback:
-  npx supabase db query --linked --project-ref ${PROJECT_REF} -f supabase/rollback/${VERSION}_role_permissions_repair_rollback.sql`);
+  fail(`migrations are APPLIED but the role matrix FAILED. Do not mark them applied; roll back in reverse order:
+${[...PENDING].reverse().map(name => `  npx supabase db query --linked --project-ref ${PROJECT_REF} -f ${rollbackPath(name)}`).join("\n")}`);
 }
 
 // 4) Record in migration history only after verification
-console.log(supabase(["migration", "repair", "--status", "applied", VERSION, "--linked", "--project-ref", PROJECT_REF]).trim());
-console.log(`Done: ${VERSION} applied, verified and recorded on ${PROJECT_REF}.`);
+for (const version of VERSIONS) {
+  console.log(supabase(["migration", "repair", "--status", "applied", version, "--linked", "--project-ref", PROJECT_REF]).trim());
+}
+console.log(`Done: ${VERSIONS.join(", ")} applied, verified and recorded on ${PROJECT_REF}.`);

@@ -47,4 +47,4 @@ catalogue live et validation dans un projet de staging isolé.
 
 Déployez ensuite les sept fonctions depuis `supabase/functions/`, notamment
 `admin-import-users`, avec `supabase/config.toml`. Les copies du dossier
-`SUPABASE_DASHBOARD_FUNCTIONS/` sont dépréciées.
+`SUPABASE_DASHBOARD_FUNCTIONS/` ont été supprimées (non sûres).

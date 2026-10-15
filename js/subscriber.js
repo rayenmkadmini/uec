@@ -133,10 +133,24 @@ async function loadUpcomingMatches() {
   }).join("");
 }
 
+// CIN, address and date of birth are not selectable through the table API;
+// the member reads their own values through get_member_private_fields().
+const OWN_MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,email,phone,gender,photo_url," +
+  "faculty_id,zone_id,status,card_paid,card_paid_at,faculties(name),zones(name)";
+
+async function withOwnPrivateFields(subscriber) {
+  if (!subscriber) return { data: null, error: null };
+  const { data, error } = await sb.rpc("get_member_private_fields", { p_subscriber_id: subscriber.id });
+  if (error) return { data: null, error };
+  const own = (data || [])[0] || {};
+  return { data: { ...subscriber, cin: own.cin ?? null, adresse: own.adresse ?? null, date_naissance: own.date_naissance ?? null }, error: null };
+}
+
 (async function init() {
   const ctx = await requirePermission("useMemberArea"); if (!ctx) return;
   setupShell(ctx);
-  const { data: s, error } = await sb.from("subscribers").select("*,faculties(name),zones(name)").eq("user_id", ctx.user.id).maybeSingle();
+  const row = await sb.from("subscribers").select(OWN_MEMBER_COLUMNS).eq("user_id", ctx.user.id).maybeSingle();
+  const { data: s, error } = row.error ? row : await withOwnPrivateFields(row.data);
   if (error) { showAlert("#pageAlert","Impossible de charger votre profil.","error"); return; }
   if (!s) {
     // Staff accounts that also hold MEMBER may have no member record: send them to their profile page.
@@ -201,10 +215,11 @@ async function saveMemberProfile() {
   const result = await sb.from("subscribers")
     .update({ phone: $("#phone").value.trim() || null, email: email || null, adresse: $("#adresse").value.trim() || null, photo_url: photoUrl })
     .eq("user_id", original.user_id)
-    .select("*,faculties(name),zones(name)");
+    .select(OWN_MEMBER_COLUMNS);
   const failure = writeError(result);
   if (failure) { showAlert("#pageAlert",failure,"error"); return; }
-  original = result.data[0];
+  const refreshed = await withOwnPrivateFields(result.data[0]);
+  original = refreshed.data || { ...result.data[0], cin: original.cin, adresse: $("#adresse").value.trim() || null };
   if ($("#photoFile")) $("#photoFile").value = "";
   ["phone","email","adresse"].forEach(id => $("#" + id).disabled = true);
   await renderMemberCard(original);
