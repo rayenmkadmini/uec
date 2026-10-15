@@ -1,6 +1,7 @@
 // Guarded production apply for the pending migrations (scripts/lib/pending-migrations.mjs):
 //   20261015120000_role_permissions_repair
 //   20261015140000_member_identity_and_password_hardening
+//   20261015160000_active_accounts_and_data_minimization
 //
 //   node scripts/apply-migration.mjs --dry-run                 # checks + prints the SQL, writes nothing
 //   node scripts/apply-migration.mjs --confirm-production      # applies (requires explicit approval)
@@ -99,7 +100,7 @@ begin
   if (select count(*) from pg_proc where pronamespace = 'public'::regnamespace and proname in
       ('set_card_payment_status','set_event_payment_status','set_match_participation',
        'remove_match_participation','complete_password_change','list_payment_members',
-       'get_member_private_fields')) <> 7 then
+       'get_member_private_fields','get_account_contacts')) <> 8 then
     raise exception 'VERIFY: RPC functions missing';
   end if;
 
@@ -126,6 +127,14 @@ begin
      or exists (select 1 from public.profiles p where p.must_change_password
                 and not exists (select 1 from private.password_change_marks m where m.user_id = p.id)) then
     raise exception 'VERIFY: password-change marks missing';
+  end if;
+
+  if to_regprocedure('private.account_ok()') is null
+     or has_column_privilege('authenticated', 'public.subscribers', 'phone', 'SELECT')
+     or has_column_privilege('authenticated', 'public.profiles', 'email', 'SELECT')
+     or has_column_privilege('authenticated', 'public.audit_logs', 'ip_address', 'SELECT')
+     or has_column_privilege('authenticated', 'public.event_payments', 'notes', 'SELECT') then
+    raise exception 'VERIFY: account-state helpers or contact-data restrictions missing';
   end if;
 end
 $verify$;

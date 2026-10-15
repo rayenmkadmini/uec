@@ -17,12 +17,13 @@
     const PERMISSIONS = {
         viewDashboard: ["SUPERADMIN", "ADMIN"],
         viewMembers: ["SUPERADMIN", "ADMIN", "TREASURER"],
-        // Member details (phone, email, gender, zone, photo). TREASURER only gets
+        // Member details (gender, zone, photo, account status). TREASURER only gets
         // identification + payment fields via list_payment_members().
         viewMemberDetails: ["SUPERADMIN", "ADMIN"],
-        // Protected identity (CIN, address, date of birth): the database withholds
-        // these columns from every API role and serves them only through
-        // get_member_private_fields() to SUPERADMIN (or the member themself).
+        // Protected identity and contact data (CIN, address, date of birth, phone,
+        // email): the database withholds these columns from every API role and
+        // serves them only through get_member_private_fields() /
+        // get_account_contacts() to SUPERADMIN (or the person themself).
         viewMemberIdentity: ["SUPERADMIN"],
         manageMembers: ["SUPERADMIN"],
         manageCardPayments: ["SUPERADMIN", "TREASURER"],

@@ -51,6 +51,7 @@ function loadCommonHelpers({ roles = [], profile = {} } = {}) {
   const context = {
     console: { warn() {}, error() {}, log() {} },
     URL,
+    URLSearchParams,
     CustomEvent: function CustomEvent(type, init = {}) { return { type, detail: init.detail || {} }; },
     window,
     document: doc,
@@ -324,10 +325,10 @@ test("only SUPERADMIN sees protected identity fields (CIN, address) in the UI", 
 });
 
 test("no page selects protected member columns or * from the members table", () => {
-  const PROTECTED = /\b(cin|adresse|date_naissance|notes)\b/;
+  const PROTECTED = /\b(cin|adresse|date_naissance|notes|phone|email|ip_address|transaction_reference)\b/;
   for (const file of fs.readdirSync(path.join(root, "js")).filter(f => f.endsWith(".js"))) {
     const source = read(`js/${file}`);
-    for (const match of source.matchAll(/from\("(subscribers|v_member_cards)"\)[\s\S]{0,80}?\.select\(([^)]*)\)/g)) {
+    for (const match of source.matchAll(/from\("(subscribers|v_member_cards|profiles|audit_logs|event_payments|card_payments)"\)[\s\S]{0,120}?\.select\(([^)]*)\)/g)) {
       const columns = match[2].trim();
       assert.doesNotMatch(columns, /"\*|\*"/, `${file}: select("*") on ${match[1]} is refused by the database`);
       if (columns.startsWith('"')) assert.doesNotMatch(columns, PROTECTED, `${file}: protected column in ${columns}`);
@@ -345,4 +346,39 @@ test("no page selects protected member columns or * from the members table", () 
 test("own payment rows are locked for a treasurer in the UI (database enforces it too)", () => {
   assert.match(read("js/subscribers.js"), /return canMarkCard && \(!s\.is_self \|\| canManageMembers\);/);
   assert.match(read("js/admin-payments.js"), /subscriber\.is_self && !canManageEvents/);
+});
+
+test("account emails are shown to SUPERADMIN only and loaded through the checked RPC", () => {
+  const users = read("js/admin-users.js");
+  assert.match(users, /if \(canManageAdmins\) \{\s*const \{ data: contacts, error: contactError \} = await sb\.rpc\("get_account_contacts"\)/);
+  assert.match(users, /<td>\$\{superAdmin \? escapeHtml\(a\.email \|\| "—"\) : '<span class="muted-text">Masqué<\/span>'\}<\/td>/);
+  assert.match(read("js/profile.js"), /sb\.rpc\("get_account_contacts"\)/);
+  const members = read("js/subscribers.js");
+  const contactCells = [...members.matchAll(/\$\{escapeHtml\(user\.(phone|email)/g)];
+  assert.equal(contactCells.length, 2);
+  for (const match of contactCells) {
+    assert.match(members.slice(Math.max(0, match.index - 220), match.index), /canViewIdentity \?/);
+  }
+});
+
+test("members without an account are activated per member; no bulk secrets in the page", () => {
+  const members = read("js/subscribers.js");
+  assert.match(members, /s\.user_id\s*\?\s*`<button[^`]*resetPassword\('\$\{s\.user_id\}'\)/);
+  assert.match(members, /:\s*`<button[^`]*activateMember\('\$\{s\.id\}'\)/);
+  assert.match(members, /issueAccess\("admin-activate-member", \{ subscriber_id: subscriberId \}/);
+  assert.match(members, /callAdminFunction\(functionName, \{ \.\.\.payload, method: "link" \}\)/, "links are tried first");
+  assert.doesNotMatch(members, /localStorage|sessionStorage|indexedDB|download|Blob\(/, "secrets are never stored or exported");
+  const importFn = members.slice(members.indexOf("async function importMembersCsv"), members.indexOf("async function init()"));
+  assert.doesNotMatch(importFn, /temporary_password|activation_link/, "the import never handles secrets");
+});
+
+test("expired or invalid activation links are explained on the password page", () => {
+  const context = loadCommonHelpers();
+  const at = (hash, search = "") => context.authLinkError({ hash, search });
+  assert.equal(at(""), null);
+  assert.equal(at("#access_token=x&type=recovery"), null);
+  assert.match(at("#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid"), /expiré ou a déjà été utilisé/);
+  assert.match(at("", "?error=server_error"), /n’est pas valide/);
+  assert.doesNotMatch(at("#error=x&error_description=<script>"), /script/, "URL text is never echoed");
+  assert.match(read("js/change-password.js"), /const linkError=authLinkError\(\);[\s\S]*history\.replaceState/);
 });

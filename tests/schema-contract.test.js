@@ -1,8 +1,8 @@
 // D3: browser queries must use the LIVE production column names. The column
 // lists below come from the schema-only dump of qwlbbfyhjdeekmrxtzjf taken on
-// 2026-10-15 (no data). Older SQL files in supabase/ (payments.sql,
-// fix_existing_installation.sql) describe events.name / event_payments.paid,
-// which do NOT exist in production.
+// 2026-10-15 (no data). The archived scripts in
+// supabase/obsolete_migrations/legacy_scripts/ describe events.name /
+// event_payments.paid, which do NOT exist in production.
 const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
@@ -64,4 +64,14 @@ test("event payment status changes go through the RPC (amount is set server-side
   const payments = source("admin-payments.js");
   assert.match(payments, /rpc\("set_event_payment_status"/);
   for (const { chain } of chains("event_payments")) assert.doesNotMatch(chain, /\.(insert|update|upsert)\(/);
+});
+
+test("no runnable SQL script outside migrations defines events.name or event_payments.paid", () => {
+  const dir = path.join(root, "supabase");
+  for (const file of fs.readdirSync(dir).filter(f => f.endsWith(".sql"))) {
+    const sql = fs.readFileSync(path.join(dir, file), "utf8");
+    assert.doesNotMatch(sql, /create table[^;]*public\.events\s*\([^;]*\bname text\b/i, file);
+    assert.doesNotMatch(sql, /\bpaid boolean\b/i, file);
+  }
+  assert.ok(fs.existsSync(path.join(dir, "obsolete_migrations", "legacy_scripts", "README.md")));
 });

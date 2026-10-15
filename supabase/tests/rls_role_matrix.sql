@@ -28,6 +28,13 @@ begin
     when 'treasurer'  then '00000000-0000-4000-8000-0000000000a3'
     when 'member'     then '00000000-0000-4000-8000-0000000000a4'
     when 'legacy'     then '00000000-0000-4000-8000-0000000000a6'
+    when 'newmember'  then '00000000-0000-4000-8000-0000000000a7'
+    when 'off_admin'  then '00000000-0000-4000-8000-0000000000a8'
+    when 'off_treasurer' then '00000000-0000-4000-8000-0000000000a9'
+    when 'off_superadmin' then '00000000-0000-4000-8000-0000000000aa'
+    when 'off_member' then '00000000-0000-4000-8000-0000000000ab'
+    when 'no_role'    then '00000000-0000-4000-8000-0000000000ac'
+    when 'ghost'      then '00000000-0000-4000-8000-0000000000ad'
     else null end;
 
   if p_who = 'anon' then
@@ -74,15 +81,35 @@ insert into public.user_roles (user_id, role) values
   ('00000000-0000-4000-8000-0000000000a1', 'SUPERADMIN'),
   ('00000000-0000-4000-8000-0000000000a2', 'ADMIN'),
   ('00000000-0000-4000-8000-0000000000a3', 'TREASURER');
-update public.profiles set must_change_password = true where id = '00000000-0000-4000-8000-0000000000a4';
+-- Extra identities for account-state tests.
+insert into auth.users (id, instance_id, aud, role, email, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
+select ('00000000-0000-4000-8000-0000000000' || x)::uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+       'rls-' || x || '@test.invalid', '{"display_name":"RLS"}', '{}', now(), now()
+from unnest(array['a7', 'a8', 'a9', 'aa', 'ab', 'ac']) x;
+delete from public.user_roles where user_id in ('00000000-0000-4000-8000-0000000000a8', '00000000-0000-4000-8000-0000000000a9', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000ac');
+insert into public.user_roles (user_id, role) values
+  ('00000000-0000-4000-8000-0000000000a8', 'ADMIN'), ('00000000-0000-4000-8000-0000000000a9', 'TREASURER'), ('00000000-0000-4000-8000-0000000000aa', 'SUPERADMIN');
+
+-- handle_new_user flags every new account. The main fixtures have completed their
+-- first login; 'newmember' (a7) has not. a8-ab are deactivated; ac has no role;
+-- 'ghost' (ad) has a JWT subject but no account at all.
+update public.profiles set must_change_password = false
+where id in ('00000000-0000-4000-8000-0000000000a1', '00000000-0000-4000-8000-0000000000a2', '00000000-0000-4000-8000-0000000000a3', '00000000-0000-4000-8000-0000000000a4', '00000000-0000-4000-8000-0000000000a8', '00000000-0000-4000-8000-0000000000a9', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000ab', '00000000-0000-4000-8000-0000000000ac');
+update public.profiles set is_active = false where id in ('00000000-0000-4000-8000-0000000000a8', '00000000-0000-4000-8000-0000000000a9', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000ab');
 
 insert into public.subscribers (id, user_id, nom, prenom, login_name, gender, status, card_paid) values
   ('00000000-0000-4000-8000-0000000000b4', '00000000-0000-4000-8000-0000000000a4', 'Membre', 'Test', 'RLSMEMBER', 'MALE', 'ACTIVE', false),
   ('00000000-0000-4000-8000-0000000000b5', null, 'Autre', 'Membre', 'RLSOTHER', 'FEMALE', 'ACTIVE', false),
-  ('00000000-0000-4000-8000-0000000000b3', '00000000-0000-4000-8000-0000000000a3', 'Tresorier', 'Membre', 'RLSTREAS', 'MALE', 'ACTIVE', false);
+  ('00000000-0000-4000-8000-0000000000b3', '00000000-0000-4000-8000-0000000000a3', 'Tresorier', 'Membre', 'RLSTREAS', 'MALE', 'ACTIVE', false),
+  ('00000000-0000-4000-8000-0000000000b7', '00000000-0000-4000-8000-0000000000a7', 'Nouveau', 'Membre', 'RLSNEW', 'MALE', 'ACTIVE', false),
+  ('00000000-0000-4000-8000-0000000000bb', '00000000-0000-4000-8000-0000000000ab', 'Inactif', 'Membre', 'RLSOFF', 'FEMALE', 'ACTIVE', false);
 -- Synthetic protected identity values (never real data).
-update public.subscribers set cin = '0000000' || right(id::text, 1), adresse = 'Rue Fictive', date_naissance = date '2000-01-01', notes = 'note'
+update public.subscribers set cin = '0000000' || right(id::text, 1), adresse = 'Rue Fictive', date_naissance = date '2000-01-01', notes = 'note',
+       phone = '+216 00 000 00' || right(id::text, 1), email = 'test.member00' || right(id::text, 1) || '@example.invalid'
 where id in ('00000000-0000-4000-8000-0000000000b4', '00000000-0000-4000-8000-0000000000b5', '00000000-0000-4000-8000-0000000000b3');
+update public.profiles set phone = '+216 00 000 099' where id = '00000000-0000-4000-8000-0000000000a2';
+insert into public.audit_logs (user_id, action, ip_address) values ('00000000-0000-4000-8000-0000000000a1', 'RLS_FIXTURE', '192.0.2.1');
+insert into public.notifications (user_id, title, message) values ('00000000-0000-4000-8000-0000000000ab', 'RLS', 'fixture');
 
 -- Production has one settings row; an empty schema-only test database has none.
 insert into public.site_settings (site_name) select 'UE Clubiste' where not exists (select 1 from public.site_settings);
@@ -126,6 +153,9 @@ select pg_temp.t('update site settings',    'superadmin', $q$update public.site_
 select pg_temp.t('mark treasurer own card (authorizes)', 'superadmin', $q$select public.set_card_payment_status('00000000-0000-4000-8000-0000000000b3', true)$q$, 'allow');
 select pg_temp.t('private fields RPC (one member)', 'superadmin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5') where cin is not null$q$, 'allow');
 select pg_temp.t('private fields RPC (all members)', 'superadmin', $q$select * from public.get_member_private_fields() where cin is not null$q$, 'allow');
+select pg_temp.t('member contact via RPC', 'superadmin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5') where phone is not null and email is not null$q$, 'allow');
+select pg_temp.t('all account contacts',    'superadmin', $q$select * from public.get_account_contacts() where user_id = '00000000-0000-4000-8000-0000000000a2' and phone is not null$q$, 'allow');
+select pg_temp.t('direct staff email read (RPC only)', 'superadmin', $q$select email from public.profiles$q$, 'deny');
 select pg_temp.t('direct CIN column read (RPC only)', 'superadmin', $q$select cin from public.subscribers$q$, 'deny');
 select pg_temp.t('correct a member CIN',    'superadmin', $q$update public.subscribers set cin = '00000009' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
 select pg_temp.t('upload match logo',       'superadmin', $q$insert into storage.objects (bucket_id, name) values ('match-logos', 'rls/sa.png')$q$, 'allow');
@@ -143,7 +173,24 @@ select pg_temp.t('filter members by CIN',   'admin', $q$select id from public.su
 select pg_temp.t('CIN via member-card view','admin', $q$select cin from public.v_member_cards$q$, 'deny');
 select pg_temp.t('private fields RPC (other member)', 'admin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5')$q$, 'deny');
 select pg_temp.t('private fields RPC (all members)',  'admin', $q$select * from public.get_member_private_fields()$q$, 'deny');
-select pg_temp.t('read allowed member fields', 'admin', $q$select nom, prenom, numero_abonnement, phone, email, gender, status, card_paid from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
+select pg_temp.t('read allowed member fields', 'admin', $q$select nom, prenom, numero_abonnement, gender, status, card_paid, faculty_id, zone_id, photo_url from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
+select pg_temp.t('read member phone',       'admin', $q$select phone from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
+select pg_temp.t('read member email',       'admin', $q$select email from public.subscribers$q$, 'deny');
+select pg_temp.t('filter members by phone', 'admin', $q$select id from public.subscribers where phone like '+216%'$q$, 'deny');
+select pg_temp.t('order members by email',  'admin', $q$select id from public.subscribers order by email$q$, 'deny');
+select pg_temp.t('read staff email',        'admin', $q$select email from public.profiles$q$, 'deny');
+select pg_temp.t('read staff phone',        'admin', $q$select phone from public.profiles where id = '00000000-0000-4000-8000-0000000000a2'$q$, 'deny');
+select pg_temp.t('select * on profiles',    'admin', $q$select * from public.profiles$q$, 'deny');
+select pg_temp.t('filter profiles by email','admin', $q$select id from public.profiles where email like 'rls-sa%'$q$, 'deny');
+select pg_temp.t('read staff names / status','admin', $q$select id, display_name, is_active, created_at from public.profiles where id <> '00000000-0000-4000-8000-0000000000a2'$q$, 'allow');
+select pg_temp.t('read audit IP address',   'admin', $q$select ip_address from public.audit_logs$q$, 'deny');
+select pg_temp.t('select * on audit log',   'admin', $q$select * from public.audit_logs$q$, 'deny');
+select pg_temp.t('read audit actions',      'admin', $q$select id, action, created_at from public.audit_logs$q$, 'allow');
+select pg_temp.t('read payment notes',      'admin', $q$select notes, transaction_reference from public.event_payments$q$, 'deny');
+select pg_temp.t('read card payment notes', 'admin', $q$select notes from public.card_payments$q$, 'deny');
+select pg_temp.t('account contacts (others)', 'admin', $q$select * from public.get_account_contacts('00000000-0000-4000-8000-0000000000a1')$q$, 'deny');
+select pg_temp.t('account contacts (all)',  'admin', $q$select * from public.get_account_contacts() where user_id <> '00000000-0000-4000-8000-0000000000a2'$q$, 'deny');
+select pg_temp.t('own account contacts',    'admin', $q$select * from public.get_account_contacts() where phone is not null$q$, 'allow');
 select pg_temp.t('read member-card view (exposes CIN)', 'admin', $q$select nom, prenom from public.v_member_cards$q$, 'deny');
 select pg_temp.t('change a user role',      'admin', $q$update public.user_roles set role = 'SUPERADMIN' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
 select pg_temp.t('delete a user role',      'admin', $q$delete from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
@@ -204,6 +251,12 @@ select pg_temp.t('insert cotisation row',   'treasurer', $q$insert into public.e
 select pg_temp.t('delete cotisation',       'treasurer', $q$delete from public.event_payments$q$, 'deny');
 select pg_temp.t('grant self SUPERADMIN',   'treasurer', $q$insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000a3', 'SUPERADMIN')$q$, 'deny');
 select pg_temp.t('update site settings',    'treasurer', $q$update public.site_settings set site_name = 'X'$q$, 'deny');
+select pg_temp.t('read member phone',       'treasurer', $q$select phone from public.subscribers$q$, 'deny');
+select pg_temp.t('read staff email',        'treasurer', $q$select email from public.profiles$q$, 'deny');
+select pg_temp.t('payment list has no contact data', 'treasurer', $q$select phone from public.list_payment_members()$q$, 'deny');
+select pg_temp.t('account contacts (others)', 'treasurer', $q$select * from public.get_account_contacts('00000000-0000-4000-8000-0000000000a1')$q$, 'deny');
+select pg_temp.t('read payment notes',      'treasurer', $q$select notes from public.event_payments$q$, 'deny');
+select pg_temp.t('read audit log',          'treasurer', $q$select id from public.audit_logs$q$, 'deny');
 select pg_temp.t('private fields RPC (other member)', 'treasurer', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5')$q$, 'deny');
 select pg_temp.t('edit event title',        'treasurer', $q$update public.events set title = 'X' where id = '00000000-0000-4000-8000-0000000000c1'$q$, 'deny');
 select pg_temp.t('edit event active flag',  'treasurer', $q$update public.events set is_active = false where id = '00000000-0000-4000-8000-0000000000c1'$q$, 'deny');
@@ -253,21 +306,103 @@ select pg_temp.t('edit own CIN',            'member', $q$update public.subscribe
 select pg_temp.t('delete own MEMBER role',  'member', $q$delete from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
 select pg_temp.t('choose seat on past match', 'member', $q$select public.set_match_participation('00000000-0000-4000-8000-0000000000d2', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d2' and zone_key = 'ENCEINTE_SUP'))$q$, 'deny');
 select pg_temp.t('remove seat after kick-off', 'member', $q$select public.remove_match_participation('00000000-0000-4000-8000-0000000000d2')$q$, 'deny');
-select pg_temp.t('clear own password flag (table)', 'member', $q$update public.profiles set must_change_password = false where id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
-select pg_temp.t('complete password change before changing it', 'member', $q$select public.complete_password_change()$q$, 'deny');
+select pg_temp.t('own contact via RPC',     'member', $q$select * from public.get_member_private_fields() where phone is not null and email is not null$q$, 'allow');
+select pg_temp.t('own phone via table (RPC only)', 'member', $q$select phone from public.subscribers where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('own account contacts',    'member', $q$select * from public.get_account_contacts()$q$, 'allow');
+select pg_temp.t('other account contacts',  'member', $q$select * from public.get_account_contacts('00000000-0000-4000-8000-0000000000a2')$q$, 'deny');
+select pg_temp.t('clear own password flag (table)', 'newmember', $q$update public.profiles set must_change_password = false where id = '00000000-0000-4000-8000-0000000000a7'$q$, 'deny');
+
+-- ---------------- FIRST LOGIN (must_change_password) ----------------
+select pg_temp.t('read own profile',        'newmember', $q$select 1 from public.profiles where id = '00000000-0000-4000-8000-0000000000a7' and must_change_password$q$, 'allow');
+select pg_temp.t('read own roles',          'newmember', $q$select 1 from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a7'$q$, 'allow');
+select pg_temp.t('read own member row before changing password', 'newmember', $q$select 1 from public.subscribers where user_id = '00000000-0000-4000-8000-0000000000a7'$q$, 'deny');
+select pg_temp.t('choose seat before changing password', 'newmember', $q$select public.set_match_participation('00000000-0000-4000-8000-0000000000d1', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE'))$q$, 'deny');
+select pg_temp.t('own private fields before changing password', 'newmember', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('complete password change before changing it', 'newmember', $q$select public.complete_password_change()$q$, 'deny');
 select pg_temp.t('legacy account: complete without changing', 'legacy', $q$select public.complete_password_change()$q$, 'deny');
 select pg_temp.t('call password digest helper', 'member', $q$select private.password_digest('00000000-0000-4000-8000-0000000000a4')$q$, 'deny');
 select pg_temp.t('read password marks table', 'superadmin', $q$select 1 from private.password_change_marks$q$, 'deny');
 
 -- What Supabase Auth does on a successful password update (as postgres, outside any JWT).
-update auth.users set encrypted_password = 'rls-new-hash-' || gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000a4';
+update auth.users set encrypted_password = 'rls-new-hash-' || gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000a7';
 
-select pg_temp.t('complete password change after changing it', 'member', $q$select public.complete_password_change()$q$, 'allow');
+-- Temporary access older than its expiry cannot be completed.
+update private.password_change_marks set expires_at = now() - interval '1 minute' where user_id = '00000000-0000-4000-8000-0000000000a7';
+select pg_temp.t('complete after temporary access expired', 'newmember', $q$select public.complete_password_change()$q$, 'deny');
+
+-- SUPERADMIN re-issues access (what admin-reset-password does: new password, then flag).
+update auth.users set encrypted_password = 'rls-reissued-hash-' || gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000a7';
+update public.profiles set must_change_password = true where id = '00000000-0000-4000-8000-0000000000a7';
+select pg_temp.t('complete with re-issued access unchanged', 'newmember', $q$select public.complete_password_change()$q$, 'deny');
+update auth.users set encrypted_password = 'rls-member-chosen-' || gen_random_uuid() where id = '00000000-0000-4000-8000-0000000000a7';
+
+select pg_temp.t('complete password change after changing it', 'newmember', $q$select public.complete_password_change()$q$, 'allow');
+select pg_temp.t('read own member row after changing password', 'newmember', $q$select 1 from public.subscribers where user_id = '00000000-0000-4000-8000-0000000000a7'$q$, 'allow');
+
+-- ---------------- DEACTIVATED ACCOUNTS (session still valid) ----------------
+select pg_temp.t('read own profile (UI can detect state)', 'off_admin', $q$select 1 from public.profiles where id = '00000000-0000-4000-8000-0000000000a8' and not is_active$q$, 'allow');
+select pg_temp.t('read own roles',          'off_admin', $q$select 1 from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a8'$q$, 'deny');
+select pg_temp.t('read members',            'off_admin', $q$select id from public.subscribers$q$, 'deny');
+select pg_temp.t('read events',             'off_admin', $q$select 1 from public.events$q$, 'deny');
+select pg_temp.t('read cotisations',        'off_admin', $q$select id from public.event_payments$q$, 'deny');
+select pg_temp.t('read audit log',          'off_admin', $q$select id from public.audit_logs$q$, 'deny');
+select pg_temp.t('read seat choices',       'off_admin', $q$select 1 from public.match_participations$q$, 'deny');
+select pg_temp.t('read other profiles',     'off_admin', $q$select 1 from public.profiles where id <> '00000000-0000-4000-8000-0000000000a8'$q$, 'deny');
+select pg_temp.t('read others roles',       'off_admin', $q$select 1 from public.user_roles$q$, 'deny');
+select pg_temp.t('read member photos',      'off_admin', $q$select 1 from storage.objects where bucket_id = 'subscriber-photos'$q$, 'deny');
+select pg_temp.t('payment member list',     'off_admin', $q$select * from public.list_payment_members()$q$, 'deny');
+select pg_temp.t('read reference data',     'off_admin', $q$select 1 from public.faculties$q$, 'deny');
+select pg_temp.t('payment member list',     'off_treasurer', $q$select * from public.list_payment_members()$q$, 'deny');
+select pg_temp.t('mark card paid (RPC)',    'off_treasurer', $q$select public.set_card_payment_status('00000000-0000-4000-8000-0000000000b5', true)$q$, 'deny');
+select pg_temp.t('mark cotisation (RPC)',   'off_treasurer', $q$select public.set_event_payment_status('00000000-0000-4000-8000-0000000000c1', '00000000-0000-4000-8000-0000000000b5', true)$q$, 'deny');
+select pg_temp.t('read events',             'off_treasurer', $q$select 1 from public.events$q$, 'deny');
+select pg_temp.t('read members',            'off_superadmin', $q$select id from public.subscribers$q$, 'deny');
+select pg_temp.t('create event',            'off_superadmin', $q$insert into public.events (title, amount) values ('OFF event', 5)$q$, 'deny');
+select pg_temp.t('edit member',             'off_superadmin', $q$update public.subscribers set nom = 'X' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
+select pg_temp.t('grant a role',            'off_superadmin', $q$insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000ac', 'ADMIN')$q$, 'deny');
+select pg_temp.t('reactivate self',         'off_superadmin', $q$update public.profiles set is_active = true where id = '00000000-0000-4000-8000-0000000000aa'$q$, 'deny');
+select pg_temp.t('card payment RPC',        'off_superadmin', $q$select public.set_card_payment_status('00000000-0000-4000-8000-0000000000b5', true)$q$, 'deny');
+select pg_temp.t('private fields RPC',      'off_superadmin', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('account contacts',        'off_superadmin', $q$select * from public.get_account_contacts()$q$, 'deny');
+select pg_temp.t('upload match logo',       'off_superadmin', $q$insert into storage.objects (bucket_id, name) values ('match-logos', 'rls/off.png')$q$, 'deny');
+select pg_temp.t('read own member row',     'off_member', $q$select 1 from public.subscribers where user_id = '00000000-0000-4000-8000-0000000000ab'$q$, 'deny');
+select pg_temp.t('edit own phone',          'off_member', $q$update public.subscribers set phone = '1' where user_id = '00000000-0000-4000-8000-0000000000ab'$q$, 'deny');
+select pg_temp.t('own private fields',      'off_member', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('choose seat (RPC)',       'off_member', $q$select public.set_match_participation('00000000-0000-4000-8000-0000000000d1', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE'))$q$, 'deny');
+select pg_temp.t('upload own photo',        'off_member', $q$insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'RLSOFF/p.jpg')$q$, 'deny');
+select pg_temp.t('read own notifications',  'off_member', $q$select 1 from public.notifications$q$, 'deny');
+select pg_temp.t('complete password change','off_member', $q$select public.complete_password_change()$q$, 'deny');
+
+-- Reactivation takes effect immediately, without a new session.
+update public.profiles set is_active = true where id = '00000000-0000-4000-8000-0000000000a8';
+select pg_temp.t('read members after reactivation', 'off_admin', $q$select id from public.subscribers$q$, 'allow');
+update public.profiles set is_active = false where id = '00000000-0000-4000-8000-0000000000a8';
+select pg_temp.t('read members after deactivation', 'off_admin', $q$select id from public.subscribers$q$, 'deny');
+
+-- ---------------- ROLES REMOVED / UNKNOWN IDENTITY ----------------
+select pg_temp.t('read members',            'no_role', $q$select id from public.subscribers$q$, 'deny');
+select pg_temp.t('read events',             'no_role', $q$select 1 from public.events$q$, 'deny');
+select pg_temp.t('read audit log',          'no_role', $q$select id from public.audit_logs$q$, 'deny');
+select pg_temp.t('payment member list',     'no_role', $q$select * from public.list_payment_members()$q$, 'deny');
+delete from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a2';
+select pg_temp.t('read members after role removal (same session)', 'admin', $q$select id from public.subscribers$q$, 'deny');
+select pg_temp.t('read audit log after role removal', 'admin', $q$select id from public.audit_logs$q$, 'deny');
+insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000a2', 'ADMIN');
+select pg_temp.t('read members after role restored', 'admin', $q$select id from public.subscribers$q$, 'allow');
+select pg_temp.t('read reference data',     'ghost', $q$select 1 from public.faculties$q$, 'deny');
+select pg_temp.t('read members',            'ghost', $q$select id from public.subscribers$q$, 'deny');
+select pg_temp.t('own private fields',      'ghost', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('account contacts',        'ghost', $q$select * from public.get_account_contacts()$q$, 'deny');
+select pg_temp.t('complete password change','ghost', $q$select public.complete_password_change()$q$, 'deny');
+select pg_temp.t('choose seat (RPC)',       'ghost', $q$select public.set_match_participation('00000000-0000-4000-8000-0000000000d1', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE'))$q$, 'deny');
+select pg_temp.t('read reference data',     'anon', $q$select 1 from public.faculties$q$, 'deny');
+select pg_temp.t('private fields RPC',      'anon', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('account contacts',        'anon', $q$select * from public.get_account_contacts()$q$, 'deny');
 
 -- Postconditions (checked as postgres)
 insert into rls_results (test, passed, detail)
-select 'POST: member password flag cleared', not must_change_password, must_change_password::text
-from public.profiles where id = '00000000-0000-4000-8000-0000000000a4';
+select 'POST: new member password flag cleared', not must_change_password, must_change_password::text
+from public.profiles where id = '00000000-0000-4000-8000-0000000000a7';
 
 insert into rls_results (test, passed, detail)
 select 'POST: treasurer cotisation stored as PENDING with server amount',
@@ -297,7 +432,7 @@ from information_schema.role_table_grants where table_schema = 'public' and gran
 
 insert into rls_results (test, passed, detail)
 select 'POST: password mark removed after verified change', count(*) = 0, count(*)::text
-from private.password_change_marks where user_id = '00000000-0000-4000-8000-0000000000a4';
+from private.password_change_marks where user_id = '00000000-0000-4000-8000-0000000000a7';
 
 insert into rls_results (test, passed, detail)
 select 'POST: legacy flagged account still flagged', must_change_password, must_change_password::text
@@ -327,3 +462,19 @@ select 'POST: authenticated cannot select protected columns',
          or has_column_privilege('authenticated', 'public.subscribers', 'date_naissance', 'SELECT')
          or has_column_privilege('authenticated', 'public.subscribers', 'notes', 'SELECT')
          or has_column_privilege('authenticated', 'public.v_member_cards', 'cin', 'SELECT')), '';
+
+insert into rls_results (test, passed, detail)
+select 'POST: deactivated superadmin did not reactivate', not is_active, is_active::text
+from public.profiles where id = '00000000-0000-4000-8000-0000000000aa';
+
+insert into rls_results (test, passed, detail)
+select 'POST: no contact / audit-IP / payment-note column selectable by authenticated',
+       not (has_column_privilege('authenticated', 'public.subscribers', 'phone', 'SELECT')
+         or has_column_privilege('authenticated', 'public.subscribers', 'email', 'SELECT')
+         or has_column_privilege('authenticated', 'public.profiles', 'email', 'SELECT')
+         or has_column_privilege('authenticated', 'public.profiles', 'phone', 'SELECT')
+         or has_column_privilege('authenticated', 'public.audit_logs', 'ip_address', 'SELECT')
+         or has_column_privilege('authenticated', 'public.event_payments', 'notes', 'SELECT')
+         or has_column_privilege('authenticated', 'public.event_payments', 'transaction_reference', 'SELECT')
+         or has_column_privilege('authenticated', 'public.card_payments', 'notes', 'SELECT')
+         or has_column_privilege('authenticated', 'public.card_payments', 'transaction_reference', 'SELECT')), '';

@@ -82,9 +82,9 @@ async function loadRefs() {
     (zonesResult.data || []).map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join("");
 }
 
-// Columns any staff reader may select. CIN, address, date of birth and notes are
-// withheld by the database (column privileges); "*" would be refused.
-const MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,email,phone,gender,photo_url," +
+// Columns any staff reader may select. CIN, address, date of birth, notes, phone
+// and email are withheld by the database (column privileges); "*" is refused.
+const MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,gender,photo_url," +
   "faculty_id,zone_id,status,card_paid,card_paid_at,subscription_start,subscription_end,created_at,updated_at," +
   "faculties(name),zones(name)";
 
@@ -94,7 +94,7 @@ function columnCount() {
 }
 
 // SUPERADMIN / ADMIN read member records without protected identity fields.
-// SUPERADMIN additionally loads CIN / address / date of birth through
+// SUPERADMIN additionally loads CIN / address / date of birth / phone / email through
 // get_member_private_fields(). TREASURER receives only identification + payment
 // fields from list_payment_members() — the database refuses anything more.
 async function loadSubs() {
@@ -115,7 +115,12 @@ async function loadSubs() {
   allSubs = (result.data || []).map(s => canViewDetails
     ? {
         ...s,
-        ...(canViewIdentity ? { cin: privateById.get(s.id)?.cin ?? null, adresse: privateById.get(s.id)?.adresse ?? null } : {}),
+        ...(canViewIdentity ? {
+          cin: privateById.get(s.id)?.cin ?? null,
+          adresse: privateById.get(s.id)?.adresse ?? null,
+          phone: privateById.get(s.id)?.phone ?? null,
+          email: privateById.get(s.id)?.email ?? null
+        } : {}),
         is_self: Boolean(s.user_id) && s.user_id === currentCtx?.user?.id
       }
     : { ...s, faculties: s.faculty_name ? { name: s.faculty_name } : null });
@@ -192,7 +197,7 @@ async function render() {
       ${canViewIdentity ? `<td>${escapeHtml(s.cin || "—")}</td>` : ""}
       <td>${escapeHtml(facultyShort(s.faculties?.name) || "—")}</td>
       ${canViewDetails ? `<td>${escapeHtml(s.zones?.name || "—")}</td>` : ""}
-      <td>${statusBadge(s.status)}</td>
+      <td>${statusBadge(s.status)}${s.user_id ? "" : ' <span class="status-badge warning" title="Aucun compte de connexion : activation requise">Non activé</span>'}</td>
       <td>
         ${cardLabel(s)}
         ${canMarkCard && !canToggleCardOf(s) ? `<span class="muted-text" title="Votre propre carte doit être validée par un super administrateur.">🔒</span>` : ""}
@@ -202,7 +207,9 @@ async function render() {
         <button class="icon-btn" aria-label="Voir la carte membre de ${escapeHtml(`${s.prenom || ""} ${s.nom || ""}`.trim())}" title="Voir la carte membre" onclick="showMemberCard('${s.id}')">▣</button>
         ${canManageMembers ? `<button class="icon-btn" aria-label="Modifier ${escapeHtml(s.nom || "le membre")}" title="Modifier" onclick="editSub('${s.id}')">${ICONS.edit}</button>
         <button class="icon-btn" aria-label="${s.status === "ACTIVE" ? "Désactiver" : "Activer"} ${escapeHtml(s.nom || "le membre")}" title="Activer/Désactiver" onclick="toggleSub('${s.id}')">${s.status === "ACTIVE" ? ICONS.pause : ICONS.play}</button>
-        <button class="icon-btn" aria-label="Réinitialiser le mot de passe" title="Réinitialiser mot de passe" onclick="resetPassword('${s.user_id}')">${ICONS.refresh}</button>
+        ${s.user_id
+          ? `<button class="icon-btn" aria-label="Nouvel accès pour ${escapeHtml(s.nom || "le membre")}" title="Nouvel accès (lien ou mot de passe temporaire)" onclick="resetPassword('${s.user_id}')">${ICONS.refresh}</button>`
+          : `<button class="icon-btn" aria-label="Activer le compte de ${escapeHtml(s.nom || "le membre")}" title="Activer le compte" onclick="activateMember('${s.id}')">${ICONS.play}</button>`}
         <button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(s.nom || "le membre")}" title="Supprimer" onclick="deleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
       </td>
     </tr>
@@ -232,8 +239,8 @@ async function openMemberCard(subscriber) {
       <div class="member-card-grid">
         <div><span>N° abonnement</span><strong>${escapeHtml(user.numero_abonnement || "—")}</strong></div>
         ${canViewDetails ? `${canViewIdentity ? `<div><span>CIN</span><strong>${escapeHtml(user.cin || "—")}</strong></div>` : ""}
-        <div><span>Téléphone</span><strong>${escapeHtml(user.phone || "—")}</strong></div>
-        <div><span>Email</span><strong>${escapeHtml(user.email || "—")}</strong></div>
+        ${canViewIdentity ? `<div><span>Téléphone</span><strong>${escapeHtml(user.phone || "—")}</strong></div>
+        <div><span>Email</span><strong>${escapeHtml(user.email || "—")}</strong></div>` : ""}
         <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>
         <div><span>Zone</span><strong>${escapeHtml(user.zones?.name || "—")}</strong></div>
         <div><span>Sexe</span><strong>${escapeHtml(user.gender === "FEMALE" ? "Femme" : user.gender === "MALE" ? "Homme" : "Non défini")}</strong></div>
@@ -366,54 +373,77 @@ window.toggleCard = async id => {
   showAlert("#pageAlert", nextPaid ? "Carte marquée comme payée." : "Carte marquée comme non payée.");
 };
 
-// Shows a server-generated temporary password exactly once. It is not stored in
-// the page and the member must replace it at first login (verified server-side).
-async function showTemporaryPassword(title, password) {
+// Shows a single-use activation link or a temporary password exactly once. It is
+// not stored in the page; the member must set their own password at first login
+// (verified by the database).
+async function showAccess(title, result) {
+  const secret = result.activation_link || result.temporary_password;
+  const isLink = Boolean(result.activation_link);
+  const explanation = isLink
+    ? "Envoyez ce lien au membre par un canal sûr. Il ne fonctionne qu’une fois et expire (durée définie dans Supabase Auth). Il ne sera plus affiché."
+    : "Remettez ce mot de passe temporaire au membre par un canal sûr. Il expire après 7 jours et ne sera plus affiché.";
   if (window.Swal) {
     await Swal.fire({
       ...swalBase(),
       title,
-      html: `<p>Remettez ce mot de passe temporaire au membre par un canal sûr. Il ne sera plus affiché.</p>
-        <p><code class="temp-password">${escapeHtml(password)}</code></p>
-        <p class="hint">Le membre devra le remplacer à sa première connexion.</p>`,
+      html: `<p>${escapeHtml(explanation)}</p>
+        <p><code class="temp-password">${escapeHtml(secret)}</code></p>
+        <p class="hint">Le membre choisira son propre mot de passe à la première connexion.</p>`,
       icon: "success",
       showDenyButton: Boolean(navigator.clipboard),
       denyButtonText: "Copier",
       confirmButtonText: "Terminé",
-      preDeny: async () => { await navigator.clipboard.writeText(password); return false; }
+      preDeny: async () => { await navigator.clipboard.writeText(secret); return false; }
     });
   } else {
-    window.prompt(`${title} — mot de passe temporaire (affiché une seule fois) :`, password);
+    window.prompt(`${title} — ${isLink ? "lien d’activation" : "mot de passe temporaire"} (affiché une seule fois) :`, secret);
   }
 }
 
-// Activation / reset: the Edge Function generates a random temporary password
-// (never derived from member data) and flags the account for a first-login change.
-window.resetPassword = async userId => {
-  if (!canManageMembers || !userId) return;
-  if (!(await confirmDialog("Générer un nouveau mot de passe temporaire pour ce membre ? L’ancien ne fonctionnera plus.", { confirmText: "Générer", icon: "question" }))) return;
-
+async function callAdminFunction(name, payload) {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) return showAlert("#pageAlert", "Session administrateur expirée.", "error");
-
-  const response = await fetch(`${UE_CONFIG.SUPABASE_URL}/functions/v1/admin-reset-password`, {
+  if (!session) return { ok: false, status: 401, result: { error: "Session administrateur expirée." } };
+  const response = await fetch(`${UE_CONFIG.SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${session.access_token}`,
       apikey: UE_CONFIG.SUPABASE_ANON_KEY,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ user_id: userId, generate: true })
+    body: JSON.stringify(payload)
   });
-
   let result = {};
   try { result = await response.json(); } catch (_) {}
+  return { ok: response.ok, status: response.status, result };
+}
 
-  if (!response.ok || !result.temporary_password) {
-    return showAlert("#pageAlert", result.error || "Réinitialisation impossible.", "error");
+// Prefer a single-use recovery link; fall back to a temporary password only if
+// links are not configured and the SUPERADMIN confirms.
+async function issueAccess(functionName, payload, title) {
+  let call = await callAdminFunction(functionName, { ...payload, method: "link" });
+  if (!call.ok && call.result.code === "link_unavailable") {
+    const fallback = await confirmDialog("Les liens d’activation ne sont pas configurés. Générer plutôt un mot de passe temporaire (affiché une seule fois) ?", { confirmText: "Mot de passe temporaire", icon: "question" });
+    if (!fallback) return false;
+    call = await callAdminFunction(functionName, functionName === "admin-reset-password" ? { ...payload, generate: true } : { ...payload, method: "temporary_password" });
   }
+  if (!call.ok || !(call.result.activation_link || call.result.temporary_password)) {
+    showAlert("#pageAlert", call.result.error || "Opération impossible.", "error");
+    return false;
+  }
+  await showAccess(title, call.result);
+  return true;
+}
 
-  await showTemporaryPassword("Mot de passe réinitialisé", result.temporary_password);
+window.activateMember = async subscriberId => {
+  if (!canManageMembers || !subscriberId) return;
+  if (!(await confirmDialog("Créer le compte de connexion de ce membre et générer son accès ?", { confirmText: "Activer", icon: "question" }))) return;
+  if (await issueAccess("admin-activate-member", { subscriber_id: subscriberId }, "Compte activé")) await loadSubs();
+};
+
+window.resetPassword = async userId => {
+  if (!canManageMembers || !userId) return;
+  if (!(await confirmDialog("Générer un nouvel accès pour ce membre ? Il devra choisir un nouveau mot de passe.", { confirmText: "Générer", icon: "question" }))) return;
+  await issueAccess("admin-reset-password", { user_id: userId }, "Nouvel accès généré");
 };
 
 window.deleteSub = async id => {
@@ -565,7 +595,8 @@ async function importMembersCsv(file) {
     const metric = value => Number.isFinite(Number(value)) ? String(Number(value)) : "Non communiqué";
     const report = [
       ["Lignes", rows.length],
-      ["Nouveaux membres (à activer)", metric(result.created)],
+      ["Nouveaux membres", metric(result.created)],
+      ["Comptes à activer", metric(result.pending_activation)],
       ["Membres mis à jour", metric(result.updated)],
       ["Échecs d’écriture", metric(result.failed)],
       ["Avec numéro d’abonnement", withSubscription],
@@ -709,8 +740,12 @@ $("#subscriberForm").addEventListener("submit", async e => {
     try { result = await response.json(); } catch (_) {}
 
     if (!response.ok) return showAlert("#pageAlert", result.error || "Création impossible.", "error");
-    showAlert("#pageAlert", "Abonné créé avec succès.");
-    if (result.temporary_password) await showTemporaryPassword("Compte membre créé", result.temporary_password);
+    if (result.activated) {
+      showAlert("#pageAlert", "Abonné créé et compte activé.");
+      await showAccess("Compte membre créé", result);
+    } else {
+      showAlert("#pageAlert", `Abonné créé, compte non activé : ${result.activation_error || "activez-le depuis la liste."}`, "error");
+    }
   }
 
   $("#modal").classList.add("hidden");

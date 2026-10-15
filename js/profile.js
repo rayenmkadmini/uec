@@ -44,17 +44,21 @@ async function renderProfile() {
 async function loadProfile() {
     const { data, error } = await sb
         .from("profiles")
-        .select("id,email,display_name,nom,prenom,phone,avatar_url")
+        .select("id,display_name,nom,prenom,avatar_url")
         .eq("id", profileCtx.user.id)
         .maybeSingle();
+    // Own email / phone come from get_account_contacts(): the columns are not
+    // selectable through the table API.
+    const contacts = data ? await sb.rpc("get_account_contacts") : { data: [], error: null };
 
-    if (error || !data) {
+    if (error || !data || contacts.error) {
         $("#profileHeading").textContent = "Profil indisponible";
         showAlert("#pageAlert", error?.message || "Votre profil est introuvable. Contactez un super administrateur.", "error");
         return false;
     }
 
-    profileRow = data;
+    const own = (contacts.data || [])[0] || {};
+    profileRow = { ...data, email: own.email ?? null, phone: own.phone ?? null };
     await renderProfile();
     return true;
 }
@@ -105,12 +109,12 @@ async function saveProfile(event) {
                 avatar_url: avatarUrl
             })
             .eq("id", profileCtx.user.id)
-            .select("id,email,display_name,nom,prenom,phone,avatar_url");
+            .select("id,display_name,nom,prenom,avatar_url");
 
         const failure = writeError(result);
         if (failure) throw new Error(failure);
 
-        profileRow = result.data[0];
+        profileRow = { ...result.data[0], email: profileRow.email, phone: $("#pPhone").value.trim() || null };
         profileCtx.profile.display_name = profileRow.display_name;
         setEditing(false);
         await renderProfile();

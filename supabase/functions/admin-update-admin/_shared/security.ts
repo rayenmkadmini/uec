@@ -80,7 +80,7 @@ export async function requireSuperAdmin(req: Request) {
   if (error || !user) throw new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders(req) });
 
   const [{ data: profile, error: profileError }, { data: rolesData, error: rolesError }] = await Promise.all([
-    admin.from("profiles").select("id,is_active").eq("id", user.id).maybeSingle(),
+    admin.from("profiles").select("id,is_active,must_change_password").eq("id", user.id).maybeSingle(),
     readUserRoles(admin, user.id),
   ]);
 
@@ -89,7 +89,8 @@ export async function requireSuperAdmin(req: Request) {
   }
 
   const roles = new Set((rolesData || []).map((row: any) => String(row.role_name || "").toUpperCase()));
-  if (!profile || profile.is_active === false || !roles.has("SUPERADMIN")) {
+  // Same account rule as the database (private.account_ok): active, password re-secured.
+  if (!profile || profile.is_active !== true || profile.must_change_password !== false || !roles.has("SUPERADMIN")) {
     throw new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders(req) });
   }
 

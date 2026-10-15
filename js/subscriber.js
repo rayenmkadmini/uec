@@ -133,9 +133,9 @@ async function loadUpcomingMatches() {
   }).join("");
 }
 
-// CIN, address and date of birth are not selectable through the table API;
-// the member reads their own values through get_member_private_fields().
-const OWN_MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,email,phone,gender,photo_url," +
+// CIN, address, date of birth, phone and email are not selectable through the
+// table API; the member reads their own values through get_member_private_fields().
+const OWN_MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,gender,photo_url," +
   "faculty_id,zone_id,status,card_paid,card_paid_at,faculties(name),zones(name)";
 
 async function withOwnPrivateFields(subscriber) {
@@ -143,7 +143,14 @@ async function withOwnPrivateFields(subscriber) {
   const { data, error } = await sb.rpc("get_member_private_fields", { p_subscriber_id: subscriber.id });
   if (error) return { data: null, error };
   const own = (data || [])[0] || {};
-  return { data: { ...subscriber, cin: own.cin ?? null, adresse: own.adresse ?? null, date_naissance: own.date_naissance ?? null }, error: null };
+  return {
+    data: {
+      ...subscriber,
+      cin: own.cin ?? null, adresse: own.adresse ?? null, date_naissance: own.date_naissance ?? null,
+      phone: own.phone ?? null, email: own.email ?? null
+    },
+    error: null
+  };
 }
 
 (async function init() {
@@ -219,7 +226,10 @@ async function saveMemberProfile() {
   const failure = writeError(result);
   if (failure) { showAlert("#pageAlert",failure,"error"); return; }
   const refreshed = await withOwnPrivateFields(result.data[0]);
-  original = refreshed.data || { ...result.data[0], cin: original.cin, adresse: $("#adresse").value.trim() || null };
+  original = refreshed.data || {
+    ...result.data[0], cin: original.cin, adresse: $("#adresse").value.trim() || null,
+    phone: $("#phone").value.trim() || null, email: email || null
+  };
   if ($("#photoFile")) $("#photoFile").value = "";
   ["phone","email","adresse"].forEach(id => $("#" + id).disabled = true);
   await renderMemberCard(original);

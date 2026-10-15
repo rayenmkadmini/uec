@@ -45,7 +45,7 @@ function renderRoleBadges(roleList) {
 async function loadAdmins() {
   const { data, error } = await sb
     .from("profiles")
-    .select("id,display_name,email,is_active,created_at")
+    .select("id,display_name,is_active,created_at")
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -77,10 +77,20 @@ async function loadAdmins() {
 
   const rolesFor = a => normalizeRoleNames(byUser[a.id] || []);
 
+  // Account emails are withheld from the table API; only SUPERADMIN can read
+  // them, through get_account_contacts(). ADMIN never receives them.
+  const emails = new Map();
+  if (canManageAdmins) {
+    const { data: contacts, error: contactError } = await sb.rpc("get_account_contacts");
+    if (contactError) return showAlert("#pageAlert", "Impossible de charger les adresses des comptes.", "error");
+    for (const contact of contacts || []) emails.set(contact.user_id, contact.email);
+  }
+
   admins = (data || [])
     .filter(a => rolesFor(a).length > 0)
     .map(a => ({
       ...a,
+      email: emails.get(a.id) ?? null,
       roles: rolesFor(a)
     }));
 
@@ -96,7 +106,7 @@ function render() {
     return `
       <tr>
         <td>${escapeHtml(a.display_name || "—")}</td>
-        <td>${escapeHtml(a.email || "—")}</td>
+        <td>${superAdmin ? escapeHtml(a.email || "—") : '<span class="muted-text">Masqué</span>'}</td>
         <td>${renderRoleBadges(a.roles)}</td>
         <td>${statusBadge(a.is_active === false ? "INACTIVE" : "ACTIVE")}</td>
         <td>${escapeHtml(new Date(a.created_at).toLocaleDateString("fr-TN"))}</td>

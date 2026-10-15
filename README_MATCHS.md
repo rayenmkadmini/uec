@@ -16,7 +16,13 @@
 - css/style.css
 - supabase/functions/admin-create-user/index.ts
 
-## Installation
+## Installation (historique)
+
+> **Ne pas exécuter sur le projet existant.** Ces étapes décrivent l'installation
+> d'origine. `supabase/matchs.sql` recrée d'anciennes règles d'accès ; les
+> changements de schéma passent uniquement par `supabase/migrations/` (revus,
+> avec rollback) et un environnement de staging.
+
 1. Ouvrir Supabase > SQL Editor.
 2. Exécuter `supabase/matchs.sql`.
 3. Remplacer les fichiers du projet par ceux du ZIP.

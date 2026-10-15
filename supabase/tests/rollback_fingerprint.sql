@@ -46,6 +46,13 @@ begin
   from pg_class c
   where c.relnamespace = 'private'::regnamespace and c.relkind = 'r';
 
+  insert into fp
+  select p_stage, 'private-table-columns ' || c.relname,
+         md5(string_agg(a.attname || ':' || format_type(a.atttypid, a.atttypmod), ',' order by a.attnum))
+  from pg_class c join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+  where c.relnamespace = 'private'::regnamespace and c.relkind = 'r'
+  group by c.relname;
+
   -- Default privileges
   insert into fp
   select p_stage, 'default-acl ' || defaclrole::regrole::text || ' ' || defaclobjtype::text, md5(pg_temp.acl(defaclacl))

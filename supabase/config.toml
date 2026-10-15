@@ -19,5 +19,8 @@ verify_jwt = true
 
 [functions.admin-reset-password]
 verify_jwt = true
+
+[functions.admin-activate-member]
+verify_jwt = true
 # Edge Function settings only. Database schema SQL is kept under supabase/*.sql.
 

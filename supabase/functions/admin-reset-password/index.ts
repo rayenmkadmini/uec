@@ -1,13 +1,13 @@
 import { requireSuperAdmin, json, options, audit, rateLimit, validateStrongPassword, corsHeaders } from "./_shared/security.ts";
-import { generateTemporaryPassword } from "./_shared/import-utils.mjs";
+import { activationRedirect, resetAccess } from "./_shared/member-lifecycle.mjs";
 
-// SUPERADMIN-only. Sets a new password through the Supabase Auth Admin API
-// (never by SQL) and flags the account for a mandatory change at next login.
-//   { user_id, generate: true }   server generates a random temporary password and
-//                                 returns it ONCE (no-store); used to activate imported
-//                                 accounts and for member resets.
-//   { user_id, new_password }     SUPERADMIN-chosen password (strong-password policy).
-// The password is never logged or written to audit rows.
+// SUPERADMIN-only. Issues new access to an existing account through the Supabase
+// Auth Admin API (never by SQL) and flags it for a mandatory, server-verified
+// password change. Never reactivates a deactivated account.
+//   { user_id, method: "link" }                single-use, expiring recovery link
+//   { user_id, generate: true }                random temporary password, returned once
+//   { user_id, new_password }                  SUPERADMIN-chosen password (strong policy)
+// Secrets are returned with Cache-Control: no-store and never logged or audited.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return options(req);
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
@@ -18,38 +18,25 @@ Deno.serve(async (req) => {
     await rateLimit(ctx.admin, ctx.caller.id, "RESET_PASSWORD", 100, 60);
     const body = await req.json().catch(() => ({}));
     const userId = String(body?.user_id || "");
-    const generate = body?.generate === true;
-    if (!userId) return json(req, { error: "user_id required" }, 400);
+    const method = body?.method === "link" ? "link" : body?.generate === true ? "temporary_password" : "chosen_password";
 
-    const password = generate ? generateTemporaryPassword() : String(body?.new_password || "");
-    if (!generate) {
-      const problem = validateStrongPassword(password);
+    if (method === "chosen_password") {
+      const problem = validateStrongPassword(body?.new_password);
       if (problem) return json(req, { error: problem }, 400);
     }
 
-    const { data: target, error: targetError } = await ctx.admin.from("profiles").select("id,is_active").eq("id", userId).single();
-    if (targetError || !target) return json(req, { error: "Utilisateur introuvable." }, 404);
-
-    const { error } = await ctx.admin.auth.admin.updateUserById(userId, { password });
-    if (error) return json(req, { error: error.message }, 400);
-
-    // Setting the flag also snapshots the new password digest (profiles trigger),
-    // so the member cannot clear it without really changing the password.
-    const { error: profileError } = await ctx.admin.from("profiles").update({ must_change_password: true }).eq("id", userId);
-    if (profileError) {
-      await audit(ctx.admin, ctx.caller.id, "RESET_PASSWORD", userId, false, { generated: generate, error: "profile flag" });
-      return json(req, { error: "Le mot de passe a été réinitialisé, mais le profil n’a pas pu être marqué pour un changement obligatoire." }, 500);
-    }
-
-    await audit(ctx.admin, ctx.caller.id, "RESET_PASSWORD", userId, true, { generated: generate });
-    if (!generate) return json(req, { ok: true });
-    return new Response(JSON.stringify({ ok: true, temporary_password: password }), {
-      status: 200,
+    const result = await resetAccess(
+      { db: ctx.admin, auth: ctx.admin.auth.admin },
+      { userId, method, newPassword: body?.new_password ?? null, redirectTo: activationRedirect(Deno.env.get("PUBLIC_SITE_URL")) },
+    );
+    await audit(ctx.admin, ctx.caller.id, "RESET_PASSWORD", userId || null, result.status === 200, { method, code: result.body.code || "ok" });
+    return new Response(JSON.stringify(result.body), {
+      status: result.status,
       headers: { ...corsHeaders(req), "Cache-Control": "no-store" },
     });
   } catch (e) {
     if (e instanceof Response) return e;
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "RESET_PASSWORD", null, false, { error: "unexpected" });
+    if (ctx) await audit(ctx.admin, ctx.caller.id, "RESET_PASSWORD", null, false, { code: "unexpected" });
     return json(req, { error: e instanceof Error ? e.message : "Erreur inattendue." }, 500);
   }
 });

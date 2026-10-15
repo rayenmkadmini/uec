@@ -1,4 +1,15 @@
 (async()=>{
+  // Activation / recovery links land here. An expired or reused link carries an
+  // error in the URL: explain it instead of silently redirecting to the login page.
+  const linkError=authLinkError();
+  if(linkError){
+    history.replaceState(null,"",location.pathname);
+    const form=$("#changeForm");
+    if(form)form.classList.add("hidden");
+    showAlert("#alert",linkError,"error");
+    return;
+  }
+
   const ctx=await requireAuthenticated();
   if(!ctx)return;
 
@@ -50,7 +61,7 @@
 
       if(rpcError){
         console.error("complete_password_change error:",rpcError);
-        throw new Error("Le mot de passe a été changé, mais la validation du compte a échoué. Vérifiez que la fonction SQL complete_password_change() est bien installée.");
+        throw new Error(rpcError.message||"Le mot de passe a été changé, mais la validation du compte a échoué.");
       }
 
       // 3. Verify that the flag is really cleared before redirecting

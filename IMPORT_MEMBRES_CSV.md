@@ -40,22 +40,34 @@ l'horodatage Google Forms) sont ignorées et listées dans l'aperçu.
   suffixe numérique est ajouté seulement si ce login généré est déjà pris).
 - Maximum : **500 lignes** par import.
 
-## Mot de passe et activation des comptes
+## Comptes de connexion et activation
 
-Le CIN n'est **plus** utilisé comme mot de passe.
+L'import crée ou met à jour uniquement les **fiches membres**. Il ne crée **aucun
+compte de connexion** et n'affiche aucun mot de passe. Les nouveaux membres
+apparaissent « **Non activé** » dans la liste. Le rapport d'import donne, pour
+chaque ligne, un statut (`created`, `updated`, `failed` + code), sans aucune
+valeur personnelle.
 
-1. Chaque nouveau compte reçoit un mot de passe aléatoire que personne ne connaît
-   (il n'est ni affiché ni enregistré).
-2. Pour activer un membre, le SUPERADMIN clique sur **Réinitialiser le mot de passe**
-   dans la liste des abonnés : un mot de passe temporaire aléatoire est généré par le
-   serveur et **affiché une seule fois**. Remettez-le au membre par un canal sûr.
-3. À la première connexion, le membre doit choisir son propre mot de passe. Le serveur
-   vérifie que le mot de passe a réellement changé avant de lever l'obligation.
+Activation, membre par membre, par un SUPERADMIN (bouton **Activer le compte**) :
 
-Les adresses de connexion sont internes (`<login>@login.ueclubiste.local`) et ne
-reçoivent pas d'e-mails : les invitations ou liens de réinitialisation par e-mail de
-Supabase ne sont donc pas utilisables tant que les comptes n'ont pas une adresse
-e-mail réelle et un serveur SMTP configuré.
+1. Le serveur crée le compte avec un mot de passe aléatoire que personne ne connaît
+   (jamais le CIN ni une autre donnée personnelle).
+2. Il génère un **lien d'activation à usage unique** (lien de récupération Supabase)
+   qui expire selon le réglage Supabase Auth. Le lien est affiché **une seule
+   fois** ; remettez-le au membre par un canal sûr.
+3. Le membre ouvre le lien, arrive sur « Nouveau mot de passe » et choisit son mot
+   de passe. Tant qu'il ne l'a pas fait, le serveur ne lui donne accès à aucune
+   donnée, et il vérifie que le mot de passe a réellement changé.
+4. Lien expiré ou déjà utilisé : la page l'indique ; le SUPERADMIN génère un nouvel
+   accès (bouton **Nouvel accès**).
+
+Si les liens ne sont pas configurés (`PUBLIC_SITE_URL` et liste des URL de
+redirection Supabase Auth), le SUPERADMIN peut, après confirmation, générer à la
+place un **mot de passe temporaire** affiché une seule fois et valable 7 jours.
+
+Les adresses de connexion sont internes (`<login>@login.ueclubiste.local`) : les
+e-mails d'invitation de Supabase ne sont pas utilisables tant que les comptes
+n'ont pas une adresse vérifiée et un serveur SMTP configuré.
 
 ## Exemple (données fictives)
 

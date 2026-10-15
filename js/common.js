@@ -358,7 +358,7 @@ async function getCurrentContext() {
 
     const { data: profile, error: profileError } = await sb
         .from("profiles")
-        .select("display_name,email,avatar_url,must_change_password,is_active")
+        .select("display_name,avatar_url,must_change_password,is_active")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -409,6 +409,18 @@ async function requirePermission(permission) {
     }
 
     return ctx;
+}
+
+// Supabase Auth redirects back with an error in the URL fragment (or query) when
+// a recovery / activation link is expired, already used or invalid. Returns a
+// user-facing message, or null when there is no such error. Values from the URL
+// are never displayed.
+function authLinkError(loc = location) {
+    const params = new URLSearchParams(`${String(loc.hash || "").replace(/^#/, "")}&${String(loc.search || "").replace(/^\?/, "")}`);
+    if (!params.get("error") && !params.get("error_code")) return null;
+    const code = params.get("error_code") || params.get("error");
+    if (code === "otp_expired") return "Ce lien a expiré ou a déjà été utilisé. Demandez un nouveau lien à l’administration.";
+    return "Ce lien n’est pas valide. Demandez un nouveau lien à l’administration.";
 }
 
 async function requireAuthenticated() {
