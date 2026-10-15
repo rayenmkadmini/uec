@@ -37,12 +37,14 @@ Chaque import conserve les anciens membres. Les lignes existantes sont mises à 
 
 Format recommandé : `mail,Nom,prenom,numero d'abonnement,CIN,sexe,Téléphone,address,FACULTÉ,zone`.
 
-### SQL à exécuter
-1. `schema.sql`
-2. `security_hardening.sql`
-3. `roles_migration.sql`
-4. `payments.sql`
-5. `permissions_v2.sql`
-6. `subscriber_photos.sql`
+### Déploiement SQL et fonctions
 
-Puis déployer les Edge Functions, notamment `admin-import-users`.
+Les fichiers SQL historiques de ce dossier ne constituent pas une migration
+production sûre : plusieurs contiennent des politiques permissives qui peuvent
+réouvrir un accès lorsqu’ils sont rejoués. Ne les exécutez pas directement sur
+la production. Utilisez une migration versionnée approuvée après capture du
+catalogue live et validation dans un projet de staging isolé.
+
+Déployez ensuite les sept fonctions depuis `supabase/functions/`, notamment
+`admin-import-users`, avec `supabase/config.toml`. Les copies du dossier
+`SUPABASE_DASHBOARD_FUNCTIONS/` sont dépréciées.

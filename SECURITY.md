@@ -9,7 +9,38 @@
 - The intended canonical role table is `public.user_roles`, supporting `SUPERADMIN`, `ADMIN`, `TREASURER`, and `MEMBER` with role-union behavior.
 - Local Edge Function sources use shared Superadmin authorization derived from an authenticated bearer token and `user_roles`; they must not trust browser-supplied roles.
 - The standalone copies under `SUPABASE_DASHBOARD_FUNCTIONS/` are deprecated; deploy from `supabase/functions/` only.
-- The local `supabase/config.toml` sets `verify_jwt = true` for protected functions. The live project was observed with `verify_jwt = false` on six deployed admin functions, and `admin-import-users` was not listed as deployed. The deployed source/version was not runtime-tested in this audit.
+- The local `supabase/config.toml` sets `verify_jwt = true` for protected functions. The older `uec` project snapshot recorded six deployed admin functions with `verify_jwt = false`; the currently configured `login.uec` project was separately verified below.
+
+## Read-only verification — 2026-10-14
+
+The repository contains two different Supabase project references. The static
+browser bundle currently points to `qwlbbfyhjdeekmrxtzjf` (`login.uec`), while
+older audit documents describe `astsvxyqyyzqvuioqsnq` (`uec`). The CLI project
+list confirms that these are separate projects. No project was linked, migrated,
+or deployed during this audit.
+
+The configured `login.uec` project was inspected read-only through the
+authenticated Supabase CLI and function-download API:
+
+- Seven Edge Functions are active, including `admin-import-users`; all seven
+  report `verify_jwt = true`.
+- The remote schema exposes `user_roles` with a legacy `role` column and an
+  `audit_logs` table. It does not expose `security_audit_logs` through the
+  public API. The local source now reads/writes both contracts during cutover,
+  preferring the selected project's `role`/`audit_logs` contract and falling
+  back only when those objects are unavailable. See
+  `docs/security/CANONICAL_SCHEMA_CONTRACT.md`.
+- Read-only table statistics reported approximately 2 subscribers, 2 profiles,
+  8 user-role rows, 4 role rows, 5 audit rows, 7 matches, 35 match zones, and
+  224 faculties. These are database estimates, not a data export.
+- The deployed function bundles were downloaded to a temporary directory for
+  comparison only. They remain older than the repaired local source and were
+  not changed.
+
+The older `uec` project remains a separate, unselected environment: it reports
+six deployed functions with JWT verification disabled, `security_audit_logs`,
+and no public `user_roles` table. Treat the older production snapshot below as
+historical evidence for that project, not as the live schema of `login.uec`.
 
 ## Live production blockers (read-only inspection, 2026-10-01)
 - The linked database has 12 public base tables and 66 public RLS policies. `roles` and `user_roles` are both absent. Live `is_admin()`, `is_staff()`, `is_superadmin()`, and `is_treasurer()` definitions still read `profiles.role` / `profiles.is_treasurer`.

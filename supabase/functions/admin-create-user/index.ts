@@ -37,16 +37,23 @@ Deno.serve(async (req) => {
       photo_url: b.photo_url ? String(b.photo_url).trim() : null
     });
     if (subError) { await ctx.admin.auth.admin.deleteUser(newUser.user.id); return json(req, { error: subError.message }, 400); }
-    const { error: profileError } = await ctx.admin.from("profiles").update({ display_name: `${b.prenom.trim()} ${b.nom.trim()}`, must_change_password: true, is_active: true }).eq("id", newUser.user.id);
-    if (profileError) {
+    const { data: updatedProfile, error: profileError } = await ctx.admin.from("profiles").update({ display_name: `${b.prenom.trim()} ${b.nom.trim()}`, must_change_password: true, is_active: true }).eq("id", newUser.user.id).select("id").single();
+    if (profileError || !updatedProfile) {
       await ctx.admin.from("subscribers").delete().eq("user_id", newUser.user.id);
       await ctx.admin.auth.admin.deleteUser(newUser.user.id);
-      return json(req, { error: profileError.message }, 400);
+      return json(req, { error: profileError?.message || "Le profil utilisateur n’a pas pu être créé." }, 400);
     }
-    const { error: roleError } = await ctx.admin.from("user_roles").upsert({
+    let { error: roleError } = await ctx.admin.from("user_roles").upsert({
       user_id: newUser.user.id,
       role: "MEMBER"
     }, { onConflict: "user_id,role" });
+    if (roleError) {
+      const legacyRole = await ctx.admin.from("user_roles").upsert({
+        user_id: newUser.user.id,
+        role_name: "MEMBER"
+      }, { onConflict: "user_id,role_name" });
+      roleError = legacyRole.error;
+    }
     if (roleError) {
       await ctx.admin.from("subscribers").delete().eq("user_id", newUser.user.id);
       await ctx.admin.auth.admin.deleteUser(newUser.user.id);

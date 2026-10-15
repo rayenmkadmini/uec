@@ -4,172 +4,306 @@ const vm = require("node:vm");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-function loadCommonHelpers() {
-  const script = fs.readFileSync(path.join(__dirname, "..", "js", "common.js"), "utf8");
-  const body = {
-    appendChild() {},
-    insertBefore() {}
-  };
+const root = path.join(__dirname, "..");
+const read = file => fs.readFileSync(path.join(root, file), "utf8");
+const PERMS = require("../js/permissions.js");
 
+function loadCommonHelpers({ roles = [], profile = {} } = {}) {
   const doc = {
-    body,
+    body: { appendChild() {}, insertBefore() {} },
     documentElement: { getAttribute: () => "", setAttribute() {}, style: {} },
     querySelector: () => null,
     querySelectorAll: () => [],
-    createElement: () => ({
-      setAttribute() {},
-      addEventListener() {},
-      style: {},
-      textContent: ""
-    }),
+    createElement: () => ({ setAttribute() {}, addEventListener() {}, style: {}, textContent: "" }),
     addEventListener() {}
   };
 
+  let signedOut = false;
   const sb = {
     auth: {
       getUser: async () => ({ data: { user: { id: "user-1" } }, error: null }),
-      signOut: async () => null
+      signOut: async () => { signedOut = true; }
     },
-    from: () => ({
+    from: table => ({
       select: () => ({
-        eq: () => ({
-          single: async () => ({ data: { role: "SUPERADMIN", display_name: "Admin", must_change_password: false, is_active: true, is_treasurer: false }, error: null }),
-          maybeSingle: async () => ({ data: null }),
-          limit: () => ({ maybeSingle: async () => ({ data: null }) })
-        }),
-        in: () => ({
-          order: () => ({})
-        }),
-        neq: () => ({
-          maybeSingle: async () => ({ data: null })
-        })
-      }),
-      update: () => ({ eq: () => ({ error: null }) }),
-      insert: () => ({ select: () => ({ single: async () => ({ data: { id: "new-id" }, error: null }) }) })
+        eq: field => {
+          if (table === "user_roles") return Promise.resolve({ data: roles.map(role => ({ role })), error: null });
+          return {
+            maybeSingle: async () => ({ data: { display_name: "Test", must_change_password: false, is_active: true, ...profile }, error: null })
+          };
+        }
+      })
     })
   };
 
-  const location = { href: "dashboard.html", pathname: "/dashboard.html" };
-  const customEventCtor = function CustomEvent(type, init = {}) {
-    return { type, detail: init.detail || {} };
+  const location = { href: "index.html", pathname: "/index.html" };
+  const window = {
+    Swal: null,
+    document: doc,
+    localStorage: { getItem: () => null, setItem: () => null },
+    matchMedia: () => ({ matches: false }),
+    dispatchEvent: () => null,
+    addEventListener: () => null,
+    location,
+    sb
   };
 
   const context = {
     console: { warn() {}, error() {}, log() {} },
-    CustomEvent: customEventCtor,
-    window: {
-      Swal: null,
-      document: doc,
-      localStorage: {
-        getItem: () => null,
-        setItem: () => null
-      },
-      matchMedia: () => ({ matches: false }),
-      dispatchEvent: () => null,
-      addEventListener: () => null,
-      location,
-      sb
-    },
+    URL,
+    CustomEvent: function CustomEvent(type, init = {}) { return { type, detail: init.detail || {} }; },
+    window,
     document: doc,
-    localStorage: {
-      getItem: () => null,
-      setItem: () => null
-    },
+    localStorage: window.localStorage,
     location,
     sb,
-    window: {
-      Swal: null,
-      document: doc,
-      localStorage: { getItem: () => null, setItem: () => null },
-      matchMedia: () => ({ matches: false }),
-      dispatchEvent: () => null,
-      addEventListener: () => null,
-      location,
-      sb
-    }
+    wasSignedOut: () => signedOut
   };
 
   vm.createContext(context);
-  vm.runInContext(script, context);
+  vm.runInContext(read("js/permissions.js"), context);
+  vm.runInContext(read("js/common.js"), context);
   return context;
 }
 
-test("normalizeRoleNames deduplicates and normalizes roles", () => {
-  const context = loadCommonHelpers();
-  const actual = context.normalizeRoleNames([" admin ", "SUPERADMIN", "admin", "member", null]);
-  assert.equal(actual.join(","), ["ADMIN", "SUPERADMIN", "MEMBER"].join(","));
+function goTo(context, page) {
+  context.location.pathname = `/${page}`;
+  context.location.href = page;
+}
+
+/* ------------------------------------------------------------------ */
+/* Permission matrix                                                   */
+/* ------------------------------------------------------------------ */
+
+const EXPECTED = {
+  SUPERADMIN: Object.keys(PERMS.PERMISSIONS).filter(p => !["useMemberArea", "editOwnProfile", "chooseOwnSeat"].includes(p)),
+  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile"],
+  TREASURER: ["viewMembers", "manageCardPayments", "viewEvents", "manageEventPaymentStatuses", "viewFinancialReports", "viewStaffProfile"],
+  MEMBER: ["useMemberArea", "editOwnProfile", "chooseOwnSeat"]
+};
+
+for (const [role, allowed] of Object.entries(EXPECTED)) {
+  test(`${role} has exactly the expected permissions`, () => {
+    const actual = Object.keys(PERMS.PERMISSIONS).filter(permission => PERMS.can({ roles: [role] }, permission));
+    assert.deepEqual(actual.sort(), [...allowed].sort());
+  });
+}
+
+test("ADMIN / SUPERVISOR has no write permission at all", () => {
+  const writes = Object.keys(PERMS.PERMISSIONS).filter(p => /^(manage|edit|choose)/.test(p));
+  for (const permission of writes) assert.equal(PERMS.can({ roles: ["ADMIN"] }, permission), false, permission);
+  assert.equal(PERMS.isReadOnlyStaff({ roles: ["ADMIN"] }), true);
 });
 
-test("hasContextRole handles combined roles", () => {
-  const context = loadCommonHelpers();
-  assert.equal(context.hasContextRole({ roles: ["ADMIN", "TREASURER"] }, "TREASURER"), true);
-  assert.equal(context.hasContextRole({ profile: { role: "MEMBER" } }, "ADMIN"), false);
+test("TREASURER cannot create/edit events, collections, members, users or settings", () => {
+  for (const permission of ["manageEvents", "manageCollections", "manageMembers", "manageUsers", "manageSettings", "manageMatches", "manageClubLogos", "viewDashboard"]) {
+    assert.equal(PERMS.can({ roles: ["TREASURER"] }, permission), false, permission);
+  }
 });
 
-test("role union preserves read-only admin and Treasurer capabilities without Superadmin override", () => {
-  const context = loadCommonHelpers();
-  const admin = { roles: ["ADMIN"] };
-  const treasurer = { roles: ["TREASURER"] };
-  const member = { roles: ["MEMBER"] };
-  const combined = { roles: ["ADMIN", "TREASURER"] };
-  const superadmin = { roles: ["SUPERADMIN"] };
-
-  assert.equal(context.isStaffContext(admin), true);
-  assert.equal(context.isTreasurerContext(admin), false);
-  assert.equal(context.canManageEverything(admin), false);
-  assert.equal(context.isTreasurerContext(treasurer), true);
-  assert.equal(context.isStaffContext(member), false);
-  assert.equal(context.isStaffContext(combined), true);
-  assert.equal(context.isTreasurerContext(combined), true);
-  assert.equal(context.canManageEverything(combined), false);
-  assert.equal(context.canManageEverything(superadmin), true);
+test("MEMBER cannot reach any administrative page", () => {
+  for (const page of ["dashboard.html", "subscribers.html", "payments.html", "admin-matchs.html", "admin-users.html", "faculties.html", "zones.html", "profile.html"]) {
+    assert.equal(PERMS.canAccessPage({ roles: ["MEMBER"] }, page), false, page);
+  }
+  assert.equal(PERMS.canAccessPage({ roles: ["MEMBER"] }, "subscriber.html"), true);
+  assert.equal(PERMS.canAccessPage({ roles: ["MEMBER"] }, "matchs.html"), true);
 });
 
-test("user_roles is authoritative when its query succeeds", async () => {
-  const context = loadCommonHelpers();
-  context.sb = {
-    from: () => ({
-      select: () => ({
-        eq: async () => ({ data: [{ role_name: "ADMIN" }, { role_name: "TREASURER" }], error: null })
-      })
-    })
-  };
-  const roles = await context.fetchUserRolesForUser("user-1", "SUPERADMIN", true);
-  assert.equal(roles.join(","), "ADMIN,TREASURER");
+test("unknown role strings never grant privileges; legacy names are mapped safely", () => {
+  assert.deepEqual(PERMS.normalizeRoles(["OWNER", "root", "", null, "admin ", "SUBSCRIBER", "supervisor"]), ["ADMIN", "MEMBER"]);
+  assert.equal(PERMS.can({ roles: ["OWNER"] }, "viewMembers"), false);
+  assert.equal(PERMS.can({ roles: ["SUPERADMIN "] }, "manageUsers"), true);
+  assert.equal(PERMS.homePage({ roles: ["GOD"] }), null);
 });
 
-test("legacy profile role is used only while user_roles is unavailable", async () => {
-  const context = loadCommonHelpers();
-  context.sb = {
-    from: () => ({
-      select: () => ({
-        eq: async () => ({ data: null, error: new Error("relation unavailable") })
-      })
-    })
-  };
-  const roles = await context.fetchUserRolesForUser("user-1", "SUBSCRIBER", true);
-  assert.equal(roles.join(","), "MEMBER,TREASURER");
+test("home page per role, and every home page is accessible to its role (no redirect loop)", () => {
+  const cases = [
+    [["SUPERADMIN"], "dashboard.html"],
+    [["ADMIN"], "dashboard.html"],
+    [["TREASURER"], "payments.html"],
+    [["MEMBER"], "subscriber.html"],
+    [["SUPERADMIN", "ADMIN", "TREASURER", "MEMBER"], "dashboard.html"],
+    [["TREASURER", "MEMBER"], "payments.html"],
+    [["ADMIN", "TREASURER"], "dashboard.html"]
+  ];
+  for (const [roles, home] of cases) {
+    assert.equal(PERMS.homePage({ roles }), home, roles.join("+"));
+    assert.equal(PERMS.canAccessPage({ roles }, home), true, roles.join("+"));
+  }
 });
 
-test("requireAdmin blocks non-admin access", async () => {
-  const context = loadCommonHelpers();
-  const location = { href: "index.html", pathname: "/index.html" };
-  context.window.location = location;
-  context.location = location;
-
-  const ctx = { profile: { role: "MEMBER", must_change_password: false }, roles: ["MEMBER"] };
-  context.getCurrentContext = async () => ctx;
-  const result = await context.requireAdmin();
-  assert.equal(result, null);
-  assert.equal(location.href, "subscriber.html");
+test("combined ADMIN + TREASURER keeps payment-status rights but gains no management rights", () => {
+  const ctx = { roles: ["ADMIN", "TREASURER"] };
+  assert.equal(PERMS.can(ctx, "manageEventPaymentStatuses"), true);
+  assert.equal(PERMS.can(ctx, "manageCardPayments"), true);
+  assert.equal(PERMS.can(ctx, "manageEvents"), false);
+  assert.equal(PERMS.can(ctx, "manageMembers"), false);
+  assert.equal(PERMS.isReadOnlyStaff(ctx), false);
 });
 
-test("CSV optional subscription number is accepted in the requested rule set", () => {
-  const nom = "TEST";
-  const prenom = "USER";
-  const cin = "12345678";
-  const gender = "M";
-  const valid = !!(nom && prenom && cin && gender);
-  assert.equal(valid, true);
-  assert.equal(Boolean(""), false);
+/* ------------------------------------------------------------------ */
+/* Route guard                                                         */
+/* ------------------------------------------------------------------ */
+
+test("requirePermission redirects each role away from forbidden pages to its own home", async () => {
+  const cases = [
+    { roles: ["MEMBER"], page: "dashboard.html", permission: "viewDashboard", expected: "subscriber.html" },
+    { roles: ["TREASURER"], page: "dashboard.html", permission: "viewDashboard", expected: "payments.html" },
+    { roles: ["TREASURER"], page: "admin-users.html", permission: "viewUsers", expected: "payments.html" },
+    { roles: ["ADMIN"], page: "subscriber.html", permission: "useMemberArea", expected: "dashboard.html" }
+  ];
+  for (const { roles, page, permission, expected } of cases) {
+    const context = loadCommonHelpers({ roles });
+    goTo(context, page);
+    const ctx = await context.requirePermission(permission);
+    assert.equal(ctx, null);
+    assert.equal(context.location.href, expected, `${roles} on ${page}`);
+  }
+});
+
+test("requirePermission admits authorized roles", async () => {
+  for (const [roles, page, permission] of [
+    [["ADMIN"], "subscribers.html", "viewMembers"],
+    [["TREASURER"], "payments.html", "viewEvents"],
+    [["SUPERADMIN"], "admin-users.html", "viewUsers"],
+    [["MEMBER"], "matchs.html", "chooseOwnSeat"]
+  ]) {
+    const context = loadCommonHelpers({ roles });
+    goTo(context, page);
+    const ctx = await context.requirePermission(permission);
+    assert.ok(ctx, `${roles} on ${page}`);
+    assert.equal(context.location.href, page);
+  }
+});
+
+test("a user with no valid role is signed out", async () => {
+  const context = loadCommonHelpers({ roles: [] });
+  goTo(context, "dashboard.html");
+  assert.equal(await context.requirePermission("viewDashboard"), null);
+  assert.equal(context.location.href, "index.html");
+  assert.equal(context.wasSignedOut(), true);
+});
+
+test("first-login users are forced to change their password", async () => {
+  const context = loadCommonHelpers({ roles: ["SUPERADMIN"], profile: { must_change_password: true } });
+  goTo(context, "dashboard.html");
+  assert.equal(await context.requirePermission("viewDashboard"), null);
+  assert.equal(context.location.href, "change-password.html");
+});
+
+test("roles fail closed when user_roles cannot be read", async () => {
+  const context = loadCommonHelpers();
+  context.sb.from = () => ({ select: () => ({ eq: async () => ({ data: null, error: new Error("unavailable") }) }) });
+  assert.equal((await context.fetchUserRolesForUser("user-1")).length, 0);
+});
+
+test("writeError treats an RLS-filtered write (0 rows) as a refusal", () => {
+  const context = loadCommonHelpers();
+  assert.match(context.writeError({ data: [], error: null }), /autorisation/);
+  assert.equal(context.writeError({ data: [{ id: 1 }], error: null }), null);
+  assert.equal(context.writeError({ data: null, error: { message: "boom" } }), "boom");
+});
+
+/* ------------------------------------------------------------------ */
+/* Club logos                                                          */
+/* ------------------------------------------------------------------ */
+
+test("team logo prefers the match logo, then the club logo, then generated initials", () => {
+  const context = loadCommonHelpers();
+  context.window.location.href = "https://login.ueclubistes.tn/matchs.html";
+  const clubs = new Map([["club africain", "https://cdn.example.org/ca.png"]]);
+  assert.match(context.teamLogoImg("Club Africain", "HOME", "https://cdn.example.org/match.png", clubs), /src="https:\/\/cdn\.example\.org\/match\.png"/);
+  assert.match(context.teamLogoImg("  CLUB AFRICAIN ", "HOME", null, clubs), /src="https:\/\/cdn\.example\.org\/ca\.png"/);
+  assert.match(context.teamLogoImg("CS Sfaxien", "AWAY", null, clubs), /src="data:image\/svg\+xml/);
+  assert.match(context.teamLogoImg("CS Sfaxien", "AWAY", null, clubs), /onerror=/);
+});
+
+test("unsafe custom team logo URLs fall back to a generated logo", () => {
+  const context = loadCommonHelpers();
+  const logo = context.getTeamLogo("Home", "HOME", "javascript:alert(1)");
+  assert.match(logo, /^data:image\/svg\+xml/);
+  assert.doesNotMatch(logo, /javascript:/i);
+  assert.doesNotMatch(context.teamLogoImg("X", "HOME", "javascript:alert(1)", new Map()), /javascript:/i);
+});
+
+/* ------------------------------------------------------------------ */
+/* Static wiring checks                                                */
+/* ------------------------------------------------------------------ */
+
+const PAGE_SCRIPTS = {
+  "dashboard.html": "js/admin.js",
+  "subscribers.html": "js/subscribers.js",
+  "payments.html": "js/admin-payments.js",
+  "admin-matchs.html": "js/admin-matchs.js",
+  "admin-users.html": "js/admin-users.js",
+  "faculties.html": "js/reference.js",
+  "zones.html": "js/reference.js",
+  "profile.html": "js/profile.js",
+  "subscriber.html": "js/subscriber.js",
+  "matchs.html": "js/matchs.js"
+};
+
+test("every protected page loads permissions.js before common.js and guards with its page permission", () => {
+  for (const [page, script] of Object.entries(PAGE_SCRIPTS)) {
+    const html = read(page);
+    const permIndex = html.indexOf("js/permissions.js");
+    assert.ok(permIndex > -1 && permIndex < html.indexOf("js/common.js"), `${page} script order`);
+    assert.ok(html.includes(script), `${page} loads ${script}`);
+    const permission = PERMS.PAGE_PERMISSIONS[page];
+    assert.ok(read(script).includes(`requirePermission("${permission}")`), `${script} guards with ${permission}`);
+  }
+});
+
+test("no page uses the removed ad-hoc role guards", () => {
+  for (const file of fs.readdirSync(path.join(root, "js"))) {
+    const source = read(`js/${file}`);
+    assert.doesNotMatch(source, /\brequire(Admin|Staff|Subscriber|Treasurer|SuperAdmin)\(/, file);
+  }
+});
+
+test("collectes module uses the live schema and the payment-status RPC", () => {
+  const source = read("js/admin-payments.js");
+  assert.match(source, /select\("id,title,description,amount,event_date,is_active"\)/);
+  assert.match(source, /\.eq\("status", "PAID"\)/);
+  assert.match(source, /rpc\("set_event_payment_status"/);
+  assert.doesNotMatch(source, /from\("event_payments"\)\s*\.upsert/);
+  assert.doesNotMatch(source, /class="payment-row"/, "rows must be <tr> inside the table body");
+});
+
+test("card payment status goes through the narrow RPC", () => {
+  const source = read("js/subscribers.js");
+  assert.match(source, /rpc\("set_card_payment_status"/);
+  assert.doesNotMatch(source, /update\(\{ card_paid/);
+});
+
+test("member profile updates only whitelisted fields", () => {
+  const source = read("js/subscriber.js");
+  const update = source.match(/\.update\(\{([^}]*)\}\)/)[1];
+  const keys = [...update.matchAll(/(\w+):/g)].map(match => match[1]).sort();
+  assert.deepEqual(keys, ["adresse", "email", "phone", "photo_url"]);
+});
+
+test("browser config never contains a service-role or secret key", () => {
+  const config = read("js/config.js");
+  assert.doesNotMatch(config, /service_role|sb_secret_|eyJhbGciOi[^"]*InNlcnZpY2Vfcm9sZSI/);
+});
+
+test("TREASURER never receives member personal data in the UI", () => {
+  assert.equal(PERMS.can({ roles: ["TREASURER"] }, "viewMemberDetails"), false);
+  assert.equal(PERMS.can({ roles: ["ADMIN"] }, "viewMemberDetails"), true);
+  const members = read("js/subscribers.js");
+  assert.match(members, /canViewDetails\s*\?\s*await sb\.from\("subscribers"\)/);
+  assert.match(members, /: await sb\.rpc\("list_payment_members"\)/);
+  assert.match(members, /\$\$\("\.col-private"\)\.forEach\(th => th\.remove\(\)\)/);
+  const payments = read("js/admin-payments.js");
+  assert.match(payments, /rpc\("list_payment_members"\)/);
+  assert.doesNotMatch(payments, /from\("subscribers"\)/, "payments page must not read the members table");
+  for (const header of ["Photo", "Sexe", "CIN", "Zone"]) {
+    assert.match(read("subscribers.html"), new RegExp(`<th class="col-private">${header}</th>`));
+  }
+});
+
+test("own payment rows are locked for a treasurer in the UI (database enforces it too)", () => {
+  assert.match(read("js/subscribers.js"), /return canMarkCard && \(!s\.is_self \|\| canManageMembers\);/);
+  assert.match(read("js/admin-payments.js"), /subscriber\.is_self && !canManageEvents/);
 });

@@ -7,6 +7,8 @@ let allFaculties = [];
 let currentCtx = null;
 let canManageMembers = false;
 let canMarkCard = false;
+let canViewDetails = false;
+const pendingCardToggles = new Set();
 const { csvField, parseCsv } = window.UE_CSV;
 
 function stripAccents(s) {
@@ -79,18 +81,32 @@ async function loadRefs() {
     (zonesResult.data || []).map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join("");
 }
 
+function columnCount() {
+  return canViewDetails ? 11 : 7;
+}
+
+// SUPERADMIN / ADMIN read the full member records. TREASURER receives only
+// identification + payment fields from list_payment_members() (no CIN, address,
+// phone, email, gender, zone or photo) — the database refuses anything more.
 async function loadSubs() {
-  const { data, error } = await sb
-    .from("subscribers")
-    .select("*,faculties(name),zones(name)")
-    .order("nom", { ascending: true });
+  const { data, error } = canViewDetails
+    ? await sb.from("subscribers").select("*,faculties(name),zones(name)").order("nom", { ascending: true })
+    : await sb.rpc("list_payment_members");
 
   if (error) {
-    $("#rows").innerHTML = '<tr><td colspan="11" class="empty">Impossible de charger les membres. Réessayez.</td></tr>';
+    $("#rows").innerHTML = `<tr><td colspan="${columnCount()}" class="empty">Impossible de charger les membres. Réessayez.</td></tr>`;
     return showAlert("#pageAlert", error.message, "error");
   }
-  allSubs = data || [];
+  allSubs = (data || []).map(s => canViewDetails
+    ? { ...s, is_self: Boolean(s.user_id) && s.user_id === currentCtx?.user?.id }
+    : { ...s, faculties: s.faculty_name ? { name: s.faculty_name } : null });
   apply();
+}
+
+// Separation of duties: a treasurer cannot change their own card status
+// (enforced by set_card_payment_status); only SUPERADMIN can.
+function canToggleCardOf(s) {
+  return canMarkCard && (!s.is_self || canManageMembers);
 }
 
 function apply() {
@@ -138,27 +154,30 @@ async function render() {
 
   const start = (page - 1) * pageSize;
   const rows = filtered.slice(start, start + pageSize);
-  const photoEntries = await Promise.all(rows.filter(s => s.photo_url).map(async s => [s.id, await getSubscriberPhotoUrl(s.photo_url)]));
+  const photoEntries = canViewDetails
+    ? await Promise.all(rows.filter(s => s.photo_url).map(async s => [s.id, await getSubscriberPhotoUrl(s.photo_url)]))
+    : [];
   if (renderRequest !== subscriberRenderRequest) return;
   const photoUrls = new Map(photoEntries);
 
   $("#rows").innerHTML = rows.map(s => `
     <tr>
-      <td class="member-thumb-cell">
+      ${canViewDetails ? `<td class="member-thumb-cell">
         ${photoUrls.get(s.id) ? `<img src="${escapeHtml(photoUrls.get(s.id))}" alt="Photo de ${escapeHtml(s.prenom || "membre")}" class="member-thumb" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">` : ""}
         <span class="member-thumb-fallback" ${photoUrls.get(s.id) ? 'style="display:none;"' : ''}>${escapeHtml((s.prenom || "A").charAt(0).toUpperCase())}</span>
-      </td>
+      </td>` : ""}
       <td>${escapeHtml(s.nom)}</td>
       <td>${escapeHtml(s.prenom)}</td>
-      <td>${genderLabel(s.gender)}</td>
-      <td>${escapeHtml(s.numero_abonnement)}</td>
-      <td>${escapeHtml(s.cin)}</td>
+      ${canViewDetails ? `<td>${genderLabel(s.gender)}</td>` : ""}
+      <td>${escapeHtml(s.numero_abonnement || "—")}</td>
+      ${canViewDetails ? `<td>${escapeHtml(s.cin)}</td>` : ""}
       <td>${escapeHtml(facultyShort(s.faculties?.name) || "—")}</td>
-      <td>${escapeHtml(s.zones?.name || "—")}</td>
+      ${canViewDetails ? `<td>${escapeHtml(s.zones?.name || "—")}</td>` : ""}
       <td>${statusBadge(s.status)}</td>
       <td>
         ${cardLabel(s)}
-        ${canMarkCard ? `<button class="icon-btn card-toggle-btn" aria-label="${s.card_paid ? "Marquer la carte comme non payée" : "Marquer la carte comme payée"}" title="${s.card_paid ? "Marquer la carte comme non payée" : "Marquer la carte comme payée"}" onclick="toggleCard('${s.id}')">${s.card_paid ? ICONS.close : ICONS.refresh}</button>` : ""}
+        ${canMarkCard && !canToggleCardOf(s) ? `<span class="muted-text" title="Votre propre carte doit être validée par un super administrateur.">🔒</span>` : ""}
+        ${canToggleCardOf(s) ? `<button class="icon-btn card-toggle-btn" ${pendingCardToggles.has(s.id) ? 'disabled aria-busy="true"' : ""} aria-label="${s.card_paid ? "Marquer la carte comme non payée" : "Marquer la carte comme payée"}" title="${s.card_paid ? "Marquer la carte comme non payée" : "Marquer la carte comme payée"}" onclick="toggleCard('${s.id}')">${s.card_paid ? ICONS.close : ICONS.refresh}</button>` : ""}
       </td>
       <td class="actions">
         <button class="icon-btn" aria-label="Voir la carte membre de ${escapeHtml(`${s.prenom || ""} ${s.nom || ""}`.trim())}" title="Voir la carte membre" onclick="showMemberCard('${s.id}')">▣</button>
@@ -168,7 +187,7 @@ async function render() {
         <button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(s.nom || "le membre")}" title="Supprimer" onclick="deleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
       </td>
     </tr>
-  `).join("") || '<tr><td colspan="11" class="empty">Aucun résultat</td></tr>';
+  `).join("") || `<tr><td colspan="${columnCount()}" class="empty">Aucun résultat</td></tr>`;
 
   $("#pageInfo").textContent = `Page ${page} / ${totalPages}`;
   if ($("#memberResultCount")) $("#memberResultCount").textContent = `${filtered.length} résultat(s) sur ${allSubs.length} membre(s)`;
@@ -178,7 +197,7 @@ async function render() {
 
 async function openMemberCard(subscriber) {
   const user = subscriber || {};
-  const photoUrl = await getSubscriberPhotoUrl(user.photo_url);
+  const photoUrl = canViewDetails ? await getSubscriberPhotoUrl(user.photo_url) : "";
   const card = `
     <div class="member-card-wrap">
       <div class="member-card-header">
@@ -193,13 +212,15 @@ async function openMemberCard(subscriber) {
       </div>
       <div class="member-card-grid">
         <div><span>N° abonnement</span><strong>${escapeHtml(user.numero_abonnement || "—")}</strong></div>
-        <div><span>CIN</span><strong>${escapeHtml(user.cin || "—")}</strong></div>
+        ${canViewDetails ? `<div><span>CIN</span><strong>${escapeHtml(user.cin || "—")}</strong></div>
         <div><span>Téléphone</span><strong>${escapeHtml(user.phone || "—")}</strong></div>
         <div><span>Email</span><strong>${escapeHtml(user.email || "—")}</strong></div>
         <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>
         <div><span>Zone</span><strong>${escapeHtml(user.zones?.name || "—")}</strong></div>
         <div><span>Sexe</span><strong>${escapeHtml(user.gender === "FEMALE" ? "Femme" : user.gender === "MALE" ? "Homme" : "Non défini")}</strong></div>
-        <div><span>Adresse</span><strong>${escapeHtml(user.adresse || "—")}</strong></div>
+        <div><span>Adresse</span><strong>${escapeHtml(user.adresse || "—")}</strong></div>` : `
+        <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>`}
+        <div><span>Carte membre</span><strong>${user.card_paid ? "Payée" : "Non payée"}</strong></div>
       </div>
     </div>
   `;
@@ -266,6 +287,12 @@ function openModal(s = null) {
     if (el) el.value = value;
   });
 
+  const editing = Boolean(s);
+  $("#fLogin").readOnly = editing;
+  $("#fCin").readOnly = editing;
+  $("#fLogin").setAttribute("aria-describedby", editing ? "immutableMemberFieldsHint" : "");
+  $("#fCin").setAttribute("aria-describedby", editing ? "immutableMemberFieldsHint" : "");
+
   $("#fPhotoFile").value = "";
   $("#fGender").value = s?.gender || "";
   selectFaculty(s?.faculty_id || "", s?.faculties?.name || "");
@@ -273,39 +300,55 @@ function openModal(s = null) {
   $("#fStatus").value = s?.status || "ACTIVE";
 }
 
-window.editSub = id => openModal(allSubs.find(s => s.id === id));
+window.editSub = id => { if (canManageMembers) openModal(allSubs.find(s => s.id === id)); };
 
 window.toggleSub = async id => {
+  if (!canManageMembers) return showAlert("#pageAlert", "Vous avez un accès en lecture seule.", "error");
   const s = allSubs.find(x => x.id === id);
   if (!s) return;
 
-  const { error } = await sb
+  const failure = writeError(await sb
     .from("subscribers")
     .update({ status: s.status === "ACTIVE" ? "INACTIVE" : "ACTIVE" })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id"));
 
-  if (error) return showAlert("#pageAlert", error.message, "error");
+  if (failure) return showAlert("#pageAlert", failure, "error");
   await loadSubs();
 };
 
+// Card PAID <-> UNPAID goes through a dedicated RPC that can change only
+// card_paid / card_paid_at (and is audited), for Treasurer and Superadmin.
 window.toggleCard = async id => {
+  if (!canMarkCard) return showAlert("#pageAlert", "Vous n’avez pas la permission de modifier le paiement des cartes.", "error");
   const s = allSubs.find(x => x.id === id);
-  if (!s) return;
+  if (!s || pendingCardToggles.has(id)) return;
+  if (!canToggleCardOf(s)) return showAlert("#pageAlert", "Votre propre carte doit être validée par un super administrateur.", "error");
 
   const nextPaid = !s.card_paid;
-  if (nextPaid && !(await confirmDialog(`Confirmer que ${s.prenom} ${s.nom} a payé sa carte membre ?`, { confirmText: "Oui, payée", icon: "question" }))) return;
+  const question = nextPaid
+    ? `Confirmer que ${s.prenom} ${s.nom} a payé sa carte membre ?`
+    : `Marquer la carte de ${s.prenom} ${s.nom} comme non payée ?`;
+  if (!(await confirmDialog(question, { confirmText: nextPaid ? "Oui, payée" : "Oui, non payée", icon: "question" }))) return;
 
-  const { error } = await sb
-    .from("subscribers")
-    .update({ card_paid: nextPaid, card_paid_at: nextPaid ? new Date().toISOString() : null })
-    .eq("id", id);
+  pendingCardToggles.add(id);
+  render();
+  const { data, error } = await sb.rpc("set_card_payment_status", { p_subscriber_id: id, p_paid: nextPaid });
+  pendingCardToggles.delete(id);
 
-  if (error) return showAlert("#pageAlert", error.message, "error");
+  if (error) {
+    render();
+    return showAlert("#pageAlert", error.message, "error");
+  }
+
+  s.card_paid = data.card_paid;
+  s.card_paid_at = data.card_paid_at;
+  apply();
   showAlert("#pageAlert", nextPaid ? "Carte marquée comme payée." : "Carte marquée comme non payée.");
-  await loadSubs();
 };
 
 window.resetPassword = async userId => {
+  if (!canManageMembers) return;
   const password = await promptDialog("Nouveau mot de passe", {
     input: "password",
     placeholder: "12 caractères min. : majuscule, minuscule, chiffre, spécial",
@@ -339,6 +382,7 @@ window.resetPassword = async userId => {
 };
 
 window.deleteSub = async id => {
+  if (!canManageMembers) return;
   if (!(await confirmDialog("Supprimer cet abonné et son compte ? Cette action est irréversible.", { confirmText: "Supprimer" }))) return;
 
   const { data: { session } } = await sb.auth.getSession();
@@ -498,11 +542,16 @@ async function importMembersCsv(file) {
 }
 
 async function init() {
-  const ctx = await requireStaff();
+  const ctx = await requirePermission("viewMembers");
   if (!ctx) return;
   currentCtx = ctx;
-  canManageMembers = hasContextRole(ctx, "SUPERADMIN");
-  canMarkCard = canManageMembers || hasContextRole(ctx, "TREASURER");
+  canManageMembers = can(ctx, "manageMembers");
+  canMarkCard = can(ctx, "manageCardPayments");
+  canViewDetails = can(ctx, "viewMemberDetails");
+  if (!canViewDetails) {
+    $$(".col-private").forEach(th => th.remove());
+    $("#genderFilter")?.remove();
+  }
 
   setupShell(ctx);
   setupFacultyCombo();
@@ -558,9 +607,7 @@ $("#subscriberForm").addEventListener("submit", async e => {
   const payload = {
     nom: $("#fNom").value.trim(),
     prenom: $("#fPrenom").value.trim(),
-    numero_abonnement: $("#fNumero").value.trim(),
-    login_name: $("#fLogin").value.trim().toUpperCase(),
-    cin: $("#fCin").value.trim(),
+    numero_abonnement: $("#fNumero").value.trim() || null,
     gender,
     phone: $("#fPhone").value.trim(),
     email: $("#fEmail").value.trim(),
@@ -571,13 +618,18 @@ $("#subscriberForm").addEventListener("submit", async e => {
     status: $("#fStatus").value
   };
 
-  if (!payload.nom || !payload.prenom || !payload.login_name || !payload.cin) {
+  if (!id) {
+    payload.login_name = $("#fLogin").value.trim().toUpperCase();
+    payload.cin = $("#fCin").value.trim();
+  }
+
+  if (!payload.nom || !payload.prenom || (!id && (!payload.login_name || !payload.cin))) {
     return showAlert("#pageAlert", "Veuillez remplir tous les champs obligatoires.", "error");
   }
 
   if (id) {
-    const { error } = await sb.from("subscribers").update(payload).eq("id", id);
-    if (error) return showAlert("#pageAlert", error.message, "error");
+    const failure = writeError(await sb.from("subscribers").update(payload).eq("id", id).select("id"));
+    if (failure) return showAlert("#pageAlert", failure, "error");
     showAlert("#pageAlert", "Abonné modifié avec succès.");
   } else {
     const { data: { session } } = await sb.auth.getSession();

@@ -16,7 +16,7 @@ function renderCharts(){
 window.addEventListener("ue-theme-change", renderCharts);
 
 (async function init(){
-  const ctx=await requireAdmin(); if(!ctx)return; setupShell(ctx);
+  const ctx=await requirePermission("viewDashboard"); if(!ctx)return; setupShell(ctx);
   const displayName=ctx.profile.display_name||"Admin";
   $("#adminName").textContent=displayName;
   if($("#adminGreetName"))$("#adminGreetName").textContent=displayName;

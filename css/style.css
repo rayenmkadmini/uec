@@ -267,7 +267,8 @@ tbody tr:hover{background:var(--hover)}
   body.print-card-mode .member-card-shell{display:block;max-width:100%;padding:0}
   body.print-card-mode .premium-card{width:min(100%, 540px);margin:0 auto;page-break-inside:avoid;box-shadow:none}
   .premium-card:before{display:none}
-  .sidebar,.topbar,.content>section:not(.print-card-section),.main{display:none!important}
+  .sidebar,.topbar,.content>section:not(.print-card-section){display:none!important}
+  body.print-card-mode .main{display:block!important;margin:0;width:100%}
 }
 
 .match-filter{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--input-bg);color:var(--ink)}
@@ -672,3 +673,13 @@ html[data-theme="dark"] .status-badge.warning{background:#3a3017;color:#f0d27a}
 
 /* Role-aware action groups */
 .panel-head-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ---------- Role / profile / logo fixes (2026-10-15) ---------- */
+.readonly-pill{display:inline-flex;align-items:center;gap:6px;margin-right:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:12px;font-weight:700;white-space:nowrap}
+.readonly-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--red)}
+.profile-hero{display:flex;align-items:center;gap:20px}
+.profile-avatar{flex:0 0 auto;width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;overflow:hidden;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.35);font-size:30px;font-weight:800;color:#fff}
+.profile-avatar img{width:100%;height:100%;object-fit:cover}
+.team-side img.team-logo{aspect-ratio:1/1;flex:0 0 auto}
+.event-meta small{color:var(--muted);font-weight:500;margin-left:4px}
+@media (max-width:640px){.readonly-pill{display:none}.profile-hero{gap:14px}.profile-avatar{width:60px;height:60px;font-size:24px}}

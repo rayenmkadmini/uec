@@ -80,7 +80,7 @@
 
       // Small delay so the success message is visible
       setTimeout(()=>{
-        location.href=["ADMIN","SUPERADMIN","TREASURER"].some(role=>hasContextRole(ctx,role))?"dashboard.html":"subscriber.html";
+        location.href=homePageFor(ctx)||"index.html";
       },600);
 
     }catch(error){

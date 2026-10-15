@@ -163,20 +163,27 @@ Deno.serve(async (req) => {
           throw new Error(insert.error.message);
         }
 
-        const { error: profileError } = await ctx.admin.from("profiles").update({
+        const { data: updatedProfile, error: profileError } = await ctx.admin.from("profiles").update({
           display_name: `${prenom} ${nom}`,
           must_change_password: true,
           is_active: true
-        }).eq("id", createUser.data.user.id);
-        if (profileError) {
+        }).eq("id", createUser.data.user.id).select("id").single();
+        if (profileError || !updatedProfile) {
           await ctx.admin.auth.admin.deleteUser(createUser.data.user.id);
-          throw new Error(profileError.message);
+          throw new Error(profileError?.message || "Le profil utilisateur n’a pas pu être créé.");
         }
 
-        const { error: roleError } = await ctx.admin.from("user_roles").upsert({
+        let { error: roleError } = await ctx.admin.from("user_roles").upsert({
           user_id: createUser.data.user.id,
           role: "MEMBER"
         }, { onConflict: "user_id,role" });
+        if (roleError) {
+          const legacyRole = await ctx.admin.from("user_roles").upsert({
+            user_id: createUser.data.user.id,
+            role_name: "MEMBER"
+          }, { onConflict: "user_id,role_name" });
+          roleError = legacyRole.error;
+        }
         if (roleError) {
           await ctx.admin.auth.admin.deleteUser(createUser.data.user.id);
           throw new Error("Le rôle membre n’a pas pu être attribué.");

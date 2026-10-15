@@ -207,7 +207,14 @@ function facultyShort(name) {
 
 function getTeamLogo(teamName, fallbackLabel, customUrl) {
     if (customUrl && String(customUrl).trim()) {
-        return customUrl;
+        try {
+            const url = new URL(String(customUrl).trim(), window.location.href);
+            if (url.protocol === "http:" || url.protocol === "https:") {
+                return escapeHtml(url.href);
+            }
+        } catch (_) {
+            // Invalid or unsafe stored URLs fall back to the generated logo.
+        }
     }
 
     const team = (teamName || fallbackLabel || "TEAM").trim();
@@ -268,6 +275,28 @@ function getTeamLogo(teamName, fallbackLabel, customUrl) {
     return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
+function clubKey(name) {
+    return String(name || "").trim().toLowerCase();
+}
+
+// Club logos are stored once per club (public.clubs) and reused by every match.
+// Returns an empty map if the table is unavailable so matches still render.
+async function loadClubLogos() {
+    const { data, error } = await sb.from("clubs").select("name,logo_url");
+    if (error) {
+        console.warn("Logos des clubs indisponibles.", error);
+        return new Map();
+    }
+    return new Map((data || []).filter(club => club.logo_url).map(club => [clubKey(club.name), club.logo_url]));
+}
+
+// <img> for a team: match logo → club logo → generated initials (also on load error).
+function teamLogoImg(teamName, fallbackLabel, matchLogoUrl, clubLogos) {
+    const fallback = getTeamLogo(teamName, fallbackLabel, null);
+    const src = getTeamLogo(teamName, fallbackLabel, matchLogoUrl || clubLogos?.get(clubKey(teamName)));
+    return `<img class="team-logo" src="${src}" alt="Logo ${escapeHtml(teamName || fallbackLabel || "")}" loading="lazy" onerror="this.onerror=null;this.src='${fallback}'">`;
+}
+
 function statusBadge(status) {
     return `
         <span class="badge ${status === "ACTIVE" ? "active" : "inactive"}">
@@ -281,28 +310,35 @@ function statusBadge(status) {
    AUTHENTICATION
 ============================================================ */
 
+const PERMS = window.UE_PERMISSIONS;
+
 function normalizeRoleNames(roles) {
-    return [...new Set((roles || [])
-        .map(role => String(role || "").trim().toUpperCase())
-        .filter(Boolean))];
+    return PERMS.normalizeRoles(roles);
 }
 
+// public.user_roles is the only authorization source. If it cannot be read the
+// user gets no roles (fail closed) — never a fallback from profile/metadata.
 async function fetchUserRolesForUser(userId) {
     if (!userId) return [];
 
-    try {
-        const { data, error } = await sb.from("user_roles").select("role").eq("user_id", userId);
-        if (error) throw error;
-        return normalizeRoleNames((data || []).map(item => item?.role));
-    } catch (error) {
-        console.error("Canonical user roles are unavailable; access denied.", error);
+    const { data, error } = await sb.from("user_roles").select("role").eq("user_id", userId);
+    if (error) {
+        console.error("Impossible de lire les rôles utilisateur.", error);
         return [];
     }
+    return normalizeRoleNames((data || []).map(item => item?.role));
 }
 
 function hasContextRole(ctx, roleName) {
-    const roles = normalizeRoleNames(ctx?.roles || []);
-    return roles.includes(String(roleName).trim().toUpperCase());
+    return normalizeRoleNames(ctx?.roles || []).includes(String(roleName).trim().toUpperCase());
+}
+
+function can(ctx, permission) {
+    return PERMS.can(ctx, permission);
+}
+
+function homePageFor(ctx) {
+    return PERMS.homePage(ctx);
 }
 
 async function getCurrentContext() {
@@ -320,12 +356,11 @@ async function getCurrentContext() {
         return null;
     }
 
-    const { data: profile, error: profileError } =
-        await sb
-            .from("profiles")
-            .select("display_name,must_change_password,is_active")
-            .eq("id", user.id)
-            .single();
+    const { data: profile, error: profileError } = await sb
+        .from("profiles")
+        .select("display_name,email,avatar_url,must_change_password,is_active")
+        .eq("id", user.id)
+        .maybeSingle();
 
     if (profileError) {
         console.error("Erreur profile:", profileError);
@@ -346,61 +381,10 @@ async function getCurrentContext() {
     };
 }
 
-async function requireSuperAdmin() {
-    const ctx = await getCurrentContext();
-    if (!ctx) { location.href = "index.html"; return null; }
-    if (!hasContextRole(ctx, "SUPERADMIN")) {
-        location.href = "dashboard.html";
-        return null;
-    }
-    if (ctx.profile.must_change_password && !location.pathname.endsWith("change-password.html")) {
-        location.href = "change-password.html";
-        return null;
-    }
-    return ctx;
-}
-
-function canManageEverything(ctx) {
-    return hasContextRole(ctx, "SUPERADMIN");
-}
-
-function isTreasurerContext(ctx) {
-    return hasContextRole(ctx, "TREASURER");
-}
-
-function isStaffContext(ctx) {
-    return ["ADMIN", "SUPERADMIN", "TREASURER"].some(role => hasContextRole(ctx, role));
-}
-
-async function requireStaff() {
-    const ctx = await getCurrentContext();
-    if (!ctx) { location.href = "index.html"; return null; }
-    if (!isStaffContext(ctx)) {
-        location.href = hasContextRole(ctx, "MEMBER") ? "subscriber.html" : "index.html";
-        return null;
-    }
-    if (ctx.profile.must_change_password && !location.pathname.endsWith("change-password.html")) {
-        location.href = "change-password.html";
-        return null;
-    }
-    return ctx;
-}
-
-async function requireTreasurer() {
-    const ctx = await getCurrentContext();
-    if (!ctx) { location.href = "index.html"; return null; }
-    if (!(hasContextRole(ctx, "SUPERADMIN") || hasContextRole(ctx, "TREASURER"))) {
-        location.href = "dashboard.html";
-        return null;
-    }
-    if (ctx.profile.must_change_password && !location.pathname.endsWith("change-password.html")) {
-        location.href = "change-password.html";
-        return null;
-    }
-    return ctx;
-}
-
-async function requireAdmin() {
+// Single route guard. Every protected page calls this with the permission it
+// needs. Unauthorized users are sent to their own home page (never in a loop:
+// a home page is always accessible to the role it belongs to).
+async function requirePermission(permission) {
     const ctx = await getCurrentContext();
 
     if (!ctx) {
@@ -408,41 +392,19 @@ async function requireAdmin() {
         return null;
     }
 
-    if (!["ADMIN", "SUPERADMIN"].some(role => hasContextRole(ctx, role))) {
-        location.href = "subscriber.html";
-        return null;
-    }
-
-    if (
-        ctx.profile.must_change_password &&
-        !location.pathname.endsWith("change-password.html")
-    ) {
+    if (ctx.profile.must_change_password && !location.pathname.endsWith("change-password.html")) {
         location.href = "change-password.html";
         return null;
     }
 
-    return ctx;
-}
-
-async function requireSubscriber() {
-    const ctx = await getCurrentContext();
-
-    if (!ctx) {
-        location.href = "index.html";
-        return null;
-    }
-
-    const isMember = hasContextRole(ctx, "MEMBER");
-    if (!isMember) {
-        location.href = "dashboard.html";
-        return null;
-    }
-
-    if (
-        ctx.profile.must_change_password &&
-        !location.pathname.endsWith("change-password.html")
-    ) {
-        location.href = "change-password.html";
+    if (permission && !can(ctx, permission)) {
+        const home = homePageFor(ctx);
+        if (!home) {
+            await sb.auth.signOut();
+            location.href = "index.html";
+        } else if (PERMS.pageName(location.pathname) !== home) {
+            location.href = home;
+        }
         return null;
     }
 
@@ -450,22 +412,15 @@ async function requireSubscriber() {
 }
 
 async function requireAuthenticated() {
-    const ctx = await getCurrentContext();
+    return requirePermission(null);
+}
 
-    if (!ctx) {
-        location.href = "index.html";
-        return null;
-    }
-
-    if (
-        ctx.profile.must_change_password &&
-        !location.pathname.endsWith("change-password.html")
-    ) {
-        location.href = "change-password.html";
-        return null;
-    }
-
-    return ctx;
+// Supabase returns success with 0 rows when RLS filters an UPDATE/DELETE.
+// Treat that as a refusal so the UI never reports a write that did not happen.
+function writeError(result, deniedMessage = "Vous n’avez pas l’autorisation d’effectuer cette action.") {
+    if (result?.error) return result.error.message || "Une erreur est survenue.";
+    if (Array.isArray(result?.data) && result.data.length === 0) return deniedMessage;
+    return null;
 }
 
 
@@ -524,29 +479,37 @@ function setupShell(ctx = null) {
             if (sidebarRoles) sidebarRoles.textContent = roles.join(" · ");
         }
 
-        const treasurerOnly = isTreasurerContext(ctx) &&
-            !hasContextRole(ctx, "ADMIN") &&
-            !hasContextRole(ctx, "SUPERADMIN");
-        const adminSidebar = [...(sidebar?.querySelectorAll("nav a") || [])]
-            .some(link => (link.getAttribute("href") || "").endsWith("dashboard.html"));
-        const memberRole = hasContextRole(ctx, "MEMBER");
-        if (adminSidebar && memberRole && !sidebar.querySelector('nav a[href="subscriber.html"]')) {
-            const memberLink = document.createElement("a");
-            memberLink.href = "subscriber.html";
-            if (location.pathname.endsWith("subscriber.html")) memberLink.classList.add("active");
-            memberLink.innerHTML = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 2.8-5.8 7-5.8s7 2.3 7 5.8"/></svg><span>Mon profil</span>';
-            sidebar.querySelector("nav")?.appendChild(memberLink);
+        const nav = sidebar?.querySelector("nav");
+        const adminSidebar = Boolean(nav?.querySelector('a[href="dashboard.html"], a[href="payments.html"]'));
+        const currentPage = PERMS.pageName(location.pathname);
+
+        // Staff get a profile page backed by public.profiles (not the member area).
+        if (nav && adminSidebar && can(ctx, "viewStaffProfile") && !nav.querySelector('a[href="profile.html"]')) {
+            const profileLink = document.createElement("a");
+            profileLink.href = "profile.html";
+            if (currentPage === "profile.html") profileLink.classList.add("active");
+            profileLink.innerHTML = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 2.8-5.8 7-5.8s7 2.3 7 5.8"/></svg><span>Mon profil</span>';
+            nav.appendChild(profileLink);
         }
-        sidebar?.querySelectorAll("nav a").forEach(link => {
+
+        // Only show links to pages this user may open (guards still enforce it).
+        nav?.querySelectorAll("a").forEach(link => {
+            const href = link.getAttribute("href") || "";
+            if (href.startsWith("#")) return;
+            if (!PERMS.canAccessPage(ctx, href)) link.remove();
+        });
+
+        nav?.querySelectorAll("a").forEach(link => {
             if (link.classList.contains("active")) link.setAttribute("aria-current", "page");
             else link.removeAttribute("aria-current");
         });
-        if (treasurerOnly && adminSidebar) {
-            sidebar.querySelectorAll("nav a").forEach(link => {
-                const href = link.getAttribute("href") || "";
-                const allowed = ["subscribers.html", "payments.html", "subscriber.html", "matchs.html"];
-                if (!allowed.some(page => href.endsWith(page))) link.classList.add("hidden");
-            });
+
+        if (topUser && PERMS.isReadOnlyStaff(ctx) && adminSidebar && !topUser.querySelector(".readonly-pill")) {
+            const pill = document.createElement("span");
+            pill.className = "readonly-pill";
+            pill.textContent = "Lecture seule";
+            pill.title = "Votre rôle Superviseur permet uniquement la consultation.";
+            topUser.insertAdjacentElement("beforebegin", pill);
         }
     }
 

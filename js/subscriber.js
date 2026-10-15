@@ -1,4 +1,6 @@
 let original = {};
+let clubLogos = new Map();
+let profileSaveInProgress = false;
 
 function formatMatchDate(date, time) {
   if (!date) return "Date non définie";
@@ -68,6 +70,7 @@ async function loadUpcomingMatches() {
   if (!container) return;
 
   const today = new Date().toISOString().slice(0, 10);
+  clubLogos = await loadClubLogos();
   const { data, error } = await sb
     .from("matches")
     .select("id,sport,home_team,away_team,home_logo_url,away_logo_url,competition,stadium,match_date,match_time")
@@ -111,12 +114,12 @@ async function loadUpcomingMatches() {
           </div>
           <div class="agenda-teams">
             <div class="team-side">
-              <img src="${getTeamLogo(homeTeam, "HOME", match.home_logo_url)}" alt="Logo ${escapeHtml(homeTeam)}" />
+              ${teamLogoImg(homeTeam, "HOME", match.home_logo_url, clubLogos)}
               <span>${escapeHtml(homeTeam)}</span>
             </div>
             <div class="vs-badge">VS</div>
             <div class="team-side">
-              <img src="${getTeamLogo(awayTeam, "AWAY", match.away_logo_url)}" alt="Logo ${escapeHtml(awayTeam)}" />
+              ${teamLogoImg(awayTeam, "AWAY", match.away_logo_url, clubLogos)}
               <span>${escapeHtml(awayTeam)}</span>
             </div>
           </div>
@@ -131,10 +134,18 @@ async function loadUpcomingMatches() {
 }
 
 (async function init() {
-  const ctx = await requireSubscriber(); if (!ctx) return;
+  const ctx = await requirePermission("useMemberArea"); if (!ctx) return;
   setupShell(ctx);
-  const { data: s, error } = await sb.from("subscribers").select("*,faculties(name),zones(name)").eq("user_id", ctx.user.id).single();
-  if (error || !s) { showAlert("#pageAlert","Impossible de charger votre profil.","error"); return; }
+  const { data: s, error } = await sb.from("subscribers").select("*,faculties(name),zones(name)").eq("user_id", ctx.user.id).maybeSingle();
+  if (error) { showAlert("#pageAlert","Impossible de charger votre profil.","error"); return; }
+  if (!s) {
+    // Staff accounts that also hold MEMBER may have no member record: send them to their profile page.
+    if (can(ctx, "viewStaffProfile")) { location.href = "profile.html"; return; }
+    $("#statusBadge").textContent = "Profil membre introuvable";
+    $("#subscriberMemberCard").innerHTML = '<div class="empty-card">Aucun profil membre n’est associé à ce compte. Contactez l’administration.</div>';
+    $("#editBtn").classList.add("hidden");
+    return;
+  }
   original = s;
   $("#welcomeName").textContent = `Bienvenue ${s.prenom || ""} ${s.nom || ""}`.trim();
   $("#userName").textContent = `${s.prenom || ""} ${s.nom || ""}`.trim();
@@ -161,6 +172,17 @@ async function loadUpcomingMatches() {
 })();
 $("#profileForm").addEventListener("submit", async e=>{
   e.preventDefault();
+  if (profileSaveInProgress || !original.user_id) return;
+  profileSaveInProgress = true;
+  const submitButton = $("#profileForm button[type=submit]");
+  if (submitButton) submitButton.disabled = true;
+  try { await saveMemberProfile(); } finally {
+    profileSaveInProgress = false;
+    if (submitButton) submitButton.disabled = false;
+  }
+});
+
+async function saveMemberProfile() {
   let photoUrl = original.photo_url || null;
   const file = $("#photoFile")?.files?.[0];
   if (file) {
@@ -173,10 +195,21 @@ $("#profileForm").addEventListener("submit", async e=>{
     if (upload.error) return showAlert("#pageAlert",upload.error.message,"error");
     photoUrl = path;
   }
-  const { error } = await sb.from("subscribers").update({phone:$("#phone").value.trim(),email:$("#email").value.trim(),adresse:$("#adresse").value.trim(),photo_url:photoUrl}).eq("user_id", original.user_id);
-  if (error) { showAlert("#pageAlert",error.message,"error"); return; }
+  const email = $("#email").value.trim();
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showAlert("#pageAlert","Adresse email invalide.","error");
+  // Only these fields are editable by a member; the database enforces the same whitelist.
+  const result = await sb.from("subscribers")
+    .update({ phone: $("#phone").value.trim() || null, email: email || null, adresse: $("#adresse").value.trim() || null, photo_url: photoUrl })
+    .eq("user_id", original.user_id)
+    .select("*,faculties(name),zones(name)");
+  const failure = writeError(result);
+  if (failure) { showAlert("#pageAlert",failure,"error"); return; }
+  original = result.data[0];
+  if ($("#photoFile")) $("#photoFile").value = "";
+  ["phone","email","adresse"].forEach(id => $("#" + id).disabled = true);
+  await renderMemberCard(original);
   showAlert("#pageAlert","Informations et photo mises à jour."); $("#saveRow").classList.add("hidden"); $("#editBtn").classList.remove("hidden");
-});
+}
 $("#passwordForm").addEventListener("submit", async e=>{
   e.preventDefault(); const p=$("#newPassword").value, c=$("#confirmPassword").value;
   if(p!==c) return showAlert("#passwordAlert","Les mots de passe ne correspondent pas.","error");

@@ -15,12 +15,17 @@ Deno.serve(async req => {
     if (targetError || !target) {
       return json(req, { error: "Administrateur introuvable." }, 404);
     }
-    const { data: targetRoleRows, error: targetRolesError } = await ctx.admin
+    let { data: targetRoleRows, error: targetRolesError } = await ctx.admin
       .from("user_roles")
       .select("role")
       .eq("user_id", userId);
+    if (targetRolesError) {
+      const legacyRoles = await ctx.admin.from("user_roles").select("role_name").eq("user_id", userId);
+      targetRoleRows = (legacyRoles.data || []).map((row: any) => ({ role: row.role_name ?? row.role }));
+      targetRolesError = legacyRoles.error;
+    }
     if (targetRolesError) return json(req, { error: "Les rôles du compte ne sont pas disponibles." }, 503);
-    const currentRoles = new Set((targetRoleRows || []).map((row: any) => String(row.role || "").toUpperCase()));
+    const currentRoles = new Set((targetRoleRows || []).map((row: any) => String(row.role ?? row.role_name ?? "").toUpperCase()));
     if (!currentRoles.size) return json(req, { error: "Aucun rôle canonique n’est attribué à ce compte." }, 404);
 
     const roles = normalizeRoles(b.roles ?? b.role ?? []);
@@ -49,9 +54,14 @@ Deno.serve(async req => {
       const { data: activeProfiles, error: activeProfilesError } = await ctx.admin.from("profiles").select("id").eq("is_active", true);
       if (activeProfilesError) return json(req, { error: "Impossible de vérifier les comptes administrateurs actifs." }, 503);
       const activeIds = (activeProfiles || []).map((row: any) => row.id);
-      const { count, error: activeRolesError } = activeIds.length
+      let { count, error: activeRolesError } = activeIds.length
         ? await ctx.admin.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "ADMIN").in("user_id", activeIds)
         : { count: 0, error: null };
+      if (activeRolesError && activeIds.length) {
+        const legacyRoles = await ctx.admin.from("user_roles").select("user_id", { count: "exact", head: true }).eq("role_name", "ADMIN").in("user_id", activeIds);
+        count = legacyRoles.count;
+        activeRolesError = legacyRoles.error;
+      }
       if (activeRolesError) return json(req, { error: "Impossible de vérifier les comptes administrateurs actifs." }, 503);
       if ((count || 0) <= 1) return json(req, { error: "Impossible de désactiver le dernier administrateur actif." }, 400);
     }

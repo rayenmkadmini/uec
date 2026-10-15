@@ -324,9 +324,18 @@ GRANT INSERT, UPDATE, DELETE ON public.matches, public.match_zones, public.match
 -- STORAGE DES LOGOS D'EQUIPES
 -- A executer dans Supabase SQL Editor avec les privileges du projet.
 -- ============================================================
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('match-logos', 'match-logos', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'match-logos',
+  'match-logos',
+  true,
+  5242880,
+  ARRAY['image/jpeg','image/png','image/webp','image/svg+xml']
+)
+ON CONFLICT (id) DO UPDATE
+SET public = true,
+    file_size_limit = 5242880,
+    allowed_mime_types = ARRAY['image/jpeg','image/png','image/webp','image/svg+xml'];
 
 DROP POLICY IF EXISTS match_logos_public_read ON storage.objects;
 CREATE POLICY match_logos_public_read
@@ -334,20 +343,23 @@ ON storage.objects FOR SELECT TO public
 USING (bucket_id = 'match-logos');
 
 DROP POLICY IF EXISTS match_logos_authenticated_insert ON storage.objects;
-CREATE POLICY match_logos_authenticated_insert
+DROP POLICY IF EXISTS match_logos_superadmin_insert ON storage.objects;
+CREATE POLICY match_logos_superadmin_insert
 ON storage.objects FOR INSERT TO authenticated
-WITH CHECK (bucket_id = 'match-logos');
+WITH CHECK (bucket_id = 'match-logos' AND public.is_superadmin());
 
 DROP POLICY IF EXISTS match_logos_authenticated_update ON storage.objects;
-CREATE POLICY match_logos_authenticated_update
+DROP POLICY IF EXISTS match_logos_superadmin_update ON storage.objects;
+CREATE POLICY match_logos_superadmin_update
 ON storage.objects FOR UPDATE TO authenticated
-USING (bucket_id = 'match-logos')
-WITH CHECK (bucket_id = 'match-logos');
+USING (bucket_id = 'match-logos' AND public.is_superadmin())
+WITH CHECK (bucket_id = 'match-logos' AND public.is_superadmin());
 
 DROP POLICY IF EXISTS match_logos_authenticated_delete ON storage.objects;
-CREATE POLICY match_logos_authenticated_delete
+DROP POLICY IF EXISTS match_logos_superadmin_delete ON storage.objects;
+CREATE POLICY match_logos_superadmin_delete
 ON storage.objects FOR DELETE TO authenticated
-USING (bucket_id = 'match-logos');
+USING (bucket_id = 'match-logos' AND public.is_superadmin());
 
 -- Important: this script assumes your existing public.is_admin() function.
 -- If your existing project uses another admin helper, replace public.is_admin().

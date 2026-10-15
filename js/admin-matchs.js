@@ -1,5 +1,7 @@
 let canManageMatches = false;
 let adminMatches = [];
+let clubLogos = new Map();
+let matchSaveInProgress = false;
 let editingMatch = null;
 
 const sports = {
@@ -48,10 +50,18 @@ async function ensureMatchStorageAndSchema() {
 async function uploadMatchLogo(file) {
   if (!file) return null;
 
+  const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+  if (!allowed.includes(file.type)) {
+    throw new Error("Format de logo invalide. Utilisez JPG, PNG, WebP ou SVG.");
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error("Le logo dépasse la limite de 5 Mo.");
+  }
+
   await ensureMatchStorageAndSchema();
 
-  const ext = file.name.includes('.') ? file.name.split('.').pop() : 'png';
-  const fileName = `match-logos/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const ext = file.type === "image/jpeg" ? "jpg" : file.type.split("/")[1];
+  const fileName = `match-logos/${crypto.randomUUID()}.${ext}`;
 
   const { error } = await sb.storage.from('match-logos').upload(fileName, file, {
     cacheControl: '3600',
@@ -76,7 +86,24 @@ function isMatchUpcoming(match) {
   return matchDate > now;
 }
 
+// A logo saved on a match is also stored on the club, so every other match of
+// that club shows it without re-uploading.
+async function saveClubLogo(teamName, logoUrl) {
+  const name = String(teamName || "").trim();
+  if (!name || !logoUrl) return null;
+
+  const { data: clubs, error } = await sb.from("clubs").select("id,name");
+  if (error) return error.message;
+
+  const existing = (clubs || []).find(club => clubKey(club.name) === clubKey(name));
+  const result = existing
+    ? await sb.from("clubs").update({ logo_url: logoUrl }).eq("id", existing.id).select("id")
+    : await sb.from("clubs").insert({ name, logo_url: logoUrl }).select("id");
+  return writeError(result);
+}
+
 async function loadMatches() {
+  clubLogos = await loadClubLogos();
   const { data, error } = await sb
     .from("matches")
     .select("id,sport,home_team,away_team,home_logo_url,away_logo_url,competition,stadium,match_date,match_time,description,is_active,match_zones(id,zone_key,zone_name,capacity,is_available)")
@@ -128,12 +155,12 @@ function renderMatches() {
           </div>
           <div class="agenda-teams">
             <div class="team-side">
-              <img src="${getTeamLogo(homeTeam, "HOME", m.home_logo_url)}" alt="Logo ${escapeHtml(homeTeam)}" />
+              ${teamLogoImg(homeTeam, "HOME", m.home_logo_url, clubLogos)}
               <span>${escapeHtml(homeTeam)}</span>
             </div>
             <div class="vs-badge">VS</div>
             <div class="team-side">
-              <img src="${getTeamLogo(awayTeam, "AWAY", m.away_logo_url)}" alt="Logo ${escapeHtml(awayTeam)}" />
+              ${teamLogoImg(awayTeam, "AWAY", m.away_logo_url, clubLogos)}
               <span>${escapeHtml(awayTeam)}</span>
             </div>
           </div>
@@ -192,7 +219,7 @@ function openForm(match = null) {
   $("#matchFormModal").classList.remove("hidden");
 }
 
-window.editMatch = id => openForm(adminMatches.find(m => m.id === id));
+window.editMatch = id => { if (canManageMatches) openForm(adminMatches.find(m => m.id === id)); };
 
 async function saveZones(matchId) {
   if (!canManageMatches) throw new Error("Lecture seule.");
@@ -205,25 +232,46 @@ async function saveZones(matchId) {
 
     const capacityInput = capacityInputs.find(x => x.dataset.zoneId === zoneId);
     const capacityValue = capacityInput?.value === "" ? null : Number(capacityInput.value);
+    if (capacityValue !== null && (!Number.isInteger(capacityValue) || capacityValue < 0)) {
+      throw new Error("La capacité doit être un nombre entier positif ou vide (illimitée).");
+    }
 
-    const { error } = await sb.from("match_zones")
+    const failure = writeError(await sb.from("match_zones")
       .update({ is_available: input.checked, capacity: capacityValue })
       .eq("id", zoneId)
-      .eq("match_id", matchId);
+      .eq("match_id", matchId)
+      .select("id"));
 
-    if (error) throw new Error(error.message);
+    if (failure) throw new Error(failure);
   }
 }
 
 $("#matchForm").addEventListener("submit", async e => {
   e.preventDefault();
-  if (!canManageMatches) return;
+  if (!canManageMatches || matchSaveInProgress) return;
+
+  const submitButton = $("#matchForm button.primary");
+  matchSaveInProgress = true;
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.setAttribute("aria-busy", "true");
+  }
 
   try {
-    await ensureMatchStorageAndSchema();
+    await saveMatchForm();
   } catch (error) {
-    return showAlert("#pageAlert", error.message, "error");
+    showAlert("#pageAlert", error?.message || "Enregistrement impossible.", "error");
+  } finally {
+    matchSaveInProgress = false;
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.removeAttribute("aria-busy");
+    }
   }
+});
+
+async function saveMatchForm() {
+  await ensureMatchStorageAndSchema();
 
   let homeLogoUrl = $("#homeLogoUrl").value.trim() || null;
   let awayLogoUrl = $("#awayLogoUrl").value.trim() || null;
@@ -264,16 +312,23 @@ $("#matchForm").addEventListener("submit", async e => {
   if (result.error) return showAlert("#pageAlert", result.error.message, "error");
   matchId = result.data.id;
 
-  try {
-    await saveZones(matchId);
-  } catch (error) {
-    return showAlert("#pageAlert", error.message, "error");
-  }
+  await saveZones(matchId);
+
+  const clubErrors = [
+    await saveClubLogo(payload.home_team, homeLogoUrl),
+    await saveClubLogo(payload.away_team, awayLogoUrl)
+  ].filter(Boolean);
 
   $("#matchFormModal").classList.add("hidden");
-  showAlert("#pageAlert", "Match enregistré avec succès.");
+  showAlert(
+    "#pageAlert",
+    clubErrors.length
+      ? "Match enregistré, mais le logo n’a pas pu être associé au club."
+      : "Match enregistré avec succès.",
+    clubErrors.length ? "error" : "success"
+  );
   await loadMatches();
-});
+}
 
 window.showStats = async matchId => {
   const match = adminMatches.find(m => m.id === matchId);
@@ -340,17 +395,17 @@ window.deleteMatch = async id => {
   if (!match) return;
   if (!(await confirmDialog(`Supprimer le match ${match.home_team} - ${match.away_team} et toutes les participations ?`, { confirmText: "Supprimer" }))) return;
 
-  const { error } = await sb.from("matches").delete().eq("id", id);
-  if (error) return showAlert("#pageAlert", error.message, "error");
+  const failure = writeError(await sb.from("matches").delete().eq("id", id).select("id"));
+  if (failure) return showAlert("#pageAlert", failure, "error");
 
   showAlert("#pageAlert", "Match supprimé.");
   await loadMatches();
 };
 
 async function init() {
-  const ctx = await requireStaff();
+  const ctx = await requirePermission("viewMatches");
   if (!ctx) return;
-  canManageMatches = hasContextRole(ctx, "SUPERADMIN");
+  canManageMatches = can(ctx, "manageMatches");
   setupShell(ctx);
   $("#addMatchBtn")?.classList.toggle("hidden", !canManageMatches);
   await loadMatches();

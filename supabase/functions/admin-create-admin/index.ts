@@ -20,8 +20,8 @@ Deno.serve(async (req) => {
     if (passwordError) return json(req, { error: passwordError }, 400);
     const { data: newUser, error } = await ctx.admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: { display_name: displayName } });
     if (error || !newUser?.user) return json(req, { error: error?.message || "Création impossible." }, 400);
-    const { error: profileError } = await ctx.admin.from("profiles").update({ display_name: displayName, email, must_change_password: true, is_active: true }).eq("id", newUser.user.id);
-    if (profileError) { await ctx.admin.auth.admin.deleteUser(newUser.user.id); return json(req, { error: profileError.message }, 400); }
+    const { data: updatedProfile, error: profileError } = await ctx.admin.from("profiles").update({ display_name: displayName, email, must_change_password: true, is_active: true }).eq("id", newUser.user.id).select("id").single();
+    if (profileError || !updatedProfile) { await ctx.admin.auth.admin.deleteUser(newUser.user.id); return json(req, { error: profileError?.message || "Le profil utilisateur n’a pas pu être créé." }, 400); }
     let roleError: Error | null = null;
     try { await replaceRoles(ctx.admin, newUser.user.id, requestedRoles); } catch (e) { roleError = e instanceof Error ? e : new Error(String(e)); }
     if (roleError) {

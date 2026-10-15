@@ -19,6 +19,5 @@ verify_jwt = true
 
 [functions.admin-reset-password]
 verify_jwt = true
--- WARNING: This schema is for context only and is not meant to be run.
--- Table order and constraints may not be valid for execution.
+# Edge Function settings only. Database schema SQL is kept under supabase/*.sql.
 

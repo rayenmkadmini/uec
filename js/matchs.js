@@ -4,6 +4,8 @@ let subscriber = null;
 let currentMatch = null;
 let selectedZoneId = null;
 let myParticipation = new Map();
+let clubLogos = new Map();
+let seatSaveInProgress = false;
 
 const zoneLabels = {
   PELOUSE: "Pelouse",
@@ -42,7 +44,8 @@ async function loadSubscriber() {
     .single();
 
   if (error || !data) {
-    showAlert("#pageAlert", error?.message || "Abonné introuvable.", "error");
+    if (error) console.error("Chargement du profil membre:", error);
+    $("#matchesGrid").innerHTML = '<div class="empty-card">Aucun profil membre n’est associé à ce compte. Contactez l’administration.</div>';
     return false;
   }
 
@@ -55,7 +58,7 @@ async function loadSubscriber() {
 }
 
 async function loadMatches() {
-  const [matchesResult, participationResult] = await Promise.all([
+  const [matchesResult, participationResult, logos] = await Promise.all([
     sb.from("matches")
       .select("id,sport,home_team,away_team,home_logo_url,away_logo_url,competition,stadium,match_date,match_time,description,is_active,match_zones(id,zone_key,zone_name,capacity,is_available)")
       .eq("is_active", true)
@@ -63,8 +66,10 @@ async function loadMatches() {
       .order("match_time", { ascending: true }),
     sb.from("match_participations")
       .select("id,match_id,zone_id")
-      .eq("subscriber_id", subscriber.id)
+      .eq("subscriber_id", subscriber.id),
+    loadClubLogos()
   ]);
+  clubLogos = logos;
 
   if (matchesResult.error) return showAlert("#pageAlert", matchesResult.error.message, "error");
   if (participationResult.error) return showAlert("#pageAlert", participationResult.error.message, "error");
@@ -112,12 +117,12 @@ function renderMatches() {
           </div>
           <div class="agenda-teams">
             <div class="team-side">
-              <img src="${getTeamLogo(homeTeam, "HOME", match.home_logo_url)}" alt="Logo ${escapeHtml(homeTeam)}" />
+              ${teamLogoImg(homeTeam, "HOME", match.home_logo_url, clubLogos)}
               <span>${escapeHtml(homeTeam)}</span>
             </div>
             <div class="vs-badge">VS</div>
             <div class="team-side">
-              <img src="${getTeamLogo(awayTeam, "AWAY", match.away_logo_url)}" alt="Logo ${escapeHtml(awayTeam)}" />
+              ${teamLogoImg(awayTeam, "AWAY", match.away_logo_url, clubLogos)}
               <span>${escapeHtml(awayTeam)}</span>
             </div>
           </div>
@@ -202,14 +207,19 @@ async function saveChoice() {
   if (!subscriber || !currentMatch || !selectedZoneId) {
     return showAlert("#pageAlert", "Veuillez choisir une place.", "error");
   }
+  if (seatSaveInProgress) return;
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return showAlert("#pageAlert", "Session expirée.", "error");
 
+  seatSaveInProgress = true;
+  $("#confirmZoneBtn").disabled = true;
   const { error } = await sb.rpc("set_match_participation", {
     p_match_id: currentMatch.id,
     p_zone_id: selectedZoneId
   });
+  seatSaveInProgress = false;
+  $("#confirmZoneBtn").disabled = false;
 
   if (error) {
     return showAlert("#pageAlert", error.message || "Impossible d'enregistrer votre choix.", "error");
@@ -243,9 +253,9 @@ async function removeChoice() {
 }
 
 async function init() {
-  const ctx = await requireSubscriber();
+  const ctx = await requirePermission("chooseOwnSeat");
   if (!ctx) return;
-  setupShell();
+  setupShell(ctx);
   if (!(await loadSubscriber())) return;
   await loadMatches();
 

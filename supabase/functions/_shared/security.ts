@@ -30,6 +30,21 @@ export function options(req: Request) {
   return new Response(null, { status: 204, headers: corsHeaders(req) });
 }
 
+async function readUserRoles(admin: ReturnType<typeof createClient>, userId: string) {
+  const preferred = await admin.from("user_roles").select("role").eq("user_id", userId);
+  if (!preferred.error) return { data: (preferred.data || []).map((row: any) => ({ role_name: row.role ?? row.role_name })), error: null };
+
+  const canonical = await admin.from("user_roles").select("role_name").eq("user_id", userId);
+  if (!canonical.error) {
+    return {
+      data: (canonical.data || []).map((row: any) => ({ role_name: row.role_name ?? row.role })),
+      error: null,
+    };
+  }
+
+  return { data: null, error: preferred.error || canonical.error };
+}
+
 export function getSecretKey() {
   const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (legacy) return legacy;
@@ -52,6 +67,27 @@ export function createAdminClient() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+function isMissingAuditContract(error: any) {
+  return ["PGRST205", "42P01", "42703"].includes(String(error?.code || ""));
+}
+
+async function countRecentAuditRows(admin: ReturnType<typeof createClient>, callerId: string, action: string, since: string) {
+  const preferred = await admin
+    .from("audit_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", callerId)
+    .eq("action", action)
+    .gte("created_at", since);
+  if (!preferred.error || !isMissingAuditContract(preferred.error)) return preferred;
+
+  return admin
+    .from("security_audit_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("actor_id", callerId)
+    .eq("action", action)
+    .gte("created_at", since);
+}
+
 export async function requireSuperAdmin(req: Request) {
   const authorization = req.headers.get("Authorization") || "";
   const token = authorization.replace(/^Bearer\s+/i, "").trim();
@@ -63,14 +99,14 @@ export async function requireSuperAdmin(req: Request) {
 
   const [{ data: profile, error: profileError }, { data: rolesData, error: rolesError }] = await Promise.all([
     admin.from("profiles").select("id,is_active").eq("id", user.id).maybeSingle(),
-    admin.from("user_roles").select("role").eq("user_id", user.id),
+    readUserRoles(admin, user.id),
   ]);
 
   if (profileError || rolesError) {
     throw new Response(JSON.stringify({ error: "Authorization roles are unavailable." }), { status: 503, headers: corsHeaders(req) });
   }
 
-  const roles = new Set((rolesData || []).map((row: any) => String(row.role || "").toUpperCase()));
+  const roles = new Set((rolesData || []).map((row: any) => String(row.role_name || "").toUpperCase()));
   if (!profile || profile.is_active === false || !roles.has("SUPERADMIN")) {
     throw new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders(req) });
   }
@@ -89,12 +125,7 @@ export function validateStrongPassword(password: unknown) {
 
 export async function rateLimit(admin: ReturnType<typeof createClient>, callerId: string, action: string, max: number, minutes: number) {
   const since = new Date(Date.now() - minutes * 60_000).toISOString();
-  const { count, error } = await admin
-    .from("audit_logs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", callerId)
-    .eq("action", action)
-    .gte("created_at", since);
+  const { count, error } = await countRecentAuditRows(admin, callerId, action, since);
   if (error) throw new Error("Rate-limit verification unavailable; request denied.");
   if ((count || 0) >= max) throw new Error("Trop de requêtes. Réessayez plus tard.");
 }
@@ -107,12 +138,24 @@ export async function audit(
   success: boolean,
   metadata: Record<string, unknown> = {},
 ) {
-  const { error } = await admin.from("audit_logs").insert({
+  const preferred = await admin.from("audit_logs").insert({
     user_id: actorId,
     action,
     table_name: "edge_function",
     record_id: targetId,
     new_data: { success, ...metadata },
   });
-  if (error) console.error("Audit write failed:", error.message);
+  if (!preferred.error || !isMissingAuditContract(preferred.error)) {
+    if (preferred.error) console.error("Audit write failed:", preferred.error.message);
+    return;
+  }
+
+  const canonical = await admin.from("security_audit_logs").insert({
+    actor_id: actorId,
+    action,
+    target_id: targetId,
+    success,
+    metadata,
+  });
+  if (canonical.error) console.error("Audit write failed:", canonical.error.message);
 }

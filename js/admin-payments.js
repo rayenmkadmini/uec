@@ -3,11 +3,14 @@ let canManageEvents = false;
 let canManageEventPayments = false;
 let events = [];
 let paymentCounts = new Map();
+let collectedTotals = new Map();
+const pendingPaymentToggles = new Set();
 let activeSubscribersCount = 0;
 
 let currentEvent = null;
 let currentSubscribers = [];
 let currentPayments = new Map();
+let eventSaveInProgress = false;
 
 function formatAmount(amount) {
     const n = Number(amount) || 0;
@@ -63,6 +66,8 @@ function formatEventDate(value) {
 function getFacultyName(subscriber) {
     if (!subscriber) return "";
 
+    if (subscriber.faculty_name) return subscriber.faculty_name;
+
     if (Array.isArray(subscriber.faculties)) {
         return subscriber.faculties[0]?.name || "";
     }
@@ -73,7 +78,7 @@ function getFacultyName(subscriber) {
 async function loadEvents() {
     const eventsResult = await sb
         .from("events")
-        .select("id,name,description,amount,event_date,is_active")
+        .select("id,title,description,amount,event_date,is_active")
         .order("event_date", {
             ascending: false
         });
@@ -89,8 +94,8 @@ async function loadEvents() {
 
     const paymentsResult = await sb
         .from("event_payments")
-        .select("event_id,paid")
-        .eq("paid", true);
+        .select("event_id,amount")
+        .eq("status", "PAID");
 
     if (paymentsResult.error) {
         showAlert(
@@ -101,28 +106,19 @@ async function loadEvents() {
         return false;
     }
 
-    const subscribersResult = await sb
-        .from("subscribers")
-        .select("id", {
-            count: "exact",
-            head: true
-        })
-        .eq("status", "ACTIVE");
+    const subscribersLoaded =
+        await loadSubscribersOnce();
 
-    if (subscribersResult.error) {
-        showAlert(
-            "#pageAlert",
-            subscribersResult.error.message,
-            "error"
-        );
+    if (!subscribersLoaded) {
         return false;
     }
 
     events = eventsResult.data || [];
 
-    activeSubscribersCount = subscribersResult.count || 0;
+    activeSubscribersCount = currentSubscribers.length;
 
     paymentCounts = new Map();
+    collectedTotals = new Map();
 
     for (const payment of paymentsResult.data || []) {
         const eventId = payment.event_id;
@@ -130,6 +126,10 @@ async function loadEvents() {
         paymentCounts.set(
             eventId,
             (paymentCounts.get(eventId) || 0) + 1
+        );
+        collectedTotals.set(
+            eventId,
+            (collectedTotals.get(eventId) || 0) + (Number(payment.amount) || 0)
         );
     }
 
@@ -160,6 +160,8 @@ function renderEvents() {
             paymentCounts.get(event.id) || 0;
 
         const amount = formatAmount(event.amount);
+        const collected = formatAmount(collectedTotals.get(event.id) || 0);
+        const expected = formatAmount((Number(event.amount) || 0) * activeSubscribersCount);
 
         const status = event.is_active
             ? `<span class="status-badge success">Actif</span>`
@@ -170,7 +172,7 @@ function renderEvents() {
 
                 <div class="event-card-header">
                     <div>
-                        <h3>${escapeHtml(event.name || "Sans nom")}</h3>
+                        <h3>${escapeHtml(event.title || "Sans nom")}</h3>
 
                         <p>
                             ${formatEventDate(event.event_date)}
@@ -200,6 +202,12 @@ function renderEvents() {
                                 ${paidCount} / ${activeSubscribersCount}
                             </strong>
                         </span>
+
+                        <span>
+                            Collecté :
+                            <strong>${collected}</strong>
+                            <small>sur ${expected}</small>
+                        </span>
                     </div>
 
                 </div>
@@ -212,7 +220,7 @@ function renderEvents() {
                         data-action="payments"
                         data-id="${escapeHtml(String(event.id))}"
                     >
-                        Gérer les paiements
+                        ${canManageEventPayments ? "Gérer les paiements" : "Voir les paiements"}
                     </button>
 
                     ${canManageEvents ? `<button type="button" class="btn secondary" data-action="edit" data-id="${escapeHtml(String(event.id))}">${window.ICONS?.edit || ""} Modifier</button>
@@ -239,7 +247,7 @@ function openEventForm(event = null) {
         event?.id || "";
 
     $("#eventName").value =
-        event?.name || "";
+        event?.title || "";
 
     $("#eventDescription").value =
         event?.description || "";
@@ -252,6 +260,8 @@ function openEventForm(event = null) {
 
     $("#eventActive").value =
         String(event?.is_active ?? true);
+
+    $("#eventFormAlert").textContent = "";
 
     modal.classList.remove("hidden");
 }
@@ -267,21 +277,26 @@ async function deleteEvent(id) {
 
     if (!event) return;
 
+    const paidCount = paymentCounts.get(event.id) || 0;
     const confirmed = await confirmDialog(
-        `Voulez-vous supprimer l'événement "${event.name}" ?`
+        paidCount
+            ? `Supprimer l'événement "${event.title}" ? ${paidCount} paiement(s) enregistré(s) seront également supprimés. Cette action est irréversible.`
+            : `Voulez-vous supprimer l'événement "${event.title}" ?`,
+        { confirmText: "Supprimer" }
     );
 
     if (!confirmed) return;
 
-    const { error } = await sb
+    const failure = writeError(await sb
         .from("events")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .select("id"));
 
-    if (error) {
+    if (failure) {
         showAlert(
             "#pageAlert",
-            error.message,
+            failure,
             "error"
         );
 
@@ -298,6 +313,8 @@ async function deleteEvent(id) {
 }
 
 async function saveEvent(event) {
+    if (eventSaveInProgress || !canManageEvents) return;
+
     const name =
         $("#eventName").value.trim();
 
@@ -307,8 +324,9 @@ async function saveEvent(event) {
     const eventDate =
         $("#eventDate").value || null;
 
-    const amount =
-        Number($("#eventAmount").value) || 0;
+    const amountText =
+        $("#eventAmount").value.trim();
+    const amount = Number(amountText);
 
     const isActive =
         $("#eventActive").value === "true";
@@ -323,63 +341,93 @@ async function saveEvent(event) {
         return;
     }
 
-    const button =
-        $("#saveEventBtn");
-
-    if (button) {
-        button.disabled = true;
-    }
-
-    let result;
-
-    if (event) {
-        result = await sb
-            .from("events")
-            .update({
-                name: name,
-                description: description || null,
-                event_date: eventDate,
-                amount: amount,
-                is_active: isActive
-            })
-            .eq("id", event.id);
-    } else {
-        result = await sb
-            .from("events")
-            .insert({
-                name: name,
-                description: description || null,
-                event_date: eventDate,
-                amount: amount,
-                is_active: isActive
-            });
-    }
-
-    if (button) {
-        button.disabled = false;
-    }
-
-    if (result.error) {
+    if (!amountText || !Number.isFinite(amount) || amount < 0) {
         showAlert(
             "#eventFormAlert",
-            result.error.message,
+            "Le montant doit être un nombre positif ou nul.",
             "error"
         );
 
         return;
     }
 
-    closeEventForm();
+    const button =
+        $("#saveEventBtn");
+    const originalButtonText = button?.textContent || "Enregistrer";
 
-    showAlert(
-        "#pageAlert",
-        event
-            ? "Événement modifié."
-            : "Événement ajouté.",
-        "success"
-    );
+    eventSaveInProgress = true;
 
-    await loadEvents();
+    if (button) {
+        button.disabled = true;
+        button.setAttribute("aria-busy", "true");
+        button.textContent = "Enregistrement…";
+    }
+
+    try {
+        let result;
+
+        if (event) {
+            result = await sb
+                .from("events")
+                .update({
+                    title: name,
+                    description: description || null,
+                    event_date: eventDate,
+                    amount: amount,
+                    is_active: isActive
+                })
+                .eq("id", event.id)
+                .select("id");
+        } else {
+            result = await sb
+                .from("events")
+                .insert({
+                    title: name,
+                    description: description || null,
+                    event_date: eventDate,
+                    amount: amount,
+                    is_active: isActive
+                })
+                .select("id");
+        }
+
+        const failure = writeError(result);
+
+        if (failure) {
+            showAlert(
+                "#eventFormAlert",
+                failure,
+                "error"
+            );
+
+            return;
+        }
+
+        closeEventForm();
+
+        showAlert(
+            "#pageAlert",
+            event
+                ? "Événement modifié."
+                : "Événement ajouté.",
+            "success"
+        );
+
+        await loadEvents();
+    } catch (_) {
+        showAlert(
+            "#eventFormAlert",
+            "L’enregistrement de l’événement a échoué. Vérifiez votre connexion puis réessayez.",
+            "error"
+        );
+    } finally {
+        eventSaveInProgress = false;
+        if (button) {
+            button.disabled = false;
+            button.removeAttribute("aria-busy");
+            button.textContent = originalButtonText;
+        }
+    }
 }
 
 async function loadSubscribersOnce() {
@@ -387,21 +435,8 @@ async function loadSubscribersOnce() {
         return true;
     }
 
-    const { data, error } = await sb
-        .from("subscribers")
-        .select(`
-            id,
-            nom,
-            prenom,
-            numero_abonnement,
-            status,
-            card_paid,
-            faculties(name)
-        `)
-        .eq("status", "ACTIVE")
-        .order("nom", {
-            ascending: true
-        });
+    // Identification + payment fields only (no personal data), for every staff role.
+    const { data, error } = await sb.rpc("list_payment_members");
 
     if (error) {
         showAlert(
@@ -413,7 +448,7 @@ async function loadSubscribersOnce() {
         return false;
     }
 
-    currentSubscribers = data || [];
+    currentSubscribers = (data || []).filter(subscriber => subscriber.status === "ACTIVE");
 
     return true;
 }
@@ -428,19 +463,26 @@ async function openPayments(eventId) {
     currentEvent = event;
 
     $("#payEventTitle").textContent =
-        event.name || "Événement";
+        event.title || "Événement";
 
     $("#payEventMeta").textContent =
         `${formatEventDate(event.event_date)} • ${formatAmount(event.amount)}`;
 
+    const rowsContainer = $("#payRows");
+    if (rowsContainer) {
+        rowsContainer.innerHTML = '<tr><td colspan="6" class="loading-state">Chargement des paiements…</td></tr>';
+    }
+    $("#payStats").innerHTML = "";
+    $("#eventPayModal")?.classList.remove("hidden");
+
     const loaded =
         await loadSubscribersOnce();
 
-    if (!loaded) return;
+    if (!loaded) return closePaymentModal();
 
     const { data, error } = await sb
         .from("event_payments")
-        .select("subscriber_id,paid,paid_at")
+        .select("subscriber_id,status,paid_at,amount")
         .eq("event_id", event.id);
 
     if (error) {
@@ -450,7 +492,7 @@ async function openPayments(eventId) {
             "error"
         );
 
-        return;
+        return closePaymentModal();
     }
 
     currentPayments = new Map();
@@ -464,10 +506,10 @@ async function openPayments(eventId) {
 
     renderPayRows();
     renderPayStats();
+}
 
-    $("#eventPayModal")
-        ?.classList
-        .remove("hidden");
+function isPaid(payment) {
+    return payment?.status === "PAID";
 }
 
 function closePaymentModal() {
@@ -482,13 +524,17 @@ function renderPayStats() {
     const total =
         currentSubscribers.length;
 
+    const paidSubscribers =
+        currentSubscribers.filter(subscriber => isPaid(currentPayments.get(subscriber.id)));
+
     const paid =
-        [...currentPayments.values()]
-            .filter(payment => payment.paid)
-            .length;
+        paidSubscribers.length;
 
     const unpaid =
         total - paid;
+
+    const collected =
+        paidSubscribers.reduce((sum, subscriber) => sum + (Number(currentPayments.get(subscriber.id)?.amount) || 0), 0);
 
     stats.innerHTML = `
         <div class="stat-card">
@@ -504,6 +550,11 @@ function renderPayStats() {
         <div class="stat-card">
             <strong>${unpaid}</strong>
             <span>Non payés</span>
+        </div>
+
+        <div class="stat-card">
+            <strong>${formatAmount(collected)}</strong>
+            <span>Collecté</span>
         </div>
     `;
 }
@@ -549,7 +600,7 @@ function renderPayRows() {
                 );
 
             const paid =
-                payment?.paid === true;
+                isPaid(payment);
 
             let matchesFilter = true;
 
@@ -569,9 +620,11 @@ function renderPayRows() {
 
     if (!rows.length) {
         container.innerHTML = `
-            <div class="empty-state">
-                Aucun adhérent trouvé.
-            </div>
+            <tr>
+                <td colspan="6" class="empty">
+                    Aucun adhérent trouvé.
+                </td>
+            </tr>
         `;
 
         return;
@@ -585,130 +638,89 @@ function renderPayRows() {
             );
 
         const paid =
-            payment?.paid === true;
+            isPaid(payment);
 
-        const statusClass =
-            paid
-                ? "success"
-                : "warning";
+        const busy =
+            pendingPaymentToggles.has(subscriber.id);
 
-        const statusText =
-            paid
-                ? "Payé"
-                : "Non payé";
+        // Separation of duties: a treasurer cannot change their own cotisation.
+        const ownRowLocked =
+            subscriber.is_self && !canManageEvents;
+
+        const paidDate =
+            paid && payment?.paid_at
+                ? new Date(payment.paid_at).toLocaleDateString("fr-TN")
+                : "";
 
         return `
-            <div class="payment-row">
-
-                <div class="payment-member">
-
-                    <strong>
-                        ${escapeHtml(
-                            subscriber.nom || ""
-                        )}
-                        ${escapeHtml(
-                            subscriber.prenom || ""
-                        )}
-                    </strong>
-
-                    <small>
-                        N° :
-                        ${escapeHtml(
-                            subscriber.numero_abonnement || "-"
-                        )}
-                    </small>
-
-                    <small>
-                        ${escapeHtml(
-                            getFacultyName(subscriber)
-                        )}
-                    </small>
-
-                </div>
-
-                <div class="payment-status">
-                    <span class="status-badge ${statusClass}">
-                        ${statusText}
+            <tr>
+                <td>${escapeHtml(subscriber.nom || "")}</td>
+                <td>${escapeHtml(subscriber.prenom || "")}</td>
+                <td>${escapeHtml(subscriber.numero_abonnement || "—")}</td>
+                <td>${escapeHtml(facultyShort(getFacultyName(subscriber)) || "—")}</td>
+                <td>
+                    <span class="status-badge ${paid ? "success" : "warning"}" title="${escapeHtml(paidDate ? `Payé le ${paidDate}` : "")}">
+                        ${paid ? "Payé" : "Non payé"}
                     </span>
-                </div>
-
-                <div class="payment-action">
-
-                    ${canManageEventPayments ? `<button type="button" class="btn ${paid ? "secondary" : "primary"}" data-action="toggle-payment" data-subscriber-id="${escapeHtml(String(subscriber.id))}">${paid ? "Annuler paiement" : "Marquer payé"}</button>` : ""}
-
-                </div>
-
-            </div>
+                </td>
+                <td>
+                    ${canManageEventPayments && ownRowLocked
+                        ? `<span class="muted-text" title="Votre propre cotisation doit être validée par un super administrateur.">🔒 Super admin requis</span>`
+                        : canManageEventPayments
+                        ? `<button type="button" class="btn ${paid ? "secondary" : "primary"}" data-action="toggle-payment" data-subscriber-id="${escapeHtml(String(subscriber.id))}" ${busy ? 'disabled aria-busy="true"' : ""}>${paid ? "Marquer non payé" : "Marquer payé"}</button>`
+                        : "—"}
+                </td>
+            </tr>
         `;
     }).join("");
 }
 
-async function togglePayment(subscriberId, button = null) {
-    if (!currentEvent || !canManageEventPayments) return showAlert("#pageAlert","Vous n’avez pas la permission de modifier les cotisations.","error");
+async function togglePayment(subscriberId) {
+    if (!currentEvent || !canManageEventPayments) {
+        return showAlert("#pageAlert", "Vous n’avez pas la permission de modifier les cotisations.", "error");
+    }
 
-    const existing =
-        currentPayments.get(subscriberId);
+    if (pendingPaymentToggles.has(subscriberId)) return;
+
+    const target = currentSubscribers.find(subscriber => String(subscriber.id) === String(subscriberId));
+    if (target?.is_self && !canManageEvents) {
+        return showAlert("#pageAlert", "Votre propre cotisation doit être validée par un super administrateur.", "error");
+    }
 
     const nextPaid =
-        !existing?.paid;
+        !isPaid(currentPayments.get(subscriberId));
 
-    if (button) {
-        button.disabled = true;
-    }
+    pendingPaymentToggles.add(subscriberId);
+    renderPayRows();
 
-    const payload = {
-        event_id: currentEvent.id,
-        subscriber_id: subscriberId,
-        paid: nextPaid,
-        paid_at: nextPaid
-            ? new Date().toISOString()
-            : null
-    };
+    const eventId = currentEvent.id;
+    const { data, error } = await sb.rpc("set_event_payment_status", {
+        p_event_id: eventId,
+        p_subscriber_id: subscriberId,
+        p_paid: nextPaid
+    });
 
-    const { data, error } = await sb
-        .from("event_payments")
-        .upsert(
-            payload,
-            {
-                onConflict:
-                    "event_id,subscriber_id"
-            }
-        )
-        .select(
-            "subscriber_id,paid,paid_at"
-        )
-        .single();
-
-    if (button) {
-        button.disabled = false;
-    }
+    pendingPaymentToggles.delete(subscriberId);
 
     if (error) {
-        console.error(
-            "togglePayment error:",
-            error
-        );
-
-        showAlert(
-            "#pageAlert",
-            error.message,
-            "error"
-        );
-
+        console.error("togglePayment error:", error);
+        showAlert("#pageAlert", error.message, "error");
+        renderPayRows();
         return;
     }
 
-    currentPayments.set(
-        subscriberId,
-        data
-    );
+    currentPayments.set(subscriberId, {
+        subscriber_id: subscriberId,
+        status: data.status,
+        paid_at: data.paid_at,
+        amount: data.amount
+    });
 
-    paymentCounts.set(
-        currentEvent.id,
-        [...currentPayments.values()]
-            .filter(payment => payment.paid)
-            .length
-    );
+    const paidPayments =
+        [...currentPayments.values()].filter(isPaid);
+
+    paymentCounts.set(eventId, paidPayments.length);
+    collectedTotals.set(eventId, paidPayments.reduce((sum, payment) => sum + (Number(payment.amount) || 0), 0));
 
     renderPayRows();
     renderPayStats();
@@ -720,7 +732,7 @@ function setupEvents() {
     $("#addEventBtn")?.addEventListener(
         "click",
         () => {
-            openEventForm();
+            if (canManageEvents) openEventForm();
         }
     );
 
@@ -817,8 +829,7 @@ function setupEvents() {
                 button.dataset.subscriberId;
 
             await togglePayment(
-                subscriberId,
-                button
+                subscriberId
             );
         }
     );
@@ -864,11 +875,11 @@ async function init() {
         return;
     }
 
-    const ctx = await requireStaff();
+    const ctx = await requirePermission("viewEvents");
     if (!ctx) return;
     currentStaffCtx = ctx;
-    canManageEvents = hasContextRole(ctx, "SUPERADMIN");
-    canManageEventPayments = canManageEvents || hasContextRole(ctx, "TREASURER");
+    canManageEvents = can(ctx, "manageEvents");
+    canManageEventPayments = can(ctx, "manageEventPaymentStatuses");
     setupShell(ctx);
     $("#addEventBtn")?.classList.toggle("hidden", !canManageEvents);
     setupEvents();

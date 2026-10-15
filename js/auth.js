@@ -1,12 +1,14 @@
 document.addEventListener("DOMContentLoaded", async () => {
+  // Already signed in (page refresh / back button): go straight to the role's home.
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) {
-    const { data: profile } = await sb.from("profiles").select("must_change_password,is_active").eq("id", session.user.id).single();
-    if (!profile || profile.is_active === false) { await sb.auth.signOut(); return; }
-    const roles = await fetchUserRolesForUser(session.user.id);
-    if (profile?.must_change_password) location.href = "change-password.html";
-    else if (roles.some(role => ["ADMIN", "SUPERADMIN", "TREASURER"].includes(role))) location.href = "dashboard.html";
-    else if (roles.includes("MEMBER")) location.href = "subscriber.html";
+    const ctx = await getCurrentContext();
+    const home = ctx && homePageFor(ctx);
+    if (ctx && home) {
+      location.href = ctx.profile.must_change_password ? "change-password.html" : home;
+      return;
+    }
+    await sb.auth.signOut();
   }
 
   const form = document.querySelector("#loginForm");
@@ -79,18 +81,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    const roles = await fetchUserRolesForUser(data.user.id);
+    const ctx = { user: data.user, profile, roles: await fetchUserRolesForUser(data.user.id) };
+    const home = homePageFor(ctx);
 
-    if (["ADMIN", "SUPERADMIN", "TREASURER"].some(role => roles.includes(role))) {
-      location.href = profile.must_change_password ? "change-password.html" : "dashboard.html";
-      return;
-    }
-
-    if (roles.includes("MEMBER")) {
+    if (home === "subscriber.html") {
       const { data: subscriber } = await sb.from("subscribers")
         .select("status").eq("user_id", data.user.id).maybeSingle();
 
-      if (subscriber?.status === "INACTIVE") {
+      if (subscriber && subscriber.status !== "ACTIVE") {
         await sb.auth.signOut();
         err.textContent = "Votre abonnement est désactivé. Contactez l’administration.";
         err.classList.remove("hidden");
@@ -99,8 +97,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         button.innerHTML = original;
         return;
       }
+    }
 
-      location.href = profile.must_change_password ? "change-password.html" : "subscriber.html";
+    if (home) {
+      location.href = profile.must_change_password ? "change-password.html" : home;
       return;
     }
 

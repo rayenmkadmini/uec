@@ -64,7 +64,7 @@ async function loadAdmins() {
 
     if (roleError) {
       $("#adminRows").innerHTML = '<tr><td colspan="6" class="empty">Impossible de charger les rôles. Réessayez.</td></tr>';
-      return showAlert("#pageAlert", "Les rôles canoniques sont indisponibles.", "error");
+      return showAlert("#pageAlert", "Impossible de charger les rôles des comptes.", "error");
     }
     roleRows = rows || [];
   }
@@ -72,7 +72,7 @@ async function loadAdmins() {
   const byUser = {};
   for (const row of roleRows) {
     if (!byUser[row.user_id]) byUser[row.user_id] = [];
-    byUser[row.user_id].push(String(row.role || "").toUpperCase());
+    byUser[row.user_id].push(String(row.role ?? row.role_name ?? "").toUpperCase());
   }
 
   const rolesFor = a => normalizeRoleNames(byUser[a.id] || []);
@@ -226,9 +226,9 @@ $("#adminModal").addEventListener("click", e => {
 });
 
 (async () => {
-  currentCtx = await requireAdmin();
+  currentCtx = await requirePermission("viewUsers");
   if (!currentCtx) return;
-  canManageAdmins = hasContextRole(currentCtx, "SUPERADMIN");
+  canManageAdmins = can(currentCtx, "manageUsers");
   setupShell(currentCtx);
   await loadAdmins();
 })();

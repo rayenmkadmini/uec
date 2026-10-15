@@ -12,9 +12,13 @@ export async function replaceRoles(db: any, userId: string, roles: string[]) {
   const { error: delError } = await db.from("user_roles").delete().eq("user_id", userId);
   if (delError) throw new Error(delError.message);
 
-  const { error: insError } = await db.from("user_roles").insert(
+  let { error: insError } = await db.from("user_roles").insert(
     normalized.map((role) => ({ user_id: userId, role })),
   );
+  if (insError) {
+    const legacyResult = await db.from("user_roles").insert(normalized.map((role_name) => ({ user_id: userId, role_name })));
+    insError = legacyResult.error;
+  }
   if (insError) throw new Error(insError.message);
   return normalized;
 }
