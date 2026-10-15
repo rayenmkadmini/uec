@@ -49,7 +49,7 @@ async function loadProfile() {
         .maybeSingle();
     // Own email / phone come from get_account_contacts(): the columns are not
     // selectable through the table API.
-    const contacts = data ? await sb.rpc("get_account_contacts") : { data: [], error: null };
+    const contacts = data ? await sb.rpc("get_account_contacts", { p_user_id: profileCtx.user.id }) : { data: [], error: null };
 
     if (error || !data || contacts.error) {
         $("#profileHeading").textContent = "Profil indisponible";

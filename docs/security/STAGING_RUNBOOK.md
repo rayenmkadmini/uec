@@ -1,6 +1,12 @@
 # Staging runbook — UE Clubiste (Phase C)
 
-Status: **not executed.** No staging project exists. Production is
+Status: hosted staging **not executed** (no staging project exists). Phase D ran the
+full validation on the **local staging stack** (`staging-local/`, see
+`PHASE_D_REPORT.md` and `DEPLOYMENT_PLAN.md`), which supersedes Option B below.
+A fourth migration, `20261015180000_admin_least_privilege`, now follows 160000.
+Include it wherever this runbook lists the pending migrations.
+
+Original status: **not executed.** No staging project exists. Production is
 `qwlbbfyhjdeekmrxtzjf` (login.uec) and must not be used for any step below. The
 second project in the organization (`astsvxyqyyzqvuioqsnq`, "uec") is **not**
 staging and must not be used either.
@@ -10,7 +16,7 @@ staging and must not be used either.
 | Prerequisite | Status | Notes |
 |---|---|---|
 | A staging Supabase project, separate from production | **Missing** | Creating a project may count against the plan's project limit. Do not create, pause or delete any project, or upgrade, without approval. |
-| Option B: local full stack (`supabase start`: Postgres, GoTrue, Storage, Edge runtime) | Possible, free | Would also allow the first **real** Edge Function integration test. Docker publishes ports on all interfaces, and the Windows firewall is currently **off** on a Public network. Fix the firewall (approval) or bind ports to localhost first. |
+| Option B: local full stack | **Done in Phase D** without `supabase start` (only `127.0.0.1:54321` published, fresh keys) | Would also allow the first **real** Edge Function integration test. Docker publishes ports on all interfaces, and the Windows firewall is currently **off** on a Public network. Fix the firewall (approval) or bind ports to localhost first. |
 | Staging site URL for the frontend (static hosting) | Missing | Needed for activation links (`PUBLIC_SITE_URL`) and the Auth redirect allow-list. |
 | Synthetic test accounts (one per role, plus deactivated / flagged ones) | To create **in staging only** | Never copy production members or Auth users. |
 | Production schema snapshot | Available | `uec-backups/2026-10-15/schema.sql` (restricted folder, schema only). |
@@ -108,7 +114,7 @@ npx supabase link --project-ref "$STAGING_REF"
 npx supabase db query --linked --project-ref "$STAGING_REF" -f <restricted>/schema.sql
 npx supabase db query --linked --project-ref "$STAGING_REF" -f <restricted>/platform_objects.v2.sql   # auth.users trigger + storage policies
 # Buckets (empty): subscriber-photos (public, 5 MB, images), match-logos (public), as in production.
-for m in 20261015120000_role_permissions_repair 20261015140000_member_identity_and_password_hardening 20261015160000_active_accounts_and_data_minimization; do
+for m in 20261015120000_role_permissions_repair 20261015140000_member_identity_and_password_hardening 20261015160000_active_accounts_and_data_minimization 20261015180000_admin_least_privilege; do
   npx supabase db query --linked --project-ref "$STAGING_REF" -f supabase/migrations/$m.sql || break
 done
 node scripts/run-rls-tests.mjs --no-migration --linked        # role matrix against staging, rolled back

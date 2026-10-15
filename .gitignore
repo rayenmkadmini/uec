@@ -50,3 +50,7 @@ service-account*.json
 # Local Supabase CLI state
 supabase/.temp/
 supabase/.branches/
+
+# Local staging stack: generated keys and site build (never commit)
+/staging-local/.secrets/
+/staging-local/.build/

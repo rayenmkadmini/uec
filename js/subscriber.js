@@ -133,9 +133,9 @@ async function loadUpcomingMatches() {
   }).join("");
 }
 
-// CIN, address, date of birth, phone and email are not selectable through the
-// table API; the member reads their own values through get_member_private_fields().
-const OWN_MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,gender,photo_url," +
+// CIN, address, date of birth, phone, email, gender and photo are not selectable
+// through the table API; the member reads their own values through get_member_private_fields().
+const OWN_MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement," +
   "faculty_id,zone_id,status,card_paid,card_paid_at,faculties(name),zones(name)";
 
 async function withOwnPrivateFields(subscriber) {
@@ -147,7 +147,8 @@ async function withOwnPrivateFields(subscriber) {
     data: {
       ...subscriber,
       cin: own.cin ?? null, adresse: own.adresse ?? null, date_naissance: own.date_naissance ?? null,
-      phone: own.phone ?? null, email: own.email ?? null
+      phone: own.phone ?? null, email: own.email ?? null,
+      gender: own.gender ?? null, photo_url: own.photo_url ?? null
     },
     error: null
   };
@@ -228,7 +229,8 @@ async function saveMemberProfile() {
   const refreshed = await withOwnPrivateFields(result.data[0]);
   original = refreshed.data || {
     ...result.data[0], cin: original.cin, adresse: $("#adresse").value.trim() || null,
-    phone: $("#phone").value.trim() || null, email: email || null
+    phone: $("#phone").value.trim() || null, email: email || null,
+    gender: original.gender, photo_url: photoUrl
   };
   if ($("#photoFile")) $("#photoFile").value = "";
   ["phone","email","adresse"].forEach(id => $("#" + id).disabled = true);

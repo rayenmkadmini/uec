@@ -37,11 +37,16 @@ async function loadSubscriber() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return false;
 
-  const { data, error } = await sb
+  const row = await sb
     .from("subscribers")
-    .select("id,nom,prenom,gender,status")
+    .select("id,nom,prenom,status")
     .eq("user_id", user.id)
     .single();
+  // Gender is not selectable through the table API; the member reads their own
+  // through get_member_private_fields(). The seat RPC enforces the zone rule anyway.
+  const own = row.data ? await sb.rpc("get_member_private_fields", { p_subscriber_id: row.data.id }) : { data: [], error: null };
+  const error = row.error || own.error;
+  const data = row.data ? { ...row.data, gender: (own.data || [])[0]?.gender ?? null } : null;
 
   if (error || !data) {
     if (error) console.error("Chargement du profil membre:", error);

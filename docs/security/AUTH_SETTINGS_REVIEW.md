@@ -69,3 +69,25 @@ sign-ins and token refreshes, but:
 
 Recommendation: keep the database check as the control. Optionally add ban /
 unban to `admin-update-admin` later, as defense in depth that also blocks sign-in.
+
+## Phase D: what was validated locally vs. what needs the Dashboard
+
+The local staging stack (`staging-local/`) runs **GoTrue v2.197.0, the same Auth
+version as production**, configured with the recommended values. The tests below
+prove that these settings **behave as intended with this app**. They say nothing
+about the values currently set in production: those were not read.
+
+| Setting | Local value (GoTrue env) | Validated locally (api-e2e / browser-e2e) | Production |
+|---|---|---|---|
+| Sign-up disabled | `GOTRUE_DISABLE_SIGNUP=true` | `POST /auth/v1/signup` refused | **Confirm in Dashboard** |
+| Minimum length 12 | `GOTRUE_PASSWORD_MIN_LENGTH=12` | 5-character password refused by Auth (422) | **Confirm** |
+| Required characters (lower, upper, digit, symbol) | `GOTRUE_PASSWORD_REQUIRED_CHARACTERS` | 14 characters without a symbol refused (422); generated temporary passwords accepted | **Confirm** |
+| Redirect allow-list | `GOTRUE_URI_ALLOW_LIST=<site>/change-password.html` | allow-listed redirect honoured; `https://evil.example/…` **not** honoured | **Confirm** (production site URL) |
+| Link / OTP expiry | `GOTRUE_MAILER_OTP_EXP` (3600; 5 for the expiry test) | link refused after expiry; page explains it; new link works | **Confirm** |
+| Single-use links | GoTrue behaviour | second use refused (`otp_expired`); no session created | Platform behaviour (same version) |
+| Secure password change | `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_REAUTHENTICATION=false` | not enabled locally; the first-login flow works without it | **Decide** (see the table above) |
+| Leaked-password protection | not available locally | — | **Plan-dependent; no upgrade** |
+| Mail link paths | `GOTRUE_MAILER_URLPATHS_*=<api>/auth/v1/verify` | links open `/auth/v1/verify` | Platform-managed |
+
+Also confirmed locally: a **deactivated** account can still obtain a token from Auth (no ban),
+but that token grants no data, RPC, storage or Edge Function access.

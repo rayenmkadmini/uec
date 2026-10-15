@@ -82,19 +82,19 @@ async function loadRefs() {
     (zonesResult.data || []).map(x => `<option value="${x.id}">${escapeHtml(x.name)}</option>`).join("");
 }
 
-// Columns any staff reader may select. CIN, address, date of birth, notes, phone
-// and email are withheld by the database (column privileges); "*" is refused.
-const MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement,gender,photo_url," +
+// Columns any staff reader may select. CIN, address, date of birth, notes, phone,
+// email, gender and photo are withheld by the database (column privileges); "*" is refused.
+const MEMBER_COLUMNS = "id,user_id,nom,prenom,login_name,numero_abonnement," +
   "faculty_id,zone_id,status,card_paid,card_paid_at,subscription_start,subscription_end,created_at,updated_at," +
   "faculties(name),zones(name)";
 
 function columnCount() {
   if (!canViewDetails) return 7;
-  return canViewIdentity ? 11 : 10;
+  return canViewIdentity ? 11 : 8;
 }
 
 // SUPERADMIN / ADMIN read member records without protected identity fields.
-// SUPERADMIN additionally loads CIN / address / date of birth / phone / email through
+// SUPERADMIN additionally loads CIN / address / date of birth / phone / email / gender / photo through
 // get_member_private_fields(). TREASURER receives only identification + payment
 // fields from list_payment_members() — the database refuses anything more.
 async function loadSubs() {
@@ -119,7 +119,9 @@ async function loadSubs() {
           cin: privateById.get(s.id)?.cin ?? null,
           adresse: privateById.get(s.id)?.adresse ?? null,
           phone: privateById.get(s.id)?.phone ?? null,
-          email: privateById.get(s.id)?.email ?? null
+          email: privateById.get(s.id)?.email ?? null,
+          gender: privateById.get(s.id)?.gender ?? null,
+          photo_url: privateById.get(s.id)?.photo_url ?? null
         } : {}),
         is_self: Boolean(s.user_id) && s.user_id === currentCtx?.user?.id
       }
@@ -136,7 +138,7 @@ function canToggleCardOf(s) {
 function apply() {
   const q = $("#search").value.toLowerCase().trim();
   const status = $("#statusFilter").value;
-  const gender = $("#genderFilter").value;
+  const gender = $("#genderFilter")?.value || "";
   const card = $("#cardFilter").value;
 
   filtered = allSubs.filter(s => {
@@ -148,7 +150,7 @@ function apply() {
 
     return (!q || text.includes(q)) &&
       (!status || s.status === status) &&
-      (!gender || s.gender === gender) &&
+      (!gender || !canViewIdentity || s.gender === gender) &&
       (!card || (card === "paid" ? s.card_paid : !s.card_paid));
   });
 
@@ -178,7 +180,7 @@ async function render() {
 
   const start = (page - 1) * pageSize;
   const rows = filtered.slice(start, start + pageSize);
-  const photoEntries = canViewDetails
+  const photoEntries = canViewIdentity
     ? await Promise.all(rows.filter(s => s.photo_url).map(async s => [s.id, await getSubscriberPhotoUrl(s.photo_url)]))
     : [];
   if (renderRequest !== subscriberRenderRequest) return;
@@ -186,13 +188,13 @@ async function render() {
 
   $("#rows").innerHTML = rows.map(s => `
     <tr>
-      ${canViewDetails ? `<td class="member-thumb-cell">
+      ${canViewIdentity ? `<td class="member-thumb-cell">
         ${photoUrls.get(s.id) ? `<img src="${escapeHtml(photoUrls.get(s.id))}" alt="Photo de ${escapeHtml(s.prenom || "membre")}" class="member-thumb" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">` : ""}
         <span class="member-thumb-fallback" ${photoUrls.get(s.id) ? 'style="display:none;"' : ''}>${escapeHtml((s.prenom || "A").charAt(0).toUpperCase())}</span>
       </td>` : ""}
       <td>${escapeHtml(s.nom)}</td>
       <td>${escapeHtml(s.prenom)}</td>
-      ${canViewDetails ? `<td>${genderLabel(s.gender)}</td>` : ""}
+      ${canViewIdentity ? `<td>${genderLabel(s.gender)}</td>` : ""}
       <td>${escapeHtml(s.numero_abonnement || "—")}</td>
       ${canViewIdentity ? `<td>${escapeHtml(s.cin || "—")}</td>` : ""}
       <td>${escapeHtml(facultyShort(s.faculties?.name) || "—")}</td>
@@ -223,7 +225,7 @@ async function render() {
 
 async function openMemberCard(subscriber) {
   const user = subscriber || {};
-  const photoUrl = canViewDetails ? await getSubscriberPhotoUrl(user.photo_url) : "";
+  const photoUrl = canViewIdentity ? await getSubscriberPhotoUrl(user.photo_url) : "";
   const card = `
     <div class="member-card-wrap">
       <div class="member-card-header">
@@ -243,7 +245,7 @@ async function openMemberCard(subscriber) {
         <div><span>Email</span><strong>${escapeHtml(user.email || "—")}</strong></div>` : ""}
         <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>
         <div><span>Zone</span><strong>${escapeHtml(user.zones?.name || "—")}</strong></div>
-        <div><span>Sexe</span><strong>${escapeHtml(user.gender === "FEMALE" ? "Femme" : user.gender === "MALE" ? "Homme" : "Non défini")}</strong></div>
+        ${canViewIdentity ? `<div><span>Sexe</span><strong>${escapeHtml(user.gender === "FEMALE" ? "Femme" : user.gender === "MALE" ? "Homme" : "Non défini")}</strong></div>` : ""}
         ${canViewIdentity ? `<div><span>Adresse</span><strong>${escapeHtml(user.adresse || "—")}</strong></div>` : ""}` : `
         <div><span>Faculté</span><strong>${escapeHtml(user.faculties?.name || "—")}</strong></div>`}
         <div><span>Carte membre</span><strong>${user.card_paid ? "Payée" : "Non payée"}</strong></div>
@@ -642,7 +644,10 @@ async function init() {
     $$(".col-private").forEach(th => th.remove());
     $("#genderFilter")?.remove();
   }
-  if (!canViewIdentity) $$(".col-identity").forEach(th => th.remove());
+  if (!canViewIdentity) {
+    $$(".col-identity").forEach(th => th.remove());
+    $("#genderFilter")?.remove();
+  }
 
   setupShell(ctx);
   setupFacultyCombo();
@@ -651,7 +656,7 @@ async function init() {
 
   $("#search").oninput = apply;
   $("#statusFilter").onchange = apply;
-  $("#genderFilter").onchange = apply;
+  if ($("#genderFilter")) $("#genderFilter").onchange = apply;
   $("#cardFilter").onchange = apply;
 
   $("#prev").onclick = () => {

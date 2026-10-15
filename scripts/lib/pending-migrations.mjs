@@ -4,7 +4,8 @@
 export const PENDING = [
   "20261015120000_role_permissions_repair",
   "20261015140000_member_identity_and_password_hardening",
-  "20261015160000_active_accounts_and_data_minimization"
+  "20261015160000_active_accounts_and_data_minimization",
+  "20261015180000_admin_least_privilege"
 ];
 
 export const migrationPath = name => `supabase/migrations/${name}.sql`;

@@ -1,9 +1,11 @@
-# Field-access matrix (after migrations 120000 + 140000 + 160000)
+# Field-access matrix (after migrations 120000 + 140000 + 160000 + 180000)
 
 Enforced by the database: RLS for rows, **column privileges** for fields, and
 checked `SECURITY DEFINER` RPCs for the few paths that return protected fields.
 The UI hides the same fields, but hiding is not the control. Every rule below
-has negative tests in `supabase/tests/rls_role_matrix.sql`.
+has negative tests in `supabase/tests/rls_role_matrix.sql`, and the main ones are
+also exercised over HTTP and in a browser against real Supabase services
+(`staging-local/tests/`).
 
 **Account state applies to every role.** A role only counts while the account
 is active (`profiles.is_active`) and has no pending password change
@@ -20,7 +22,8 @@ Legend: ✔ allowed · own = own row only · — denied · RPC = only through th
 |---|---|---|---|---|
 | id, nom, prénom, numero_abonnement, status, card_paid, card_paid_at | ✔ all | ✔ all | via `list_payment_members()` | own |
 | user_id (account linked / "Non activé"), login_name | ✔ all | ✔ all | — (is_self flag only) | own |
-| gender, faculty, zone, photo path, subscription dates, created/updated | ✔ all | ✔ all | faculty name only | own |
+| faculty, zone, subscription dates, created/updated | ✔ all | ✔ all | faculty name only | own |
+| **gender, photo path** | RPC `get_member_private_fields` | — | — | own, RPC |
 | **phone, email** | RPC `get_member_private_fields` | — | — | own, RPC |
 | **CIN, adresse, date_naissance** | RPC `get_member_private_fields` | — | — | own, RPC |
 | notes | — (not used by the app) | — | — | — |
@@ -57,8 +60,8 @@ and counts only. They never contain CIN, contact data, passwords or links.
 | Data | SUPERADMIN | ADMIN | TREASURER | MEMBER |
 |---|---|---|---|---|
 | matches, match_zones, clubs, faculties, zones, site_settings, roles | ✔ read/write | read | read | read |
-| seat choices (`match_participations`) | ✔ all | read all | — | own; change via RPC before kick-off |
-| `subscriber-photos` bucket | read/write all | read | — | own folder read/write |
+| seat choices (`match_participations`) | ✔ all | read all; names + zones via `list_match_participants()` (gender empty) | — | own; change via RPC before kick-off |
+| `subscriber-photos` bucket | read/write all | — | — | own folder read/write |
 | `match-logos` bucket | write | read | read | read |
 
 ## Edge Functions
@@ -76,8 +79,10 @@ member page (`download`, `Blob(`).
 
 ## Decisions to confirm
 
-- ADMIN still sees member **photos**, gender, faculty, zone, seats and card status,
-  for supervision and member cards. Remove any of these if not required.
+- Since 180000, ADMIN **no longer** sees member photos or gender (least-privilege default).
+  ADMIN keeps faculty, zone, seat choices and card status. The ADMIN role is defined
+  with `viewMatches` / supervision duties, and the seat list exposes names, subscription
+  numbers and zones only. Any further expansion needs approval.
 - TREASURER receives **no contact data**. No payment workflow in the app needs it.
 - `notes` (members, payments) and `ip_address` (audit) are now readable by no API
   role, SUPERADMIN included. The app never displayed them.

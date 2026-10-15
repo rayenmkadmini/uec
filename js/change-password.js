@@ -6,6 +6,9 @@
     history.replaceState(null,"",location.pathname);
     const form=$("#changeForm");
     if(form)form.classList.add("hidden");
+    // Persistent explanation (the toast disappears after a few seconds).
+    const box=$("#linkError");
+    if(box){box.textContent=linkError;box.classList.remove("hidden");}
     showAlert("#alert",linkError,"error");
     return;
   }

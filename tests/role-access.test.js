@@ -352,7 +352,8 @@ test("account emails are shown to SUPERADMIN only and loaded through the checked
   const users = read("js/admin-users.js");
   assert.match(users, /if \(canManageAdmins\) \{\s*const \{ data: contacts, error: contactError \} = await sb\.rpc\("get_account_contacts"\)/);
   assert.match(users, /<td>\$\{superAdmin \? escapeHtml\(a\.email \|\| "—"\) : '<span class="muted-text">Masqué<\/span>'\}<\/td>/);
-  assert.match(read("js/profile.js"), /sb\.rpc\("get_account_contacts"\)/);
+  // Own id is required: for a SUPERADMIN the RPC without an id returns every account.
+  assert.match(read("js/profile.js"), /sb\.rpc\("get_account_contacts", \{ p_user_id: profileCtx\.user\.id \}\)/);
   const members = read("js/subscribers.js");
   const contactCells = [...members.matchAll(/\$\{escapeHtml\(user\.(phone|email)/g)];
   assert.equal(contactCells.length, 2);
@@ -381,4 +382,31 @@ test("expired or invalid activation links are explained on the password page", (
   assert.match(at("", "?error=server_error"), /n’est pas valide/);
   assert.doesNotMatch(at("#error=x&error_description=<script>"), /script/, "URL text is never echoed");
   assert.match(read("js/change-password.js"), /const linkError=authLinkError\(\);[\s\S]*history\.replaceState/);
+});
+
+test("member photos and gender are SUPERADMIN-only in the staff UI; seat pages use RPCs", () => {
+  const html = read("subscribers.html");
+  for (const header of ["Photo", "Sexe", "CIN"]) assert.match(html, new RegExp(`<th class="col-private col-identity">${header}</th>`), header);
+  const members = read("js/subscribers.js");
+  assert.match(members, /const photoEntries = canViewIdentity/);
+  assert.match(members, /\$\{canViewIdentity \? `<td>\$\{genderLabel\(s\.gender\)\}<\/td>` : ""\}/);
+  assert.match(members, /const gender = \$\("#genderFilter"\)\?\.value \|\| "";/, "gender filter may be absent (ADMIN, TREASURER)");
+  assert.doesNotMatch(read("js/subscribers.js").match(/const MEMBER_COLUMNS = ([^;]+);/)[1], /gender|photo_url/);
+  assert.doesNotMatch(read("js/subscriber.js").match(/const OWN_MEMBER_COLUMNS = ([^;]+);/)[1], /gender|photo_url/);
+  const seats = read("js/matchs.js");
+  assert.match(seats, /\.select\("id,nom,prenom,status"\)/);
+  assert.match(seats, /sb\.rpc\("get_member_private_fields", \{ p_subscriber_id: row\.data\.id \}\)/);
+  const stats = read("js/admin-matchs.js");
+  assert.match(stats, /sb\.rpc\("list_match_participants", \{ p_match_id: matchId \}\)/);
+  assert.doesNotMatch(stats, /subscribers\([^)]*gender/);
+});
+
+test("expired-link details survive supabase-js URL handling and stay visible", () => {
+  const config = read("js/config.js");
+  assert.ok(config.indexOf("window.UE_AUTH_REDIRECT = { hash: location.hash, search: location.search };") < config.indexOf("createClient("),
+    "the redirect snapshot must be taken before the client consumes the fragment");
+  assert.match(read("js/common.js"), /function authLinkError\(loc = window\.UE_AUTH_REDIRECT \|\| location\)/);
+  const page = read("change-password.html");
+  assert.ok(page.indexOf('id="linkError"') >= 0 && page.indexOf('id="linkError"') < page.indexOf('<form id="changeForm"'), "outside the hidden form");
+  assert.match(read("js/change-password.js"), /box\.textContent=linkError;box\.classList\.remove\("hidden"\)/);
 });

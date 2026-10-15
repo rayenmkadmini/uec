@@ -338,16 +338,20 @@ window.showStats = async matchId => {
   $("#statsContent").innerHTML = '<div class="loading-state">Chargement des statistiques…</div>';
   $("#statsModal").classList.remove("hidden");
 
-  const { data, error } = await sb.from("match_participations")
-    .select("id,zone_id,subscribers(nom,prenom,numero_abonnement,gender),match_zones(zone_key,zone_name)")
-    .eq("match_id", matchId);
+  // Names, subscription numbers and zones for ADMIN; gender only for SUPERADMIN
+  // (list_match_participants returns it as null otherwise).
+  const { data, error } = await sb.rpc("list_match_participants", { p_match_id: matchId });
 
   if (error) {
     return $("#statsContent").innerHTML = `<div class="gender-warning">${escapeHtml(error.message)}</div>`;
   }
 
-  const rows = data || [];
+  const rows = (data || []).map(r => ({
+    subscribers: { nom: r.nom, prenom: r.prenom, numero_abonnement: r.numero_abonnement, gender: r.gender },
+    match_zones: { zone_key: r.zone_key, zone_name: r.zone_name }
+  }));
   const total = rows.length;
+  const showGender = rows.some(x => x.subscribers.gender);
   const men = rows.filter(x => x.subscribers?.gender === "MALE").length;
   const women = rows.filter(x => x.subscribers?.gender === "FEMALE").length;
   const unknown = total - men - women;
@@ -364,9 +368,9 @@ window.showStats = async matchId => {
   $("#statsContent").innerHTML = `
     <div class="stats-grid match-stats-grid">
       <article class="stat-card accent-card"><span>Total participants</span><strong>${total}</strong></article>
-      <article class="stat-card"><span>Hommes</span><strong>${men}</strong></article>
+      ${showGender ? `<article class="stat-card"><span>Hommes</span><strong>${men}</strong></article>
       <article class="stat-card"><span>Femmes</span><strong>${women}</strong></article>
-      <article class="stat-card"><span>Non renseigné</span><strong>${unknown}</strong></article>
+      <article class="stat-card"><span>Non renseigné</span><strong>${unknown}</strong></article>` : ""}
     </div>
     <div class="panel inner-panel"><div class="panel-head"><div><span class="mini-label">PLACEMENT</span><h2>Participants par zone</h2></div></div>
       <div class="stats-bars">${defaultZones.map((z, i) => {

@@ -415,7 +415,7 @@ async function requirePermission(permission) {
 // a recovery / activation link is expired, already used or invalid. Returns a
 // user-facing message, or null when there is no such error. Values from the URL
 // are never displayed.
-function authLinkError(loc = location) {
+function authLinkError(loc = window.UE_AUTH_REDIRECT || location) {
     const params = new URLSearchParams(`${String(loc.hash || "").replace(/^#/, "")}&${String(loc.search || "").replace(/^\?/, "")}`);
     if (!params.get("error") && !params.get("error_code")) return null;
     const code = params.get("error_code") || params.get("error");
