@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "supaaa": {
-      "type": "http",
-      "url": "npx skills add supabase/agent-skills"
-    }
-  }
-}

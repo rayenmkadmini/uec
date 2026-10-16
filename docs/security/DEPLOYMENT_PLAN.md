@@ -1,9 +1,14 @@
-# Deployment plan — migrations 120000–180000, Edge Functions, frontend
+# Deployment plan — 5 migrations, 8 Edge Functions, frontend
 
 Status: **prepared, not executed.** No production step has been run. Every step
 below needs explicit approval at the time it is run.
 
 Production: `qwlbbfyhjdeekmrxtzjf` (login.uec). Never `astsvxyqyyzqvuioqsnq`.
+
+Verified read-only on 2026-10-16 (`SECURITY_AUDIT_REPORT.md`): the production schema is identical
+to the 2026-10-15 backup used by every local test. Remote history: `20261001194746` and
+`20261001194845`; 5 pending. Postgres 17.11. 7 v1 functions. No `PUBLIC_SITE_URL` secret.
+3 Auth users. The frontend is Git-connected: a push to `main` deploys to production.
 
 ## 1. Migration dependency graph
 
@@ -25,7 +30,11 @@ Production: `qwlbbfyhjdeekmrxtzjf` (login.uec). Never `astsvxyqyyzqvuioqsnq`.
         │                                    payment notes withheld; get_account_contacts; expiring temporary access
         ▼
 20261015180000_admin_least_privilege         gender / photo_url withheld; photo files SUPERADMIN + owner only;
-                                             list_match_participants (gender for SUPERADMIN only)
+        │                                    list_match_participants (gender for SUPERADMIN only)
+        ▼
+20261016120000_least_privilege_hardening     privileges only: no function executable by anon; trigger functions
+                                             not callable by API roles; no MAINTAIN / TRUNCATE for API roles;
+                                             no DELETE grant on notifications; default privileges tightened
 ```
 
 Each migration checks that the previous ones are present (column-set and function
@@ -67,7 +76,9 @@ version), PostgREST v16.3, Storage v1.77.0 (production runs v1.80.2) and Edge ru
 v1.76.2, with the production schema and synthetic data
 (`staging-local/`, `docs/security/PHASE_D_REPORT.md`):
 
-- [x] All 4 migrations apply on the production schema; rollbacks verified
+- [x] All 5 migrations apply on the production schema; rollbacks verified (re-run 2026-10-16,
+      with the exact production transaction rehearsed and rolled back; see `TEST_REPORT.md`)
+- [x] Frontend served from the exact Vercel artifact (`scripts/build-public.mjs`), with phone-width checks
 - [x] Role matrix over HTTP (anonymous, SUPERADMIN, ADMIN, TREASURER, MEMBER, deactivated,
       pending password change, role removed, forged JWT)
 - [x] Import (valid / malformed / duplicate / unknown references), activation link
@@ -86,19 +97,23 @@ Still to do on a hosted staging project, if one is approved:
 
 ## 4. Production sequence (maintenance window)
 
-1. Announce the window. Turn on the maintenance page (static page replacing `index.html`,
-   or hosting-level redirect) **before** any database change. From here on, no page of
-   the old frontend may load.
+1. Announce the window (staff only: production has 3 Auth users). There is no maintenance
+   page in the repository. Between steps 5 and 7, the old frontend fails against the new
+   schema (sessions end) for about 2–5 minutes. Optional: a temporary Vercel firewall rule
+   denying all paths during steps 5–7. It uses the same mechanism as the CSV rule and is
+   removed after step 8.
 2. Verify the target (`supabase/.temp/project-ref`, `js/config.js`, `migration list`).
    `scripts/apply-migration.mjs` refuses any other project.
 3. Final backup and pre-checks (§2).
 4. Dashboard Auth settings (§6), so that new links follow the new rules.
-5. `node scripts/apply-migration.mjs --confirm-production`: all 4 migrations in **one**
+5. `node scripts/apply-migration.mjs --confirm-production`: all 5 migrations in **one**
    transaction with in-transaction verification. Any failure rolls back everything.
    Then the role matrix runs (rolled back) and the history is repaired.
 6. `supabase secrets set PUBLIC_SITE_URL=https://login.ueclubistes.tn`, then deploy the
    8 functions (including the new `admin-activate-member`).
-7. Deploy the frontend from the release commit.
+7. Deploy the frontend: fast-forward push of the release commit to `main`
+   (`git push origin <release-commit>:main`, no force). Vercel builds it with `vercel.json`
+   (allowlist build: only pages, `css/`, `js/` and `assets/` are served). Then run `npm run check:public`.
 8. Smoke tests with real staff accounts (no member data in notes): SUPERADMIN, ADMIN and
    TREASURER pages load; ADMIN sees no CIN, contacts, photos or gender; one activation
    on a synthetic member, then delete it.
@@ -110,12 +125,14 @@ Expected effect on users: every session continues, and accounts flagged
 
 ## 5. Rollback plan
 
-Order: maintenance page on → previous frontend → previous functions → rollback
-180000 → 160000 → 140000 → 120000 (each in one transaction) → maintenance off.
+Order: previous frontend (Vercel: promote deployment `dpl_FogJSA1gAa8hVTsMe76KqGfHhDff`
+or revert on `main`) → previous functions → rollback 20261016120000 → 180000 → 160000 →
+140000 → 120000 (each in one transaction).
 
-Partial rollback is possible **only from the end**: rolling back 180000 alone with the
-new frontend degrades (no gender in seat statistics; seat statistics fail) but does not
-expose data. The old frontend needs all four rolled back.
+Partial rollback is possible **only from the end**. Rolling back 20261016120000 alone changes
+privileges only. Rolling back 180000 alone with the new frontend degrades (no gender in seat
+statistics; seat statistics fail) but does not expose data. The old frontend needs all five
+rolled back.
 
 What a rollback does **not** undo:
 

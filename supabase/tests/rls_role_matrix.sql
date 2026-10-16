@@ -444,6 +444,40 @@ insert into rls_results (test, passed, detail)
 select 'POST: anon has no table grants', count(*) = 0, count(*)::text
 from information_schema.role_table_grants where table_schema = 'public' and grantee = 'anon';
 
+-- 20261016120000 least-privilege hardening
+insert into rls_results (test, passed, detail)
+select 'POST: no function in public/private is executable by anon', count(*) = 0, coalesce(string_agg(p.proname, ','), '')
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname in ('public', 'private') and has_function_privilege('anon', p.oid, 'EXECUTE');
+
+insert into rls_results (test, passed, detail)
+select 'POST: trigger functions are not executable by authenticated', count(*) = 0, coalesce(string_agg(p.proname, ','), '')
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname in ('public', 'private') and p.prorettype in ('trigger'::regtype, 'event_trigger'::regtype)
+  and has_function_privilege('authenticated', p.oid, 'EXECUTE');
+
+insert into rls_results (test, passed, detail)
+select 'POST: authenticated keeps EXECUTE on the role helpers used by policies',
+       has_function_privilege('authenticated', 'public.is_superadmin()', 'EXECUTE')
+   and has_function_privilege('authenticated', 'public.is_admin()', 'EXECUTE')
+   and has_function_privilege('authenticated', 'public.is_staff()', 'EXECUTE'), '';
+
+insert into rls_results (test, passed, detail)
+select 'POST: no API role holds MAINTAIN/TRUNCATE/TRIGGER/REFERENCES on public tables', count(*) = 0, coalesce(string_agg(r || ':' || c.relname || ':' || priv, ','), '')
+from pg_class c join pg_namespace n on n.oid = c.relnamespace
+cross join (values ('anon'), ('authenticated')) v(r)
+cross join (values ('MAINTAIN'), ('TRUNCATE'), ('TRIGGER'), ('REFERENCES')) w(priv)
+where n.nspname = 'public' and c.relkind in ('r', 'p') and has_table_privilege(v.r, c.oid, w.priv);
+
+insert into rls_results (test, passed, detail)
+select 'POST: authenticated holds no DELETE on notifications', not has_table_privilege('authenticated', 'public.notifications', 'DELETE'), '';
+
+insert into rls_results (test, passed, detail)
+select 'POST: default privileges of postgres grant anon nothing and authenticated no MAINTAIN', count(*) = 0, coalesce(string_agg(d.defaclobjtype::text || ':' || a.privilege_type, ','), '')
+from pg_default_acl d cross join lateral aclexplode(d.defaclacl) a
+where d.defaclnamespace = 'public'::regnamespace and d.defaclrole = 'postgres'::regrole
+  and ((a.grantee = 'anon'::regrole) or (a.grantee = 'authenticated'::regrole and a.privilege_type = 'MAINTAIN') or a.grantee = 0 and d.defaclobjtype = 'f');
+
 insert into rls_results (test, passed, detail)
 select 'POST: password mark removed after verified change', count(*) = 0, count(*)::text
 from private.password_change_marks where user_id = '00000000-0000-4000-8000-0000000000a7';

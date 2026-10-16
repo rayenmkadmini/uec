@@ -3,8 +3,9 @@
 //   20261015140000_member_identity_and_password_hardening
 //   20261015160000_active_accounts_and_data_minimization
 //   20261015180000_admin_least_privilege
+//   20261016120000_least_privilege_hardening
 //
-//   node scripts/apply-migration.mjs --dry-run                 # checks + prints the SQL, writes nothing
+//  node scripts/apply-migration.mjs --dry-run                 # checks + prints the SQL, writes nothing
 //   node scripts/apply-migration.mjs --confirm-production      # applies (requires explicit approval)
 //
 // Steps when confirmed:
@@ -138,6 +139,17 @@ begin
      or has_column_privilege('authenticated', 'public.subscribers', 'gender', 'SELECT')
      or has_column_privilege('authenticated', 'public.subscribers', 'photo_url', 'SELECT') then
     raise exception 'VERIFY: account-state helpers or contact-data restrictions missing';
+  end if;
+
+  if exists (select 1 from pg_proc p where p.pronamespace in ('public'::regnamespace, 'private'::regnamespace)
+             and has_function_privilege('anon', p.oid, 'EXECUTE')) then
+    raise exception 'VERIFY: functions still executable by anon';
+  end if;
+
+  if exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'v', 'p')
+             and (has_table_privilege('authenticated', c.oid, 'MAINTAIN')
+                  or has_table_privilege('authenticated', c.oid, 'TRUNCATE'))) then
+    raise exception 'VERIFY: authenticated still holds MAINTAIN or TRUNCATE';
   end if;
 end
 $verify$;

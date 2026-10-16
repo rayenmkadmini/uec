@@ -285,6 +285,32 @@ try {
   check("no session kept", await page.eval("!Object.keys(localStorage).some(k => k.includes('ueclubiste-auth') && localStorage.getItem(k) && localStorage.getItem(k) !== 'null')"));
   await page.close();
   await service("PATCH", `/rest/v1/profiles?id=eq.${admin.id}`, { is_active: true });
+
+  begin("Mobile layout (390 px wide): no horizontal page overflow");
+  const phone = async () => {
+    const p = await openPage();
+    await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, p.sessionId);
+    return p;
+  };
+  const fits = async (label, file) => {
+    await page.goto(`${SITE}/${file}`);
+    await page.waitFor("document.readyState === 'complete'");
+    await sleep(1500);
+    const extra = await page.eval("document.documentElement.scrollWidth - window.innerWidth");
+    const at = await page.path();
+    check(`${label} ${file}`, extra <= 1 && at.endsWith(file), `${extra}px wider than the screen; at ${at}`);
+  };
+  page = await phone();
+  await fits("anonymous", "index.html");
+  await login(page, sa.email, sa.password);
+  for (const file of ["dashboard.html", "subscribers.html", "payments.html", "admin-users.html", "admin-matchs.html", "faculties.html", "zones.html", "profile.html"]) await fits("SUPERADMIN", file);
+  await page.close();
+  page = await phone();
+  await login(page, L(1), P(`bm1-${run}`));
+  for (const file of ["subscriber.html", "matchs.html"]) await fits("MEMBER", file);
+  await page.goto(`${SITE}/profile.html`);
+  check("MEMBER sent from the staff profile page to the member area", await page.waitFor("location.pathname.endsWith('subscriber.html')"), await page.path());
+  await page.close();
 } catch (error) {
   check("runner", false, error instanceof Error ? error.message : String(error));
 } finally {

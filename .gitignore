@@ -54,3 +54,9 @@ supabase/.branches/
 # Local staging stack: generated keys and site build (never commit)
 /staging-local/.secrets/
 /staging-local/.build/
+
+# Vercel build output (scripts/build-public.mjs)
+/public/
+
+# Per-user Claude Code MCP server config (may hold tokens)
+.mcp.json

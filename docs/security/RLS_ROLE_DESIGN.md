@@ -34,7 +34,7 @@ Also present: view `v_member_cards`, with subscriber identity/contact fields inc
 - `roles` and `user_roles`: absent.
 - `profiles.role`: `text`, `NOT NULL`, default `SUBSCRIBER`, check currently permits `ADMIN`, `SUPERADMIN`, `SUBSCRIBER`.
 - Profile role distribution: two `SUPERADMIN` profiles.
-- Auth: 3 users, 2 profiles; no profile without Auth user; one Auth user without a profile: `5eaf3c33-0dcd-47db-8150-0cb8dab33192` (email masked `m***@gmail.com`). Do not delete or auto-link it.
+- Auth: 3 users, 2 profiles; no profile without Auth user; one Auth user without a profile (identifier withheld from this document). Do not delete or auto-link it.
 - Exact row counts: 0 subscribers, 0 events, 0 event payments, 0 payments, 8 matches, 40 match zones, 0 match participations, 210 faculties, 4 zones, 24 gouvernorats.
 - `subscribers.numero_abonnement`: `text NOT NULL`, existing `UNIQUE (numero_abonnement)`; 0 NULL, empty, or duplicate values currently.
 - `events.id` and `event_payments.event_id`: `bigint`; older SQL assumptions using UUID do not match.
