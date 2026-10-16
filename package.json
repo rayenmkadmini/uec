@@ -7,6 +7,7 @@
     "supabase": "supabase",
     "test": "node --test",
     "check:js": "node -e \"for (const f of require('fs').readdirSync('js')) require('child_process').execFileSync(process.execPath, ['--check', 'js/' + f], { stdio: 'inherit' })\"",
+    "check:public": "node scripts/check-public-exposure.mjs",
     "test:rls": "node scripts/run-rls-tests.mjs",
     "test:rls:applied": "node scripts/run-rls-tests.mjs --no-migration",
     "test:rollback": "node scripts/run-rollback-check.mjs"
