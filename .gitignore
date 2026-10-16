@@ -23,3 +23,5 @@ Thumbs.db
 
 # Test / local files
 coverage/
+# Vercel build output (scripts/build-public.mjs)
+/public/
