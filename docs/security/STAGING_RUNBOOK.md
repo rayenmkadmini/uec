@@ -1,5 +1,9 @@
 # Staging runbook — UE Clubiste (Phase C)
 
+> **Superseded (2026-10-17).** For the production release use `DEPLOYMENT_PLAN.md` §4. For
+> test databases use `LOCAL_TEST_DATABASE.md`; restores now need `supabase/tests/replica_alignment.sql`.
+> The migration and rollback lists below date from Phase C (3 migrations); there are now 5.
+
 Status: hosted staging **not executed** (no staging project exists). Phase D ran the
 full validation on the **local staging stack** (`staging-local/`, see
 `PHASE_D_REPORT.md` and `DEPLOYMENT_PLAN.md`), which supersedes Option B below.

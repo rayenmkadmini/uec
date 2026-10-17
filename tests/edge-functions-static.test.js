@@ -109,3 +109,47 @@ test("every Edge Function is registered with JWT verification", () => {
   const config = read("supabase/config.toml");
   for (const name of functionNames) assert.match(config, new RegExp(`\\[functions\\.${name}\\]\\s*\\nverify_jwt = true`), name);
 });
+
+test("every remote import in the Edge Functions is pinned to an exact version", () => {
+  const sources = [];
+  const walk = dir => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.(ts|mjs|js)$/.test(e.name)) sources.push(p);
+    }
+  };
+  walk(functionsDir);
+  let specs = 0;
+  for (const file of sources) {
+    const source = fs.readFileSync(file, "utf8");
+    for (const [, spec] of source.matchAll(/(?:from\s+|import\s*\(\s*|import\s+)["']((?:npm|jsr|https?):[^"']+)["']/g)) {
+      specs++;
+      assert.match(spec, /@\d+\.\d+\.\d+(\/[^@]*)?$/, `${path.relative(functionsDir, file)}: ${spec}`);
+    }
+  }
+  assert.ok(specs > 0, "no remote import found: the scan is broken");
+});
+
+test("audit rows of failed calls hold codes, never raw error text (ADMIN can read audit_logs.new_data)", () => {
+  for (const name of functionNames) {
+    for (const [call] of indexSource(name).matchAll(/audit\([^;]*\);/g)) {
+      assert.doesNotMatch(call, /String\((e|err|error)\)|\b(e|err|error)\.message\b|\berror\s*:\s*(e|err|error)\b|\.stack\b/, `${name}: ${call}`);
+    }
+  }
+});
+
+test("CORS allows exactly the expected origins and never a wildcard", () => {
+  for (const name of functionNames) {
+    const security = read(`supabase/functions/${name}/_shared/security.ts`);
+    const list = security.match(/allowedOrigins = new Set\(\[([^\]]*)\]\)/);
+    assert.ok(list, name);
+    const origins = [...list[1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+    for (const origin of ["https://login.ueclubistes.tn", "https://www.login.ueclubistes.tn", "https://uec-five.vercel.app"]) {
+      assert.ok(origins.includes(origin), `${name}: ${origin}`);
+    }
+    assert.ok(origins.every(o => /^https?:\/\/[a-z0-9.-]+(:\d+)?$/.test(o)), `${name}: ${origins.join(", ")}`);
+    assert.doesNotMatch(security, /Access-Control-Allow-Origin"?\s*:\s*"\*"/, name);
+  }
+});
+

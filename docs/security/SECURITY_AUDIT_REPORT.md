@@ -76,6 +76,36 @@ no self-promotion.
   CSP limit: `script-src` keeps `'unsafe-inline'` because 22 generated buttons use `onclick=`.
   Moving them to `addEventListener` would allow a strict CSP (follow-up).
 
+### 2026-10-17: migration runner, replica fidelity, backup
+
+| Severity | Finding | Fix (local, tested) |
+|---|---|---|
+| High | `scripts/apply-migration.mjs` committed the migrations and only **then** ran the role matrix (`run-rls-tests --linked`). A failing matrix left the migrations applied, and the runner only printed rollback commands. | The runner was redesigned. Every check that can run in the transaction now runs before COMMIT, and the migration history is recorded inside the same transaction. The role matrix and the rollback check run beforehand, in a mandatory rehearsal on a replica whose catalog matches production in the 13 compared fingerprint categories. Nothing but read-only checks runs after COMMIT. |
+| Medium | The migration history was checked with `includes()` on raw CLI text. | It is now parsed with `JSON.parse` in `scripts/lib/migration-history.mjs`, which fails closed. `tests/migration-history.test.js` covers malformed JSON, missing fields, unexpected or already-applied versions, and local versus remote. |
+| Medium | The test replica had 12 EXECUTE grants and 1 default privilege that production does not have (a pg_dump restore artifact). As a result, the rollback of `20261016120000` would have **granted** `anon` EXECUTE on role helpers and trigger functions in production. | `supabase/tests/replica_alignment.sql` aligns the replica, and the stack and docs now apply it. The rollback was regenerated, and the rollback-exactness check passes for all 5 migrations. |
+| Medium | Migration 160000 removes the roles of any account that is inactive or must change its password, including a SUPERADMIN. | A pre-commit assertion requires that, whenever SUPERADMIN accounts exist, at least one stays usable (active and not flagged). The first version compared "before" with "after" and could never fail; the independent review caught this and it was corrected. Negative controls are refused: all accounts flagged, and all accounts inactive. In production, both SUPERADMIN accounts are active and unflagged. |
+| High (review) | If the response to the apply call was lost, the outcome probe could report "unchanged" while the transaction was still running. | The transaction takes an advisory lock, and the probe waits on that lock before reading the state. |
+| Medium (review) | Approval by hash was not enforced, and the history was checked only once. | `--confirm-production` now requires `--expect-sha256=<hash>`, verified (a wrong hash is refused before anything is written). The history and the fingerprint are re-checked right before the apply. |
+| Medium (functions review) | The Edge Functions imported `npm:@supabase/supabase-js@2` unpinned, in code that holds the service-role key. | Pinned to `2.117.2` (the frontend's version, ≥ 14 days old). A static test now requires exact versions for every remote import. |
+| Medium (frontend review) | CORS allowed only `login.ueclubistes.tn`, yet the site is also served on `www.login.ueclubistes.tn` and `uec-five.vercel.app`, so every admin action failed from those origins. | Both origins were added. The static test checks the exact list, and `check:functions` checks the live preflights. |
+| Low (migration and functions reviews) | Failed staff-management calls stored the raw error text in `audit_logs.new_data`, which ADMIN can read after the migrations. | Audit rows now store `{code: "unexpected"}`; the details go to the function logs only. A static test with positive controls guards this. |
+| Low | The page route guard did not redirect when building the session context threw an exception. One intermittent browser-e2e failure was seen. | The guard now fails closed (an error sends the user to login). Afterwards the browser e2e passed 4 consecutive runs. |
+| Low | The UI accepted 5 MB logos, but the `match-logos` bucket accepts 2 MB. | The UI limit is now 2 MB. |
+| Test gap | One browser assertion ended in `\|\| true`, so it always passed. | It now asserts the real state for ADMIN (no controls). A SUPERADMIN counterpart serves as a positive control. |
+| Info | There are no platform backups (PITR is off). | A new verified backup with a successful restore test (see `DEPLOYMENT_PLAN.md` §2). |
+
+The independent review of the five migrations found no Critical or High issue in the forward
+migrations. No statement deletes or updates application rows, and none drops a table or column.
+The bucket updates and policy replacements are listed in the review.
+
+Low findings deferred to a later migration (not launch blockers):
+
+- **Photo folders:** the folder name is derived from `login_name`. Add a CHECK so that two names cannot map to the same folder.
+- **Logo bucket:** `match-logos` accepts SVG. Uploads are SUPERADMIN-only.
+- **Notifications:** a member can rewrite the title and text of their own notifications. Limit their UPDATE grant to `is_read`.
+- **Password marks:** marks back-filled before 160000 have no expiry. In production no account is flagged, so none is affected.
+- **Default function privileges:** only a per-schema default revoke is used. This is guarded by the safety-net check and by the matrix test "no function executable by anon".
+
 ### Deleted files
 
 | File | Reason |

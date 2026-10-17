@@ -54,8 +54,9 @@ async function uploadMatchLogo(file) {
   if (!allowed.includes(file.type)) {
     throw new Error("Format de logo invalide. Utilisez JPG, PNG, WebP ou SVG.");
   }
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Le logo dépasse la limite de 5 Mo.");
+  if (file.size > 2 * 1024 * 1024) {
+    // Same limit as the match-logos bucket (migration 20261015120000).
+    throw new Error("Le logo dépasse la limite de 2 Mo.");
   }
 
   await ensureMatchStorageAndSchema();

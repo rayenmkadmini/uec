@@ -8,7 +8,7 @@ Production: `qwlbbfyhjdeekmrxtzjf` (login.uec). Never `astsvxyqyyzqvuioqsnq`.
 Verified read-only on 2026-10-16 (`SECURITY_AUDIT_REPORT.md`): the production schema is identical
 to the 2026-10-15 backup used by every local test. Remote history: `20261001194746` and
 `20261001194845`; 5 pending. Postgres 17.11. 7 v1 functions. No `PUBLIC_SITE_URL` secret.
-3 Auth users. The frontend is Git-connected: a push to `main` deploys to production.
+2 Auth users, both SUPERADMIN and active. The frontend is Git-connected: a push to `main` deploys to production.
 
 ## 1. Migration dependency graph
 
@@ -53,9 +53,19 @@ and verified by `npm run test:rollback`.
 
 **No order of separate deployments is safe**: there is no frontend that works on
 both schemas. The migrations, the 8 functions and the frontend must change
-together, behind a maintenance page (§4).
+together, in one short window (§4).
 
 ## 2. Pre-deployment backup checklist
+
+Status on 2026-10-17:
+
+- **Platform backups:** none. `supabase backups list` returns no backups and PITR is disabled.
+- **Own backup:** `uec-backups/2026-10-17-pre-release`, with `MANIFEST.json`. It holds roles, schema, data, and the `auth`/`storage` structure.
+- **Checksums:** recorded in the manifest.
+- **Counts:** live counts equal dump counts for all 48 tables.
+- **Restore test:** passed. It ran in an isolated container (no network): all 48 tables matched the backup, and the catalog matched production in all 13 compared categories. The migrations were then rehearsed on that restored data.
+- **Older backups:** the 2026-10-15 backup checksums still match, and the incident Git bundle verifies.
+- **Not in the backup:** the migration-history rows (recorded in the manifest), Storage files (0 objects), Edge Function code, and Auth/project settings.
 
 - [ ] `supabase db dump --linked` for roles, schema and data into the restricted backup folder
       (outside the repository; ACL limited to the owner). Record sizes and SHA-256.
@@ -97,28 +107,60 @@ Still to do on a hosted staging project, if one is approved:
 
 ## 4. Production sequence (maintenance window)
 
-1. Announce the window (staff only: production has 3 Auth users). There is no maintenance
-   page in the repository. Between steps 5 and 7, the old frontend fails against the new
-   schema (sessions end) for about 2–5 minutes. Optional: a temporary Vercel firewall rule
-   denying all paths during steps 5–7. It uses the same mechanism as the CSV rule and is
-   removed after step 8.
-2. Verify the target (`supabase/.temp/project-ref`, `js/config.js`, `migration list`).
-   `scripts/apply-migration.mjs` refuses any other project.
-3. Final backup and pre-checks (§2).
-4. Dashboard Auth settings (§6), so that new links follow the new rules.
-5. `node scripts/apply-migration.mjs --confirm-production`: all 5 migrations in **one**
-   transaction with in-transaction verification. Any failure rolls back everything.
-   Then the role matrix runs (rolled back) and the history is repaired.
-6. `supabase secrets set PUBLIC_SITE_URL=https://login.ueclubistes.tn`, then deploy the
-   8 functions (including the new `admin-activate-member`).
-7. Deploy the frontend: fast-forward push of the release commit to `main`
-   (`git push origin <release-commit>:main`, no force). Vercel builds it with `vercel.json`
-   (allowlist build: only pages, `css/`, `js/` and `assets/` are served). Then run `npm run check:public`.
-8. Smoke tests with real staff accounts (no member data in notes): SUPERADMIN, ADMIN and
-   TREASURER pages load; ADMIN sees no CIN, contacts, photos or gender; one activation
-   on a synthetic member, then delete it.
-9. Turn off the maintenance page. Keep the window open for 30 minutes and monitor the
-   function logs and the error rate.
+1. **Announce the window.** Only staff are affected: production has 2 Auth accounts, both
+   SUPERADMIN. There is no maintenance page. Between steps 5 and 7 the old frontend fails
+   against the new schema (sessions end) for a few minutes.
+2. **Owner actions** in the Supabase Dashboard (not possible from the CLI):
+   - turn self-signup off (§6);
+   - set the Site URL and the redirect allow-list.
+
+   They do not depend on the release and can be done before it.
+3. **Final backup and pre-checks** (§2).
+4. **Dry run (go/no-go):**
+
+   ```sh
+   UE_TEST_DB_CONTAINER=<restore container> node scripts/apply-migration.mjs --dry-run
+   ```
+
+   It prints the sha256 of the exact transaction.
+5. **Apply the migrations:**
+
+   ```sh
+   UE_TEST_DB_CONTAINER=<restore container> node scripts/apply-migration.mjs --confirm-production --expect-sha256=<hash>
+   ```
+
+   The script refuses any other transaction. Before writing to production it:
+   - checks the target and the history (parsed with `JSON.parse`; remote exactly the 2 applied versions);
+   - checks that the replica's catalog fingerprint equals production's in the 13 compared categories;
+   - checks the shape of production's migration-history table;
+   - rehearses the exact transaction on the replica (COMMIT → ROLLBACK);
+   - runs the role matrix and the rollback-exactness check, which must report real results;
+   - re-checks the history and the fingerprint immediately before applying.
+
+   It then sends one file, which runs in one session and one transaction. Before COMMIT,
+   that transaction:
+   - takes an advisory lock;
+   - runs the 5 migrations;
+   - checks that row counts are unchanged;
+   - checks that, if SUPERADMIN accounts exist, at least one stays usable;
+   - checks the catalog;
+   - records the history.
+
+   Any failure aborts the transaction. If the response is lost, the outcome probe waits on
+   the same advisory lock, so it reads the state only after the transaction has ended. After
+   COMMIT only read-only checks run, and nothing is rolled back automatically. The role matrix
+   does not run on production, because it writes fixture rows.
+6. **Edge Functions:**
+   - `supabase secrets set PUBLIC_SITE_URL=https://login.ueclubistes.tn`;
+   - deploy the 8 functions, **without** `--no-verify-jwt` and without `--prune`;
+   - `npm run check:functions -- --with-cli`.
+7. **Frontend:** fast-forward push of the release commit to `main`
+   (`git push origin <release-commit>:main`, no force). Vercel builds it with `vercel.json`,
+   which serves only pages, `css/`, `js/` and `assets/`, with the security headers. Then run
+   `npm run check:public` and check the response headers.
+8. **Smoke tests:** the read-only checks above. Logging in with real staff accounts is the
+   owner's step; the release creates no member and no test record in production.
+9. **Monitor** the function logs and the error rate for 30 minutes.
 
 Expected effect on users: every session continues, and accounts flagged
 `must_change_password` must change their password before using the app.
@@ -128,6 +170,12 @@ Expected effect on users: every session continues, and accounts flagged
 Order: previous frontend (Vercel: promote deployment `dpl_FogJSA1gAa8hVTsMe76KqGfHhDff`
 or revert on `main`) → previous functions → rollback 20261016120000 → 180000 → 160000 →
 140000 → 120000 (each in one transaction).
+
+Rollback files restore the **previous** state exactly, which includes its weaknesses:
+
+- **120000 rollback:** makes the `subscriber-photos` bucket public again (with a `TO public` read policy) and restores `anon` ALL grants on every table. **Do not run it unchanged.** No partial rollback file is prepared. If 120000 really had to be undone, write one at that time from this file: keep the storage and `anon` hardening, and verify it with `npm run test:rollback`. Otherwise prefer a forward fix.
+- **Migration history:** the runner records it inside the migration transaction. After any database rollback, also run `supabase migration repair --status reverted <version>` for each version that was rolled back.
+- **20261016120000 rollback:** regenerated on 2026-10-17 so that it no longer grants `anon` anything production never had.
 
 Partial rollback is possible **only from the end**. Rolling back 20261016120000 alone changes
 privileges only. Rolling back 180000 alone with the new frontend degrades (no gender in seat

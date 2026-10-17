@@ -133,6 +133,12 @@ up() {
   docker exec ue-stage-db psql -U supabase_admin -d postgres -X -q -f /tmp/roles.sql >/dev/null 2>&1 || true   # 1 known error: supabase_realtime_admin
   psql_file /tmp/schema.sql
   psql_file /tmp/platform_objects.sql
+  # Remove the EXECUTE grants that the restore adds but production does not have
+  # (supabase/tests/replica_alignment.sql), so tests start from production's real privileges.
+  copy_in "$REPO/supabase/tests/replica_alignment.sql" /tmp/replica_alignment.sql
+  db_target_check
+  docker exec -e PGOPTIONS="-c client_min_messages=warning -c ue.replica_alignment=local-only" ue-stage-db \
+    psql -U postgres -d postgres -X -q -v ON_ERROR_STOP=1 -f /tmp/replica_alignment.sql
   copy_in "$REPO/supabase/faculties_seed.sql" /tmp/faculties_seed.sql
   copy_in "$HERE/seed.sql" /tmp/seed.sql
   psql_file /tmp/faculties_seed.sql

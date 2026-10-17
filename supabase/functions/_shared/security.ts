@@ -1,4 +1,4 @@
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2.117.2";
 
 export const allowedOrigins = new Set([
   "http://localhost:5500",
@@ -6,6 +6,8 @@ export const allowedOrigins = new Set([
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "https://login.ueclubistes.tn",
+  "https://www.login.ueclubistes.tn",
+  "https://uec-five.vercel.app",
   "https://ueclubistes.tn",
   "https://www.ueclubistes.tn",
 ]);

@@ -10,7 +10,8 @@
     "check:public": "node scripts/check-public-exposure.mjs",
     "test:rls": "node scripts/run-rls-tests.mjs",
     "test:rls:applied": "node scripts/run-rls-tests.mjs --no-migration",
-    "test:rollback": "node scripts/run-rollback-check.mjs"
+    "test:rollback": "node scripts/run-rollback-check.mjs",
+    "check:functions": "node scripts/check-edge-functions.mjs"
   },
   "devDependencies": {
     "supabase": "^2.117.0"

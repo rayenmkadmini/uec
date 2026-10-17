@@ -386,7 +386,13 @@ async function getCurrentContext() {
 // needs. Unauthorized users are sent to their own home page (never in a loop:
 // a home page is always accessible to the role it belongs to).
 async function requirePermission(permission) {
-    const ctx = await getCurrentContext();
+    let ctx = null;
+    try {
+        ctx = await getCurrentContext();
+    } catch (error) {
+        // Fail closed: an unexpected error must never leave the page open.
+        console.error("Session indisponible:", error);
+    }
 
     if (!ctx) {
         location.href = "index.html";

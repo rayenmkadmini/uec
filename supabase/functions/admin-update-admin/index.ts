@@ -97,7 +97,9 @@ Deno.serve(async req => {
     return json(req, { ok: true, roles });
   } catch (e) {
     if (e instanceof Response) return e;
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", null, false, { error: String(e) });
+    // Details go to the function logs (project owners only), never to audit_logs (readable by ADMIN).
+    console.error("admin-update-admin failed:", e instanceof Error ? e.message : String(e));
+    if (ctx) await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", null, false, { code: "unexpected" });
     return json(req, { error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });

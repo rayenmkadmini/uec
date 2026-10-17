@@ -40,7 +40,30 @@ docker exec ue-phaseb-testdb sh -c 'cd /restore &&
   psql -U supabase_admin -d postgres -q -f schema.sql &&
   psql -U supabase_admin -d postgres -q -f platform_stub.sql &&
   psql -U supabase_admin -d postgres -q -f platform_objects.v2.sql'
+# Remove the EXECUTE grants that the restore adds but production does not have (see below).
+docker exec -i -e PGOPTIONS="-c ue.replica_alignment=local-only" ue-phaseb-testdb \
+  psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 < supabase/tests/replica_alignment.sql
 ```
+
+### Proving the replica matches production
+
+`scripts/lib/schema-fingerprint.sql` is a read-only catalog fingerprint in 13 categories:
+relations, columns, constraints, policies (including storage), function bodies, function
+and table grants, column grants, triggers, enum types, storage buckets, default
+privileges, and ownership/options. The last category covers object owners, view options
+(`security_invoker`), schema owners and privileges, extensions with their versions, and
+event triggers.
+
+`node scripts/apply-migration.mjs --dry-run` runs it on production and on this container
+and refuses to continue unless every category matches. It does not compare role attributes
+or the Auth/Storage services themselves; those are stubs here (see the differences below).
+
+On 2026-10-17 a restore without the alignment step differed in 2 categories. The restore
+had 12 extra EXECUTE grants and 1 extra default privilege. This happens because pg_dump
+does not revoke the grants that the image's own default privileges add.
+`supabase/tests/replica_alignment.sql` removes exactly those, and all 13 categories then
+match. The rollback of `20261016120000` had been generated from the unaligned state and
+would have granted those privileges in production; it was regenerated.
 
 `--network none` means the database is reachable only through `docker exec`
 (no published port), which matters while the Windows firewall is disabled.
@@ -52,6 +75,34 @@ Use `UE_TEST_DB_CONTAINER=<name>` to point the runners at another container.
 ```sh
 docker rm -f ue-phaseb-testdb      # removes only this container; the image is kept
 ```
+
+## Restore test with data (pre-release backup)
+
+The pre-release backup (`uec-backups/2026-10-17-pre-release`, which contains personal data)
+was restored into a separate container: `--network none`, no published port, same image.
+The procedure:
+
+1. Load `roles.sql`.
+2. Drop the image's `auth` and `storage` schemas.
+3. Load `auth_storage_schema.sql`, except its 7 statements that reference `public`.
+4. Load `schema.sql`.
+5. Load those 7 statements.
+6. Run `replica_alignment.sql`.
+7. Load `data.sql`.
+
+Results:
+
+- Row counts match the backup for all 48 tables.
+- The catalog fingerprint matches production in all 13 categories.
+- Running `UE_TEST_DB_CONTAINER=<restore container> node scripts/apply-migration.mjs --dry-run`
+  rehearses the exact production transaction on real data.
+
+That container is **not** the schema-only test container described above. It holds
+personal data and the live Auth sessions and refresh tokens of the backup, so:
+
+- it has no network and no published port;
+- it is only used for rehearsals;
+- it must be removed once the release is done (`docker rm -f <name>`).
 
 ## Known differences from production
 

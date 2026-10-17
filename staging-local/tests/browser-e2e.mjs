@@ -202,6 +202,11 @@ try {
   check("members list renders", await page.waitFor("document.querySelectorAll('#rows tr td').length > 3 && !document.querySelector('#rows').textContent.includes('Impossible')"));
   const saHeaders = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.textContent.trim())");
   check("CIN, photo and gender columns shown", ["CIN", "Photo", "Sexe"].every(h => saHeaders.includes(h)), saHeaders.join(","));
+  const saControls = await page.eval(`(() => {
+    const visible = el => !!el && !el.classList.contains("hidden") && getComputedStyle(el).display !== "none";
+    return { edit: document.querySelectorAll('#rows button[title="Modifier"]').length, add: visible(document.querySelector("#addBtn")), import: visible(document.querySelector("#importCsvBtn")) };
+  })()`);
+  check("add / import / edit controls shown", saControls && saControls.edit > 0 && saControls.add && saControls.import, JSON.stringify(saControls));
   check("imported members shown as 'Non activé'", await page.eval("document.querySelector('#rows').textContent.includes('Non activé')"));
   check("no JS error / failed API call", clean(page), problems(page));
   await page.goto(`${SITE}/admin-users.html`);
@@ -229,7 +234,11 @@ try {
   const adHeaders = await page.eval("[...document.querySelectorAll('thead th')].map(t => t.textContent.trim())");
   check("no CIN / photo / gender column", !["CIN", "Photo", "Sexe"].some(h => adHeaders.includes(h)), adHeaders.join(","));
   check("no gender filter", await page.eval("!document.querySelector('#genderFilter')"));
-  check("no add / import / edit controls", await page.eval("!document.querySelector('#rows button[title=\"Modifier\"]') && getComputedStyle(document.querySelector('#importCsvBtn') || document.body).display !== 'inline-block' || true"));
+  const adminControls = await page.eval(`(() => {
+    const visible = el => !!el && !el.classList.contains("hidden") && getComputedStyle(el).display !== "none";
+    return { edit: document.querySelectorAll('#rows button[title="Modifier"]').length, add: visible(document.querySelector("#addBtn")), import: visible(document.querySelector("#importCsvBtn")) };
+  })()`);
+  check("no add / import / edit controls", adminControls && adminControls.edit === 0 && !adminControls.add && !adminControls.import, JSON.stringify(adminControls));
   const adminText = await page.eval("document.body.innerText");
   check("no CIN, phone or email in the page", !adminText.includes(`B${run}1`) && !adminText.includes("+216 00 000 01") && !adminText.includes("example.invalid"));
   check("members page: no JS error / failed API call", clean(page), problems(page));
@@ -289,7 +298,8 @@ try {
   check("seat page shows own gender", await page.waitFor("['Homme','Femme'].includes(document.querySelector('#genderBadge')?.textContent)"));
   check("seat page: no JS error / failed API call", clean(page), problems(page));
   await page.goto(`${SITE}/dashboard.html`);
-  check("member sent away from the admin dashboard", await page.waitFor("!location.pathname.endsWith('dashboard.html')"));
+  const leftDashboard = await page.waitFor("!location.pathname.endsWith('dashboard.html')");
+  check("member sent away from the admin dashboard", leftDashboard, leftDashboard ? await page.path() : `${await page.path()} ${problems(page)}`);
   await page.close();
 
   page = await openPage();

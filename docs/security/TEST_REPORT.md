@@ -28,3 +28,20 @@ Not run, with the reason:
   during the e2e suites.
 - Hosted gateway (Kong) and production Storage version: no hosted staging project.
 - Tests against the production database: not allowed before approval. Only read-only checks were run.
+
+## 2026-10-17: pre-release validation (production schema + data rehearsal)
+
+Every row below was run on 2026-10-17.
+
+| Check | Result |
+|---|---|
+| `npm test` | **122 / 122** (including `tests/migration-history.test.js` and the hardened `tests/edge-functions-static.test.js`, each with positive controls) |
+| `npm run test:rls` (aligned replica) | **267 checks, 0 failed** |
+| `npm run test:rollback` (aligned replica) | **5 / 5** rollbacks exact, no data changed. Before the rollback of `20261016120000` was fixed, this check caught the defect. |
+| Catalog fingerprint, replica and restored copy vs production (read-only) | **identical in all 13 categories** |
+| Backup `2026-10-17-pre-release` | checksums recorded; live and dump row counts equal for **48 / 48** tables |
+| Restore test (isolated container, no network) | restored row counts = backup for **48 / 48** tables; catalog identical to production |
+| `apply-migration.mjs --dry-run`, on the schema-only replica and on the restored copy of production data | exact transaction rehearsed (COMMIT → ROLLBACK), role matrix 267/0, rollbacks 5/5, replica unchanged; sha256 `78de466b…` |
+| Runner negative controls | wrong `--expect-sha256` refused before any write (production history unchanged); missing hash refused; forbidden grants refused; "no usable SUPERADMIN" refused (all flagged, and all inactive) |
+| Stack e2e (production-aligned privileges, functions with supabase-js 2.117.2) | API **145 / 0**. Browser 66/0 and later 67/0: three consecutive runs green after the guard fix, and one intermittent failure before it (see `SECURITY_AUDIT_REPORT.md`). |
+| `npm run check:functions -- --with-cli` against **current** production (before the deploy) | 20 expected failures: the v1 functions lack the www and vercel.app origins, and `admin-activate-member` is not deployed. It confirms the gateway enforces JWT (`UNAUTHORIZED_NO_AUTH_HEADER`). |
