@@ -1,5 +1,19 @@
 # UE CLUBISTE CHANGELOG
 
+## 2026-10-18 — Smart collections (individual contributions)
+
+### Added
+- Migration `20261018120000_smart_collections` (PENDING, with rollback): collection settings on `events` (global `target_amount`, optional `suggested_amount`, `start_date`, `deadline`, `collection_status`, `organizer`, `category`), `collection_contributions` (one row per real payment, `numeric(12,3)`), optional `collection_member_targets`, and the `collection_totals` view.
+- RPCs `record_collection_contribution` (idempotent by `p_request_id`), `update_collection_contribution`, `cancel_collection_contribution` (reason required, never deleted) and `set_collection_member_target`. SUPERADMIN / TREASURER only, never on one's own member record unless SUPERADMIN; every change goes to `audit_logs`.
+- Existing `event_payments` rows with status `PAID` are imported once with their stored amount (`source = LEGACY`); `event_payments` itself is unchanged.
+- New Collectes page: financial dashboard (collected / target / remaining or surplus / progress, contributors, average, largest, smallest), member table with search, filters, sorting, pagination and side panel, payment ledger, CSV export, print view, deadline / target alerts. Financial maths in `js/collections-core.js` (integer millimes) with unit tests.
+
+### Changed
+- `tests/role-access.test.js` and `tests/schema-contract.test.js` now pin the new contract (RPC-only writes, new columns) instead of the paid / unpaid toggle this replaces.
+
+### Notes
+- Not applied to production. `npm run test:rls` / `test:rollback` were not run (no Docker on the authoring machine).
+
 ## 2026-09-30
 
 ### Fixed

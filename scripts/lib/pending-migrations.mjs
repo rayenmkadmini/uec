@@ -22,7 +22,7 @@ export const RELEASED = [
 
 // Add the next migration here; scripts/apply-migration.mjs refuses to run with nothing pending.
 // Also update RELEASED_PROBE_SQL / PENDING_PROBE_SQL below to objects of the new state.
-export const PENDING = [];
+export const PENDING = ["20261018120000_smart_collections"];
 
 export const versionOf = name => name.split("_")[0];
 export const APPLIED_VERSIONS = [...BASE_APPLIED, ...RELEASED.map(versionOf)];
@@ -36,8 +36,8 @@ export const rollbackPath = name => `supabase/rollback/${name}_rollback.sql`;
 export const RELEASED_PROBE_SQL = "select 'UE_RELEASED=' || (to_regprocedure('public.admin_revoke_user_sessions(uuid)') is not null)::text as probe;";
 
 // Prints UE_PENDING_PRESENT=true|false: whether PENDING objects already exist (must be false
-// before an apply). No migration is pending: set this to an object the next one creates.
-export const PENDING_PROBE_SQL = "select 'UE_PENDING_PRESENT=false' as probe;";
+// before an apply). public.collection_contributions is created by 20261018120000.
+export const PENDING_PROBE_SQL = "select 'UE_PENDING_PRESENT=' || (to_regclass('public.collection_contributions') is not null)::text as probe;";
 
 export function parseProbe(output, key) {
   const match = String(output).match(new RegExp(`${key}=(true|false)`));

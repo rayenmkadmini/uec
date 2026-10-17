@@ -262,13 +262,16 @@ test("no page uses the removed ad-hoc role guards", () => {
   }
 });
 
-test("collectes module uses the live schema and the payment-status RPC", () => {
+test("collectes module records individual payments through the checked RPCs only", () => {
   const source = read("js/admin-payments.js");
-  assert.match(source, /select\("id,title,description,amount,event_date,is_active"\)/);
-  assert.match(source, /\.eq\("status", "PAID"\)/);
-  assert.match(source, /rpc\("set_event_payment_status"/);
-  assert.doesNotMatch(source, /from\("event_payments"\)\s*\.upsert/);
-  assert.doesNotMatch(source, /class="payment-row"/, "rows must be <tr> inside the table body");
+  assert.match(source, /select\("id,title,description,amount,target_amount,suggested_amount,event_date,start_date,deadline,collection_status,organizer,category,is_active,created_at"\)/);
+  for (const rpc of ["record_collection_contribution", "update_collection_contribution", "cancel_collection_contribution", "set_collection_member_target", "list_payment_members"]) {
+    assert.ok(source.includes(`rpc("${rpc}"`), rpc);
+  }
+  // No direct writes: amounts, authorship and audit are set server-side.
+  assert.doesNotMatch(source, /from\("(collection_contributions|collection_member_targets|event_payments)"\)[^;]*\.(insert|update|upsert|delete)\(/);
+  // Each submission carries an idempotency key so a double click cannot count twice.
+  assert.match(source, /p_request_id: state\.paymentRequestId/);
 });
 
 test("card payment status goes through the narrow RPC", () => {
@@ -345,7 +348,7 @@ test("no page selects protected member columns or * from the members table", () 
 
 test("own payment rows are locked for a treasurer in the UI (database enforces it too)", () => {
   assert.match(read("js/subscribers.js"), /return canMarkCard && \(!s\.is_self \|\| canManageMembers\);/);
-  assert.match(read("js/admin-payments.js"), /subscriber\.is_self && !canManageEvents/);
+  assert.match(read("js/admin-payments.js"), /return state\.canRecord && \(!sub\?\.is_self \|\| state\.canConfigure\);/);
 });
 
 test("account emails are shown to SUPERADMIN only and loaded through the checked RPC", () => {
