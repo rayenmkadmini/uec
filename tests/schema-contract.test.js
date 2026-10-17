@@ -10,11 +10,18 @@ const assert = require("node:assert/strict");
 
 const root = path.join(__dirname, "..");
 const LIVE = {
-  events: ["id", "title", "description", "event_date", "location", "image_url", "amount", "capacity", "is_active", "created_at", "updated_at"],
+  events: ["id", "title", "description", "event_date", "location", "image_url", "amount", "capacity", "is_active", "created_at", "updated_at",
+    // added by 20261018120000_smart_collections
+    "target_amount", "suggested_amount", "start_date", "deadline", "collection_status", "organizer", "category"],
+  collection_contributions: ["id", "event_id", "subscriber_id", "amount", "paid_on", "method", "reference", "notes", "status", "cancelled_at", "cancel_reason", "source", "request_id", "recorded_by", "created_at", "updated_at"],
+  collection_member_targets: ["event_id", "subscriber_id", "target_amount", "updated_at"],
   event_payments: ["id", "event_id", "subscriber_id", "amount", "status", "payment_method", "transaction_reference", "paid_at", "notes", "created_at", "updated_at"],
   card_payments: ["id", "subscriber_id", "amount", "status", "payment_method", "transaction_reference", "paid_at", "notes", "created_at", "updated_at"]
 };
 const PAYMENT_STATUS = ["PENDING", "PAID", "FAILED", "REFUNDED", "CANCELLED"];
+// events.collection_status, collection_contributions.status and the per-member summary
+// computed in js/collections-core.js (20261018120000_smart_collections).
+const COLLECTION_STATUS = ["DRAFT", "ACTIVE", "COMPLETED", "CANCELLED", "VALID", "NOT_PAID", "PARTIAL", "TARGET_REACHED", "CONTRIBUTED"];
 
 const jsFiles = fs.readdirSync(path.join(root, "js")).filter(f => f.endsWith(".js"));
 const source = file => fs.readFileSync(path.join(root, "js", file), "utf8");
@@ -56,14 +63,17 @@ test("events use title (not name); event payments use status (not paid)", () => 
   for (const value of payments.matchAll(/status === "([A-Z]+)"|\.eq\("status", "([A-Z]+)"\)/g)) {
     const status = value[1] || value[2];
     if (["ACTIVE", "INACTIVE", "SUSPENDED"].includes(status)) continue; // member status, not payment
+    if (COLLECTION_STATUS.includes(status)) continue; // collection / contribution / member-summary status
     assert.ok(PAYMENT_STATUS.includes(status), status);
   }
 });
 
-test("event payment status changes go through the RPC (amount is set server-side)", () => {
+test("event payments are never written by the browser; contributions go through RPCs", () => {
   const payments = source("admin-payments.js");
-  assert.match(payments, /rpc\("set_event_payment_status"/);
-  for (const { chain } of chains("event_payments")) assert.doesNotMatch(chain, /\.(insert|update|upsert)\(/);
+  assert.match(payments, /rpc\("record_collection_contribution"/);
+  for (const table of ["event_payments", "collection_contributions", "collection_member_targets"]) {
+    for (const { chain } of chains(table)) assert.doesNotMatch(chain, /\.(insert|update|upsert|delete)\(/, table);
+  }
 });
 
 test("no runnable SQL script outside migrations defines events.name or event_payments.paid", () => {
