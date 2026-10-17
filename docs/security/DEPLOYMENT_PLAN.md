@@ -151,7 +151,11 @@ What a rollback does **not** undo:
 
 See `AUTH_SETTINGS_REVIEW.md` for how to verify each one and what was validated locally.
 
-1. Authentication → Sign In / Providers → **Allow new users to sign up: off**.
+1. Authentication → Sign In / Providers → **Allow new users to sign up: off**. Verified **on**
+   in production on 2026-10-17 (`/auth/v1/settings`: `disable_signup=false`). It does not
+   depend on the release, so it can be turned off now. Check afterwards:
+   `curl -s -H "apikey: <publishable key>" https://qwlbbfyhjdeekmrxtzjf.supabase.co/auth/v1/settings`
+   must show `"disable_signup":true`.
 2. Password policy: **minimum length 12**; required characters: lowercase, uppercase,
    digits, symbols.
 3. URL Configuration: Site URL = `https://login.ueclubistes.tn`; Redirect URLs include

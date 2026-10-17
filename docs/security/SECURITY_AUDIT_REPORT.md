@@ -29,6 +29,10 @@ Test evidence: `TEST_REPORT.md`. Launch steps: `DEPLOYMENT_PLAN.md`.
 | Edge Functions | 7 v1 functions (2026-10-01), `verify_jwt = true`. v1 sets the **CIN as the initial password**. `PUBLIC_SITE_URL` secret missing. | PENDING (8 new functions) + OWNER (reset CIN passwords) |
 | Function grants | Public helpers are `authenticated`-only; `set_updated_at` is granted to `anon` (trigger function, not callable as RPC). | PENDING (161200) |
 | Secrets in browser code | Only the publishable key in `js/config.js`; no service-role/secret key in any page or script. | VERIFIED |
+| Self-signup (2026-10-17) | `GET /auth/v1/settings`: `disable_signup=false` (email confirmation on). A self-registered user automatically gets a profile and the MEMBER role (`handle_new_user`). Today that user sees only reference data and active matches/events. | OWNER: Dashboard → Authentication → turn off "Allow new users to sign up" (can be done now, independent of the launch) |
+| Browser hardening (2026-10-17) | Production sends only HSTS: no CSP, no anti-framing, no `nosniff`. `supabase-js@2` and `sweetalert2@11` load unpinned from the CDN without SRI, on pages that hold staff sessions in `localStorage`. | PENDING: fixed in the release (`vercel.json` headers; scripts pinned with SRI) |
+| HTTPS | HTTP → HTTPS 308 on both domains; certificate valid until 2026-12-14; HSTS 2 years. | VERIFIED |
+| GitHub repository | Private (anonymous API → 404). The real CSV in history is not public. | VERIFIED |
 
 ## 3. Database decision: repair, not rebuild
 
@@ -62,6 +66,15 @@ no self-promotion.
 - Removed the unused `@supabase/server` dependency (no code reference).
 - `.mcp.json` untracked and ignored (per-user tool config); `/public/` ignored.
 - Docs: Auth user ID removed from `SECURITY.md` and `RLS_ROLE_DESIGN.md`.
+- 2026-10-17: `vercel.json` security headers (CSP: scripts only from the site and jsDelivr,
+  API calls only to the project, `frame-ancestors 'none'`, `object-src 'none'`; `X-Frame-Options`,
+  `nosniff`, `Referrer-Policy`, `Permissions-Policy`). CDN scripts pinned with SRI:
+  `supabase-js` 2.117.2 (newest release ≥ 14 days old), `sweetalert2` 11.26.25, `chart.js` 4.4.4.
+  The browser e2e serves the site with these exact headers and fails on any CSP or SRI violation.
+  `tests/site-headers.test.js` guards both. The team-logo fallback escapes initials (an apostrophe
+  broke the `onerror` handler).
+  CSP limit: `script-src` keeps `'unsafe-inline'` because 22 generated buttons use `onclick=`.
+  Moving them to `addEventListener` would allow a strict CSP (follow-up).
 
 ### Deleted files
 

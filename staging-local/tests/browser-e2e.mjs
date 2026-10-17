@@ -6,9 +6,10 @@
 //
 //   node staging-local/tests/browser-e2e.mjs
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -57,7 +58,20 @@ const edgeFn = (token, fn, body) => fetch(`${API}/functions/v1/${fn}`, { method:
 
 // ---------------------------------------------------------------- processes
 const webRoot = join(stackDir, ".build", "web");
-const server = spawn("python", ["-m", "http.server", "5500", "--bind", "127.0.0.1", "--directory", webRoot], { stdio: "ignore" });
+// Static server with the response headers of vercel.json. The production Supabase origin in
+// the CSP is replaced by the local API, exactly as the stack does for js/config.js.
+const PROD_API = "https://qwlbbfyhjdeekmrxtzjf.supabase.co";
+const siteHeaders = Object.fromEntries((JSON.parse(readFileSync(join(stackDir, "..", "vercel.json"), "utf8")).headers || [])
+  .flatMap(rule => rule.headers)
+  .map(({ key, value }) => [key, value.replaceAll(PROD_API, API).replaceAll(PROD_API.replace("https:", "wss:"), API.replace("http:", "ws:"))]));
+const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".svg": "image/svg+xml", ".webp": "image/webp", ".ico": "image/x-icon", ".woff2": "font/woff2" };
+const server = createServer((req, res) => {
+  const file = join(webRoot, normalize(decodeURIComponent(new URL(req.url, SITE).pathname)).replace(/^[\\/]+/, "") || "index.html");
+  if (!file.startsWith(webRoot) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404, siteHeaders); res.end("not found"); return; }
+  res.writeHead(200, { ...siteHeaders, "Content-Type": TYPES[extname(file).toLowerCase()] || "application/octet-stream" });
+  res.end(readFileSync(file));
+}).listen(5500, "127.0.0.1");
 const profile = mkdtempSync(join(tmpdir(), "ue-edge-profile-"));
 const browser = spawn(EDGE_BIN, ["--headless=new", "--remote-debugging-port=9222", "--remote-debugging-address=127.0.0.1", `--user-data-dir=${profile}`,
   "--no-first-run", "--no-default-browser-check", "--disable-extensions", "--disable-sync", "about:blank"], { stdio: "ignore" });
@@ -71,7 +85,7 @@ async function cleanup() {
       `Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -like '*${profile.replace(/'/g, "''")}*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`],
       { stdio: "ignore" });
   } catch {}
-  try { server.kill(); } catch {}
+  try { server.close(); } catch {}
   await sleep(1500);
   try { rmSync(profile, { recursive: true, force: true }); } catch {}
 }
@@ -116,7 +130,10 @@ async function openPage() {
       const { url, status } = msg.params.response;
       if (url.startsWith(API) && status >= 400) page.failed.push(`${status} ${new URL(url).pathname}`);
     }
+    // CSP violations and SRI mismatches are browser log entries, not exceptions.
+    if (msg.method === "Log.entryAdded" && /Content Security Policy|integrity/i.test(msg.params.entry?.text || "")) page.errors.push(`CSP: ${msg.params.entry.text.slice(0, 160)}`);
   });
+  await send("Log.enable", {}, sessionId);
   await send("Page.enable", {}, sessionId);
   await send("Runtime.enable", {}, sessionId);
   await send("Network.enable", {}, sessionId);
@@ -163,8 +180,22 @@ try {
   const pelouse = (await service("GET", "/rest/v1/match_zones?select=id&zone_key=eq.PELOUSE&match_id=eq.10000000-0000-4000-8000-0000000000d1")).json[0].id;
   await service("POST", "/rest/v1/match_participations", { match_id: "10000000-0000-4000-8000-0000000000d1", subscriber_id: subs[L(2)], zone_id: pelouse }); // seat fixture
 
-  begin("SUPERADMIN pages");
+  begin("Security headers (vercel.json): CSP, SRI, anti-framing");
+  const head = await fetch(`${SITE}/index.html`);
+  check("CSP and anti-framing headers served", (head.headers.get("content-security-policy") || "").includes("frame-ancestors 'none'")
+    && head.headers.get("x-frame-options") === "DENY" && head.headers.get("x-content-type-options") === "nosniff");
   let page = await openPage();
+  await page.goto(`${SITE}/index.html`);
+  check("pinned libraries load under CSP + SRI", await page.waitFor("typeof window.supabase?.createClient === 'function' && typeof window.Swal === 'function' && !!window.sb"));
+  check("login page: no CSP / SRI / JS error", clean(page), problems(page));
+  const blocked = await page.eval(`new Promise(r => { document.addEventListener("securitypolicyviolation", e => r(e.effectiveDirective), { once: true }); fetch("https://example.invalid/x").catch(() => {}); setTimeout(() => r(null), 4000); })`);
+  check("CSP blocks requests to other origins", blocked === "connect-src", blocked);
+  await sleep(500);
+  check("CSP violations reach the per-page error checks", page.errors.some(e => e.startsWith("CSP:")), page.errors.length);
+  await page.close();
+
+  begin("SUPERADMIN pages");
+  page = await openPage();
   await login(page, sa.email, sa.password);
   check("login lands on dashboard", (await page.path()).endsWith("dashboard.html"), await page.path());
   await page.goto(`${SITE}/subscribers.html`);

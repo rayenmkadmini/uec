@@ -266,13 +266,14 @@ function getTeamLogo(teamName, fallbackLabel, customUrl) {
                 font-size="28"
                 font-weight="700"
                 fill="#ffffff">
-                ${initials}
+                ${escapeHtml(initials)}
             </text>
 
         </svg>
     `;
 
-    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    // encodeURIComponent leaves ' as is; this URL is also placed inside a quoted onerror handler.
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg).replace(/'/g, "%27")}`;
 }
 
 function clubKey(name) {
