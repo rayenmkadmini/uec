@@ -1,7 +1,14 @@
 # Deployment plan — 5 migrations, 8 Edge Functions, frontend
 
-Status: **prepared, not executed.** No production step has been run. Every step
-below needs explicit approval at the time it is run.
+Status: **executed on 2026-10-17**, under the owner's release authorization. Times are UTC.
+
+1. **Frontend first, by mistake.** Commit `1366b0a` reached `main` outside the planned sequence, and was live from about 06:18 against the old schema.
+2. **Backup.** A backup was taken and restore-tested. A recheck just before the apply found the same row counts in all 48 tables.
+3. **Migrations.** `apply-migration.mjs --confirm-production --expect-sha256=78de466b…` committed the 5 migrations in one transaction, and the read-only post-checks passed. The remote history now holds 7 versions, and row counts are unchanged.
+4. **Edge Functions.** The `PUBLIC_SITE_URL` secret was set, and the 8 functions were deployed with `--use-api`. All 8 are ACTIVE with `verify_jwt=true`, and `check:functions --with-cli` passes. The previously deployed versions are saved in `uec-backups/2026-10-17-pre-release/functions-v1/`.
+5. **Frontend.** Fast-forward push of `743dd14` to `main`. Vercel deployment `dpl_4N4eYKbD3MR4DfBP99sXGwU8Pnz3` is READY on the 3 domains, `check:public` passes, the security headers are served, and the SRI hashes match.
+
+Owner actions still open: §6 items 1–3 (signup, password policy, URL configuration).
 
 Production: `qwlbbfyhjdeekmrxtzjf` (login.uec). Never `astsvxyqyyzqvuioqsnq`.
 

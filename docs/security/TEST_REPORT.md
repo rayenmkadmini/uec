@@ -45,3 +45,19 @@ Every row below was run on 2026-10-17.
 | Runner negative controls | wrong `--expect-sha256` refused before any write (production history unchanged); missing hash refused; forbidden grants refused; "no usable SUPERADMIN" refused (all flagged, and all inactive) |
 | Stack e2e (production-aligned privileges, functions with supabase-js 2.117.2) | API **145 / 0**. Browser 66/0 and later 67/0: three consecutive runs green after the guard fix, and one intermittent failure before it (see `SECURITY_AUDIT_REPORT.md`). |
 | `npm run check:functions -- --with-cli` against **current** production (before the deploy) | 20 expected failures: the v1 functions lack the www and vercel.app origins, and `admin-activate-member` is not deployed. It confirms the gateway enforces JWT (`UNAUTHORIZED_NO_AUTH_HEADER`). |
+
+## 2026-10-17: production verification after the release (read-only or credential-free)
+
+| Check | Result |
+|---|---|
+| Remote migration history | 7 versions (2 earlier + the 5 applied) |
+| Row counts, 48 tables vs the pre-release backup | unchanged |
+| Anonymous REST access (publishable key) to subscribers, profiles, user_roles, audit_logs, payments, matches, clubs, v_member_cards | **401** on every one (no `anon` grants left) |
+| Anonymous listing of the `subscriber-photos` bucket | empty |
+| `npm run check:functions -- --with-cli` | **all passed**: 8 functions ACTIVE with verify_jwt=true; preflights from the 3 site origins; unknown origin refused; POST without JWT gets 401 from the gateway |
+| `npm run check:public` | **all passed** (CSV 403; pages 200; internal files 404) |
+| Security headers on 3 domains | CSP, `X-Frame-Options: DENY`, `nosniff` present |
+| SRI of supabase-js, sweetalert2 and chart.js vs the CDN files | all match |
+| Vercel build of `743dd14` | allowlist build, 29 files, READY |
+
+Not run in production: logging in with real staff accounts. That is the owner's smoke test; no credentials were used and no test record was created.

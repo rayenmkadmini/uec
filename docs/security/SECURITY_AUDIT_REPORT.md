@@ -4,6 +4,20 @@ Status labels: **VERIFIED** (checked today with a command or test), **PENDING** 
 needs an approval-gated production step), **OWNER** (needs an account owner).
 Test evidence: `TEST_REPORT.md`. Launch steps: `DEPLOYMENT_PLAN.md`.
 
+**Update 2026-10-17: release executed.** Every **PENDING** item in §2 is now in production:
+
+- the 5 migrations;
+- the 8 Edge Functions;
+- the frontend with the allowlist build, security headers and SRI.
+
+Verified after deployment:
+
+- `anon` gets 401 on every table and view;
+- the photo bucket is private and empty;
+- internal files return 404, and the member CSV returns 403.
+
+Still open: **OWNER** items only (self-signup, password policy, URL configuration).
+
 ## 1. Targets (VERIFIED)
 
 | Item | Value |
