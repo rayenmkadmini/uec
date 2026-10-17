@@ -124,20 +124,57 @@ Order: **migration → functions → frontend**. Each part works without the oth
 (functions report `sessions_revoked: false` if the migration is missing; the migration adds
 an unused function and tightens grants the current frontend does not use).
 
-1. **Preview**: push the branch (`git push -u origin audit/2026-10-17-completion`). Vercel
-   builds a preview from it; check the faculties page, login, members, matches.
+1. **Preview** — done 2026-10-17 (push approved by the owner): branch pushed at `a1e5199`;
+   Vercel preview `dpl_5t3ScB8NFWC7u1Qi8xsqFjY9riTR`
+   (`uec-akeh891dg-rayenmkadminins-projects.vercel.app`) READY; build log: clone of
+   `audit/2026-10-17-completion` @ `a1e5199`, `build-public: 29 files published`. Production
+   aliases unchanged (all three on `dpl_8Jo3…` / `fa726d9`). The preview is behind Vercel
+   Authentication (anonymous → 302 to the Vercel login), so it was **not** exercised in a
+   browser here; the identical build output was exercised on the local stack (browser e2e 71/0).
+   The preview uses the production Supabase project (same `js/config.js`): test it with a
+   SUPERADMIN account only, read-only, and expect Edge Function calls to fail CORS from the
+   preview origin (only the 3 production origins are allowed) — that is by design.
 2. **Migration** (one transaction, approved by hash):
    ```sh
    UE_TEST_DB_CONTAINER=ue-replica-postrelease node scripts/apply-migration.mjs --dry-run
    UE_TEST_DB_CONTAINER=ue-replica-postrelease node scripts/apply-migration.mjs --confirm-production --expect-sha256=<hash printed by the dry run>
    ```
-   The hash above is for the files on this branch; re-run the dry run right before applying.
+   Last dry run (2026-10-17, exit 0): sha256 `d4c923e5ffab2dc72d26415ec0d8abc616f93b943931c296bed0b5810d4ac36f`.
+   The hash covers the exact file bytes in this working tree; `core.autocrlf=true`, so a fresh
+   checkout (CRLF) produces a different hash. Always re-run the dry run in the checkout you apply
+   from, immediately before applying. The replica `ue-replica-postrelease` must still match
+   production in all 13 categories (the runner refuses otherwise).
 3. **Functions** (no `--no-verify-jwt`, no `--prune`), then `npm run check:functions -- --with-cli`:
    ```sh
    npx supabase functions deploy admin-activate-member admin-create-admin admin-create-user admin-delete-admin admin-delete-user admin-import-users admin-reset-password admin-update-admin --use-api
    ```
-4. **Frontend**: fast-forward `main` to the reviewed commit (`git push origin <commit>:main`,
-   no force). Then `npm run check:public` and the header check.
+   Check first that the CLI is linked to `qwlbbfyhjdeekmrxtzjf` (`cat supabase/.temp/project-ref`)
+   and deploy from a clean checkout of the reviewed commit (the per-function `_shared` copies are
+   what gets bundled).
+4. **Frontend**: fast-forward `main` to the reviewed commit, no force:
+   ```sh
+   git push origin <reviewed-commit>:main
+   ```
+   Vercel then builds and promotes production. Afterwards: `npm run check:public`, the response
+   headers, and `STAFF_LOGIN_VERIFICATION.md` §1–4.
+
+### Compatibility (any order is safe)
+
+| Deployed | Not yet deployed | Behaviour | Evidence |
+|---|---|---|---|
+| New functions | Migration | Resets work; response `sessions_revoked: false`, error logged | Local stack, RPC renamed away: reset 200, temporary password returned, `sessions_revoked=false` |
+| Migration | New functions | Old functions never call the RPC; grants they use are unchanged (service role) | Rehearsal on the post-release replica; role matrix 280/0 |
+| Migration | New frontend | Old frontend: photo paths it builds (`<LOGIN>/<uuid>.<ext>`) still pass; an SVG logo upload is refused by the bucket with a raw error (SUPERADMIN only; 0 logos today) | Code review; matrix "photo path: generated name" allow |
+| New frontend | Migration / functions | Frontend uses no new server field | `grep sessions_revoked\|protected_account js/` → none |
+
+### Needs the owner (Dashboard or credentials)
+
+- Preview test in a browser logged in to Vercel (or approve a temporary
+  "Protection Bypass for Automation" secret, to revoke afterwards).
+- SUPERADMIN login and the checks in `STAFF_LOGIN_VERIFICATION.md` (password policy, redirect
+  allow-list, OTP expiry, MFA settings are only visible in the Dashboard).
+- `gh` CLI is not logged in (`gh auth login` if PRs should be opened from here); Git pushes
+  use Git Credential Manager as `rayenmkadmini`.
 
 ### Rollback
 
