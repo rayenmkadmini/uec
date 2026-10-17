@@ -175,7 +175,18 @@ an unused function and tightens grants the current frontend does not use).
    Check first that the CLI is linked to `qwlbbfyhjdeekmrxtzjf` (`cat supabase/.temp/project-ref`)
    and deploy from a clean checkout of the reviewed commit (the per-function `_shared` copies are
    what gets bundled).
-4. **Frontend**: fast-forward `main` to the reviewed commit, no force:
+4. **Frontend — RELEASED 2026-10-17 13:05 UTC** (owner approval for this step):
+   - `main` fast-forwarded `fa726d9..0e78dcc` (no force);
+   - Vercel production `dpl_2DGcsSmeosKBmffutyKiFJkSTAEY` READY (clone of `main` @ `0e78dcc`,
+     `build-public: 29 files`); `login.ueclubistes.tn`, `www.login.ueclubistes.tn` and
+     `uec-five.vercel.app` all point at it;
+   - CSP, `X-Frame-Options: DENY`, `nosniff`, HSTS, Referrer-Policy, Permissions-Policy on all
+     3 domains; `check:public` 45 PASS / 0 FAIL; SRI of supabase-js, chart.js, sweetalert2 match;
+     `js/reference.js`, `common.js`, `admin-users.js`, `subscribers.js`, `auth.js`, `matchs.js`,
+     `admin-matchs.html` served on all 3 domains are identical to `0e78dcc`;
+   - rollback: Vercel → promote `dpl_8Jo3ktSarnBQQ8TjjiCnnwkFgm67` (`fa726d9`)
+     (`vercel promote dpl_8Jo3ktSarnBQQ8TjjiCnnwkFgm67`), or revert on `main`.
+   Original procedure: fast-forward `main` to the reviewed commit, no force:
    ```sh
    git push origin <reviewed-commit>:main
    ```
