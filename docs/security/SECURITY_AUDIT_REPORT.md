@@ -91,7 +91,7 @@ No database object is deleted. The applied migration history is untouched.
 | 1 | Production still runs the old schema, functions and frontend (section 2 PENDING rows) | Approval: launch sequence in `DEPLOYMENT_PLAN.md` |
 | 2 | Accounts created by v1 functions may use the CIN as password | OWNER: reset after the launch (migrations flag `must_change_password`) |
 | 3 | Real CSV remains in Git history and in old Vercel deployments (protected by Vercel Authentication) | Approval: Phase E history rewrite; delete old deployments; GitHub Support cache purge |
-| 4 | Password of the separate database `astsvxyqyyzqvuioqsnq` exposed in history | OWNER: rotate |
+| 4 | Database URLs of the old, separate project `astsvxyqyyzqvuioqsnq` exposed in history | **Closed** (2026-10-17): the project no longer exists (its API and DB hosts do not resolve; not in the account). Production is only `qwlbbfyhjdeekmrxtzjf`. |
 | 5 | Personal-data breach assessment (INPDP) for the CSV exposure | OWNER |
 | 6 | Supabase connector in Claude is signed in to another account (`login.uec` not visible); the Supabase CLI works | OWNER: reconnect the connector if needed |
 | 7 | Leaked-password protection, MFA for staff | OWNER: Dashboard, plan-dependent |
