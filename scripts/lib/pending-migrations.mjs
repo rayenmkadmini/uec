@@ -1,7 +1,8 @@
 // Migration lists shared by the test runners, the local stack and scripts/apply-migration.mjs.
 //
 // BASE_APPLIED: in production since 2026-10-01.
-// RELEASED:     applied to production on 2026-10-17 (docs/security/DEPLOYMENT_PLAN.md).
+// RELEASED:     applied to production on 2026-10-17: the release (DEPLOYMENT_PLAN.md) and, in the
+//               afternoon, 20261017120000 (COMPLETION_AUDIT_2026-10-17.md).
 // PENDING:      written locally, NOT yet applied to qwlbbfyhjdeekmrxtzjf, in apply order.
 //               Each has a rollback in supabase/rollback/<name>_rollback.sql.
 //
@@ -15,12 +16,13 @@ export const RELEASED = [
   "20261015140000_member_identity_and_password_hardening",
   "20261015160000_active_accounts_and_data_minimization",
   "20261015180000_admin_least_privilege",
-  "20261016120000_least_privilege_hardening"
-];
-
-export const PENDING = [
+  "20261016120000_least_privilege_hardening",
   "20261017120000_session_revocation_and_grant_tightening"
 ];
+
+// Add the next migration here; scripts/apply-migration.mjs refuses to run with nothing pending.
+// Also update RELEASED_PROBE_SQL / PENDING_PROBE_SQL below to objects of the new state.
+export const PENDING = [];
 
 export const versionOf = name => name.split("_")[0];
 export const APPLIED_VERSIONS = [...BASE_APPLIED, ...RELEASED.map(versionOf)];
@@ -29,12 +31,13 @@ export const migrationPath = name => `supabase/migrations/${name}.sql`;
 export const rollbackPath = name => `supabase/rollback/${name}_rollback.sql`;
 
 // Prints UE_RELEASED=true|false: whether the target already holds RELEASED.
-// private.account_ok() is created by 20261015160000.
-export const RELEASED_PROBE_SQL = "select 'UE_RELEASED=' || (to_regprocedure('private.account_ok()') is not null)::text as probe;";
+// public.admin_revoke_user_sessions(uuid) is created by the last released migration
+// (20261017120000). A replica holding only part of RELEASED must be rebuilt or brought up to date.
+export const RELEASED_PROBE_SQL = "select 'UE_RELEASED=' || (to_regprocedure('public.admin_revoke_user_sessions(uuid)') is not null)::text as probe;";
 
 // Prints UE_PENDING_PRESENT=true|false: whether PENDING objects already exist (must be false
-// before an apply). public.admin_revoke_user_sessions(uuid) is created by 20261017120000.
-export const PENDING_PROBE_SQL = "select 'UE_PENDING_PRESENT=' || (to_regprocedure('public.admin_revoke_user_sessions(uuid)') is not null)::text as probe;";
+// before an apply). No migration is pending: set this to an object the next one creates.
+export const PENDING_PROBE_SQL = "select 'UE_PENDING_PRESENT=false' as probe;";
 
 export function parseProbe(output, key) {
   const match = String(output).match(new RegExp(`${key}=(true|false)`));

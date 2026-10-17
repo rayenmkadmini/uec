@@ -36,6 +36,10 @@ import { APPLIED_VERSIONS, PENDING, PENDING_PROBE_SQL, RELEASED_PROBE_SQL, migra
 const PROJECT_REF = "qwlbbfyhjdeekmrxtzjf";
 const FORBIDDEN_REF = "astsvxyqyyzqvuioqsnq";
 const APPLIED = APPLIED_VERSIONS;
+if (!PENDING.length) {
+  console.error("ABORTED: no pending migration (scripts/lib/pending-migrations.mjs). Nothing to apply.");
+  process.exit(1);
+}
 const VERSIONS = PENDING.map(versionOf);
 const REPLICA = process.env.UE_TEST_DB_CONTAINER || "ue-phaseb-testdb";
 

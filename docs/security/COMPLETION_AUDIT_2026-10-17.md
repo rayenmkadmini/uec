@@ -134,7 +134,20 @@ an unused function and tightens grants the current frontend does not use).
    The preview uses the production Supabase project (same `js/config.js`): test it with a
    SUPERADMIN account only, read-only, and expect Edge Function calls to fail CORS from the
    preview origin (only the 3 production origins are allowed) — that is by design.
-2. **Migration** (one transaction, approved by hash):
+2. **Migration — APPLIED 2026-10-17** (owner approval for this step, by hash):
+   - schema-only backup first: `uec-backups/2026-10-17-pre-20261017120000/` (schema + roles, SHA256SUMS);
+   - fresh dry run: exit 0, replica = production 13/13, hash `d4c923e5…ac36f` = approved hash;
+   - `--confirm-production --expect-sha256=d4c923e5…ac36f`: exit 0, "COMMITTED: 20261017120000
+     applied and recorded", runner post-checks passed;
+   - independent post-checks: remote history 8 versions; new function present, service_role
+     only, SECURITY DEFINER with `search_path=""`; notifications `UPDATE(is_read)` only; no
+     sequence privilege for authenticated; strict photo path; `account_ok()` in
+     `can_select_match_zone`; logos JPEG/PNG/WebP only; anon: 0 table grants, 0 executable
+     functions, RPC call → 401; RLS on every table; row counts unchanged (2 users, 2 profiles,
+     2 members, 7 roles, 2 usable SUPERADMIN); `check:public` and `check:functions --with-cli` pass;
+   - a replica rebuilt as "backup + the 6 migration files" equals production in 13/13 fingerprint
+     categories.
+   The tooling now lists it under RELEASED; nothing is pending. Original procedure:
    ```sh
    UE_TEST_DB_CONTAINER=ue-replica-postrelease node scripts/apply-migration.mjs --dry-run
    UE_TEST_DB_CONTAINER=ue-replica-postrelease node scripts/apply-migration.mjs --confirm-production --expect-sha256=<hash printed by the dry run>
