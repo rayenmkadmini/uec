@@ -157,7 +157,18 @@ an unused function and tightens grants the current frontend does not use).
    checkout (CRLF) produces a different hash. Always re-run the dry run in the checkout you apply
    from, immediately before applying. The replica `ue-replica-postrelease` must still match
    production in all 13 categories (the runner refuses otherwise).
-3. **Functions** (no `--no-verify-jwt`, no `--prune`), then `npm run check:functions -- --with-cli`:
+3. **Functions — DEPLOYED 2026-10-17 13:01 UTC** (owner approval for this step), from `f7c9ffa`:
+   - previous versions (7 × v3, `admin-activate-member` v1) downloaded to
+     `uec-backups/2026-10-17-pre-functions-v4/` (SHA256SUMS); all 28 source files identical to `fa726d9`;
+   - `supabase functions deploy <8> --project-ref qwlbbfyhjdeekmrxtzjf --use-api`: exit 0;
+   - now 7 × v4 + `admin-activate-member` v2, all ACTIVE, `verify_jwt=true`;
+     `check:functions --with-cli`: 57 PASS, 0 FAIL; unknown-origin preflight now sends
+     `Vary: Origin` (new code); re-downloaded code identical to `f7c9ffa` (28/28 files);
+   - rollback: `supabase functions deploy <8> --project-ref qwlbbfyhjdeekmrxtzjf --use-api
+     --workdir "C:/Users/Rayen Mkadmini/uec-backups/2026-10-17-pre-functions-v4"`
+     (the backup holds the previous code under `supabase/functions/`; add a `supabase/config.toml`
+     with the 8 `verify_jwt = true` blocks there first, or deploy from a `fa726d9` worktree).
+   Original procedure (no `--no-verify-jwt`, no `--prune`), then `npm run check:functions -- --with-cli`:
    ```sh
    npx supabase functions deploy admin-activate-member admin-create-admin admin-create-user admin-delete-admin admin-delete-user admin-import-users admin-reset-password admin-update-admin --use-api
    ```
