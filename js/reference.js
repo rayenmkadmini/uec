@@ -6,8 +6,12 @@ async function loadRefs(){const grid=$("#refGrid");if(grid)grid.innerHTML='<div 
 function renderRefs(){
   const q=stripAccents(($("#refSearch")?.value||"").trim().toLowerCase());
   const list=q?allRefs.filter(x=>stripAccents(x.name).toLowerCase().includes(q)):allRefs;
-  $("#refGrid").innerHTML=list.map(x=>`<article class="ref-card"><div><span class="ref-dot" aria-hidden="true"></span><strong>${escapeHtml(x.name)}</strong></div><div class="actions">${window.canManageReferences ? `<button class="icon-btn" aria-label="Modifier ${escapeHtml(x.name)}" title="Modifier" onclick="editRef('${x.id}','${escapeHtml(x.name).replace(/'/g,"&#039;")}')">${ICONS.edit}</button><button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(x.name)}" title="Supprimer" onclick="deleteRef('${x.id}')">${ICONS.trash}</button>` : ""}</div></article>`).join("")||`<div class="empty">Aucune donnée trouvée.</div>`;
+  // No data inside inline JavaScript: the browser decodes HTML entities in onclick=""
+  // before running it, so an escaped quote in a name would still break out. Buttons
+  // carry the id only; the delegated listener below looks the record up.
+  $("#refGrid").innerHTML=list.map(x=>`<article class="ref-card"><div><span class="ref-dot" aria-hidden="true"></span><strong>${escapeHtml(x.name)}</strong></div><div class="actions">${window.canManageReferences ? `<button type="button" class="icon-btn" aria-label="Modifier ${escapeHtml(x.name)}" title="Modifier" data-ref-action="edit" data-ref-id="${escapeHtml(x.id)}">${ICONS.edit}</button><button type="button" class="icon-btn danger" aria-label="Supprimer ${escapeHtml(x.name)}" title="Supprimer" data-ref-action="delete" data-ref-id="${escapeHtml(x.id)}">${ICONS.trash}</button>` : ""}</div></article>`).join("")||`<div class="empty">Aucune donnée trouvée.</div>`;
 }
+$("#refGrid")?.addEventListener("click",e=>{const button=e.target.closest("[data-ref-action]");if(!button)return;const id=button.dataset.refId;if(button.dataset.refAction==="edit"){const ref=allRefs.find(x=>String(x.id)===id);if(ref)editRef(ref.id,ref.name);}else window.deleteRef(id);});
 function editRef(id,name){ if(!window.canManageReferences)return;$("#refModal").classList.remove("hidden");$("#refTitle").textContent="Modifier";$("#refId").value=id;$("#refName").value=name;}
 $("#addRef").onclick=()=>{if(!window.canManageReferences)return;$("#refModal").classList.remove("hidden");$("#refTitle").textContent="Ajouter";$("#refId").value="";$("#refName").value=""};
 $("#closeRef").onclick=()=>$("#refModal").classList.add("hidden");

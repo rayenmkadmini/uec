@@ -8,12 +8,18 @@
 // database (even though the runners always roll back) and must only be used
 // with explicit approval.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 export function describeTarget(argv = process.argv) {
   return argv.includes("--linked")
     ? "linked Supabase project (REMOTE)"
     : `local container ${process.env.UE_TEST_DB_CONTAINER || "ue-phaseb-testdb"}`;
+}
+
+// Runs one read-only SQL text and returns its output (same target rules as runSqlFile).
+export function runSqlText(sql, { root, argv = process.argv, tmp }) {
+  writeFileSync(tmp, sql);
+  return runSqlFile(tmp, { root, argv });
 }
 
 // Runs a SQL file and returns stdout+stderr (the runners read their report from

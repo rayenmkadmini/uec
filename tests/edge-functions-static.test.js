@@ -84,7 +84,9 @@ test("access issuing never reactivates a deactivated account", () => {
 });
 
 test("every per-function _shared copy matches the canonical modules", () => {
-  for (const file of ["import-utils.mjs", "member-lifecycle.mjs"]) {
+  // The per-function copies are what gets deployed; the canonical files are what
+  // reviews and unit tests read. They must be byte-identical.
+  for (const file of ["import-utils.mjs", "member-lifecycle.mjs", "security.ts", "roles.ts"]) {
     const canonical = read(`supabase/functions/_shared/${file}`);
     for (const name of functionNames) {
       const copy = path.join(functionsDir, name, "_shared", file);
@@ -92,8 +94,39 @@ test("every per-function _shared copy matches the canonical modules", () => {
       assert.equal(fs.readFileSync(copy, "utf8"), canonical, `${name}/_shared/${file}`);
     }
   }
-  const security = functionNames.map(name => read(`supabase/functions/${name}/_shared/security.ts`));
-  assert.ok(security.every(s => s === security[0]), "per-function security.ts copies are identical");
+});
+
+test("handlers never send raw exception or database error text to the caller", () => {
+  for (const name of functionNames) {
+    const source = indexSource(name);
+    assert.doesNotMatch(source, /error:\s*e instanceof Error \? e\.message/, `${name}: raw exception text in a response`);
+    assert.doesNotMatch(source, /json\(req,\s*\{\s*error:\s*\w*[eE]rror\??\.message/, `${name}: raw database/Auth error text in a response`);
+    assert.match(source, /return errorResponse\(req, "[a-z-]+", e\);/, `${name}: catch-all must use errorResponse`);
+    assert.doesNotMatch(source, /await req\.json\(\)/, `${name}: body must be read with readJson (400 on malformed JSON)`);
+  }
+  const security = read("supabase/functions/_shared/security.ts");
+  const handler = security.slice(security.indexOf("export function errorResponse"), security.indexOf("export function failureCode"));
+  assert.match(handler, /console\.error/, "unexpected errors are logged for project owners");
+  assert.doesNotMatch(handler.split("console.error")[1], /e\.message\s*}/, "the caller gets a fixed message");
+});
+
+test("destructive staff functions are rate-limited and protect other SUPERADMIN accounts", () => {
+  for (const name of ["admin-delete-admin", "admin-delete-user", "admin-update-admin", "admin-reset-password"]) {
+    assert.match(indexSource(name), /await rateLimit\(ctx\.admin, ctx\.caller\.id, "[A-Z_]+", \d+, \d+\)/, name);
+  }
+  assert.match(indexSource("admin-delete-admin"), /roles\.has\("SUPERADMIN"\)\)\s*\{\s*return json\(req, \{[^}]*protected_account[^}]*\}, 403\)/);
+  assert.match(indexSource("admin-reset-password"), /callerId: ctx\.caller\.id/);
+  assert.match(lifecycle, /protected_account/);
+  const security = read("supabase/functions/_shared/security.ts");
+  assert.match(security, /new HttpError\(429, "rate_limited"/, "rate limit answers 429");
+  assert.match(security, /"Vary": "Origin",/, "Vary: Origin on every response");
+});
+
+test("role replacement adds before it removes (never leaves an account without roles)", () => {
+  const roles = read("supabase/functions/_shared/roles.ts");
+  const body = roles.slice(roles.indexOf("export async function replaceRoles"));
+  assert.ok(body.indexOf(".upsert(") > 0 && body.indexOf(".upsert(") < body.indexOf(".delete()"), "upsert precedes delete");
+  assert.match(body, /\.not\("role", "in"/, "only roles no longer wanted are deleted");
 });
 
 test("every admin Edge Function requires an active, re-secured SUPERADMIN", () => {

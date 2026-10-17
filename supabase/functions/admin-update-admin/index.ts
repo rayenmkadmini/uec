@@ -1,4 +1,4 @@
-import { requireSuperAdmin, json, options, audit } from "./_shared/security.ts";
+import { requireSuperAdmin, json, options, audit, rateLimit, errorResponse, failureCode, readJson, revokeSessions } from "./_shared/security.ts";
 import { normalizeRoles, replaceRoles } from "./_shared/roles.ts";
 
 Deno.serve(async req => {
@@ -7,7 +7,8 @@ Deno.serve(async req => {
   let ctx;
   try {
     ctx = await requireSuperAdmin(req);
-    const b = await req.json();
+    await rateLimit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", 60, 60);
+    const b = await readJson(req);
     const userId = String(b.user_id || "");
     if (!userId) return json(req, { error: "user_id required" }, 400);
 
@@ -32,7 +33,7 @@ Deno.serve(async req => {
     if (typeof b.display_name !== "undefined" && (typeof b.display_name !== "string" || !b.display_name.trim() || b.display_name.length > 100)) {
       return json(req, { error: "Nom invalide." }, 400);
     }
-    if (typeof b.email !== "undefined" && !/^\S+@\S+\.\S+$/.test(String(b.email).trim())) {
+    if (typeof b.email !== "undefined" && (!/^\S+@\S+\.\S+$/.test(String(b.email).trim()) || String(b.email).trim().length > 254)) {
       return json(req, { error: "Email invalide." }, 400);
     }
     if (typeof b.is_active !== "undefined" && typeof b.is_active !== "boolean") return json(req, { error: "Statut invalide." }, 400);
@@ -77,29 +78,44 @@ Deno.serve(async req => {
 
     if (!Object.keys(patch).length && !roles.length) return json(req, { error: "Aucune modification fournie." }, 400);
 
+    // Details of failed writes go to the function logs (project owners only), never to the browser.
     if (roles.length) {
       try {
         await replaceRoles(ctx.admin, userId, roles);
       } catch (e) {
-        return json(req, { error: e instanceof Error ? e.message : String(e) }, 400);
+        console.error("admin-update-admin: role update failed:", e instanceof Error ? e.message : String(e));
+        await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", userId, false, { code: "roles_failed" });
+        return json(req, { error: "Les rôles n’ont pas pu être enregistrés. Réessayez." }, 400);
       }
     }
 
-    const { error } = await ctx.admin.from("profiles").update(patch).eq("id", userId);
-    if (error) return json(req, { error: error.message }, 400);
+    if (Object.keys(patch).length) {
+      const { error } = await ctx.admin.from("profiles").update(patch).eq("id", userId);
+      if (error) {
+        console.error("admin-update-admin: profile update failed:", error.message);
+        await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", userId, false, { code: "profile_failed" });
+        return json(req, { error: String(error.code || "") === "23505" ? "Cet email est déjà utilisé." : "Le compte n’a pas pu être modifié. Réessayez." }, 400);
+      }
+    }
 
     if (patch.email) {
       const { error: emailError } = await ctx.admin.auth.admin.updateUserById(userId, { email: patch.email as string, email_confirm: true });
-      if (emailError) return json(req, { error: emailError.message }, 400);
+      if (emailError) {
+        console.error("admin-update-admin: Auth email update failed:", emailError.message);
+        await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", userId, false, { code: "auth_email_failed" });
+        return json(req, { error: "L’email de connexion n’a pas pu être modifié (déjà utilisé ?)." }, 400);
+      }
     }
 
-    await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", userId, true, { fields: Object.keys(patch), roles });
-    return json(req, { ok: true, roles });
+    // A deactivated account loses data access at once (database check); its
+    // sessions are also ended so it cannot use Auth endpoints either.
+    const sessionsRevoked = patch.is_active === false ? await revokeSessions(ctx.admin, userId) : null;
+
+    await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", userId, true, { fields: Object.keys(patch), roles, sessions_revoked: sessionsRevoked });
+    return json(req, { ok: true, roles, ...(sessionsRevoked === null ? {} : { sessions_revoked: sessionsRevoked }) });
   } catch (e) {
-    if (e instanceof Response) return e;
     // Details go to the function logs (project owners only), never to audit_logs (readable by ADMIN).
-    console.error("admin-update-admin failed:", e instanceof Error ? e.message : String(e));
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", null, false, { code: "unexpected" });
-    return json(req, { error: e instanceof Error ? e.message : String(e) }, 500);
+    if (ctx && !(e instanceof Response)) await audit(ctx.admin, ctx.caller.id, "UPDATE_ADMIN", null, false, { code: failureCode(e) });
+    return errorResponse(req, "admin-update-admin", e);
   }
 });

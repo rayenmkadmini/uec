@@ -21,7 +21,11 @@ window.addEventListener("ue-theme-change", renderCharts);
   $("#adminName").textContent=displayName;
   if($("#adminGreetName"))$("#adminGreetName").textContent=displayName;
   const {data: subs,error}=await sb.from("subscribers").select("id,nom,prenom,numero_abonnement,status,created_at,faculties(name),zones(name)").order("created_at",{ascending:false});
-  if(error)return showAlert("#pageAlert","Erreur de chargement des statistiques.","error");
+  if(error){
+    for(const id of ["#total","#active","#inactive","#rate"])$(id).textContent="—";
+    $("#recentRows").innerHTML=`<tr><td colspan="6" class="empty">Impossible de charger les données. Rechargez la page.</td></tr>`;
+    return showAlert("#pageAlert","Erreur de chargement des statistiques.","error");
+  }
   const total=subs.length, active=subs.filter(s=>s.status==="ACTIVE").length;
   $("#total").textContent=total;$("#active").textContent=active;$("#inactive").textContent=total-active;$("#rate").textContent=total?Math.round(active/total*100)+"%":"0%";
   const countBy=(key)=>Object.entries(subs.reduce((a,s)=>{let k=s[key]?.name||"Non défini";if(key==="faculties")k=facultyShort(k);a[k]=(a[k]||0)+1;return a},{}));

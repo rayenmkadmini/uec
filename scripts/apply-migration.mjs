@@ -1,10 +1,7 @@
-// Guarded production apply of the pending migrations (scripts/lib/pending-migrations.mjs) to
-// qwlbbfyhjdeekmrxtzjf (login.uec):
-//   20261015120000_role_permissions_repair
-//   20261015140000_member_identity_and_password_hardening
-//   20261015160000_active_accounts_and_data_minimization
-//   20261015180000_admin_least_privilege
-//   20261016120000_least_privilege_hardening
+// Guarded production apply of the PENDING migrations (scripts/lib/pending-migrations.mjs) to
+// qwlbbfyhjdeekmrxtzjf (login.uec). The 2026-10-17 release (RELEASED) is already applied;
+// pending now:
+//   20261017120000_session_revocation_and_grant_tightening
 //
 //   node scripts/apply-migration.mjs --dry-run             # read-only production checks + full local rehearsal
 //   node scripts/apply-migration.mjs --confirm-production  # same, then ONE production transaction (explicit approval)
@@ -12,7 +9,8 @@
 // Order. Nothing is written to production before step 6, and nothing after its COMMIT:
 //   1. Target: linked ref, js/config.js; the deleted project astsvxyqyyzqvuioqsnq is refused.
 //   2. History: `migration list --output-format json`, parsed with JSON.parse. Remote must be exactly
-//      the two applied versions and local exactly applied + pending; anything else aborts.
+//      the applied versions (BASE_APPLIED + RELEASED) and local exactly applied + pending; anything
+//      else aborts.
 //   3. Replica = production: the read-only catalog fingerprint (scripts/lib/schema-fingerprint.sql)
 //      of production and of the disposable replica must match in every category.
 //   4. Rehearsal on the replica: the exact production transaction with COMMIT replaced by ROLLBACK,
@@ -33,12 +31,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkAfterApply, checkBeforeApply, parseMigrationList } from "./lib/migration-history.mjs";
-import { PENDING, migrationPath, rollbackPath } from "./lib/pending-migrations.mjs";
+import { APPLIED_VERSIONS, PENDING, PENDING_PROBE_SQL, RELEASED_PROBE_SQL, migrationPath, parseProbe, rollbackPath, versionOf } from "./lib/pending-migrations.mjs";
 
 const PROJECT_REF = "qwlbbfyhjdeekmrxtzjf";
 const FORBIDDEN_REF = "astsvxyqyyzqvuioqsnq";
-const APPLIED = ["20261001194746", "20261001194845"];
-const VERSIONS = PENDING.map(name => name.split("_")[0]);
+const APPLIED = APPLIED_VERSIONS;
+const VERSIONS = PENDING.map(versionOf);
 const REPLICA = process.env.UE_TEST_DB_CONTAINER || "ue-phaseb-testdb";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -243,6 +241,23 @@ const ASSERTIONS = `
   if exists (select 1 from pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p')
              and not c.relrowsecurity) then
     raise exception 'VERIFY: a public table has RLS disabled';
+  end if;
+
+  -- 20261017120000
+  if to_regprocedure('public.admin_revoke_user_sessions(uuid)') is null
+     or not has_function_privilege('service_role', 'public.admin_revoke_user_sessions(uuid)', 'EXECUTE')
+     or has_function_privilege('authenticated', 'public.admin_revoke_user_sessions(uuid)', 'EXECUTE') then
+    raise exception 'VERIFY: session revocation function missing or executable by authenticated';
+  end if;
+
+  if has_column_privilege('authenticated', 'public.notifications', 'title', 'UPDATE')
+     or not has_column_privilege('authenticated', 'public.notifications', 'is_read', 'UPDATE')
+     or has_sequence_privilege('authenticated', 'public.audit_logs_id_seq', 'USAGE') then
+    raise exception 'VERIFY: notification or sequence privileges not tightened';
+  end if;
+
+  if (select 'image/svg+xml' = any(coalesce(allowed_mime_types, array[]::text[])) from storage.buckets where id = 'match-logos') then
+    raise exception 'VERIFY: match-logos still accepts SVG';
   end if;`;
 
 const sql = `begin;
@@ -310,8 +325,13 @@ const sqlHash = createHash("sha256").update(sql).digest("hex");
 console.log(`Production transaction: ${sqlFile} (sha256 ${sqlHash}, ${sql.length} bytes).`);
 
 // ---------------------------------------------------------------- 4) rehearsal on the replica
-const baseline = replicaPsql("select (to_regclass('public.clubs') is null and to_regprocedure('private.account_ok()') is null)::text;", true).trim();
-if (baseline !== "true") fail(`replica ${REPLICA} is not at the pre-migration baseline (pending objects already present).`);
+// The replica must be where production is: release applied, pending migrations not.
+try {
+  if (!parseProbe(replicaPsql(RELEASED_PROBE_SQL, true), "UE_RELEASED")) fail(`replica ${REPLICA} does not hold the 2026-10-17 release; build a post-release replica (docs/security/LOCAL_TEST_DATABASE.md).`);
+  if (parseProbe(replicaPsql(PENDING_PROBE_SQL, true), "UE_PENDING_PRESENT")) fail(`replica ${REPLICA} already holds pending objects.`);
+} catch (error) {
+  fail(`replica baseline check failed: ${error.message}`);
+}
 replicaPsql(`create schema if not exists supabase_migrations;
 create table if not exists supabase_migrations.schema_migrations
   (version text primary key, statements text[], name text, created_by text, idempotency_key text, rollback text[]);`);
@@ -335,9 +355,12 @@ const subChecks = [
     return m && Number(m[1]) > 0 && Number(m[2]) === 0 ? `${m[1]} checks, 0 failed` : null;
   }],
   ["run-rollback-check.mjs", "rollback exactness", out => {
+    // On a post-release replica the checker replays exactly the pending migrations.
+    const checked = Number((out.match(/Migrations checked: (\d+)/) || [])[1]);
     const exact = (out.match(/Not restored by rollback: none/g) || []).length;
     const unchanged = (out.match(/Data changed by migration: none/g) || []).length;
-    return exact === PENDING.length && unchanged === PENDING.length ? `${exact}/${PENDING.length} rollbacks exact, no data changed` : null;
+    return checked === PENDING.length && PENDING.every(name => out.includes(name)) && exact === checked && unchanged === checked
+      ? `${exact}/${checked} rollbacks exact, no data changed` : null;
   }],
 ];
 for (const [script, label, verdict] of subChecks) {
@@ -393,22 +416,22 @@ if (!result || Number(result.recorded) !== VERSIONS.length) {
 set local lock_timeout = '300s';
 select pg_advisory_xact_lock(${APPLY_LOCK});
 select (select count(*) from supabase_migrations.schema_migrations where version in (${versionList}))::int as recorded,
-       to_regclass('public.clubs') is not null as clubs_present;`, "outcome");
+       to_regprocedure('public.admin_revoke_user_sessions(uuid)') is not null as pending_present;`, "outcome");
   } catch (error) {
     fail(`could not determine the outcome (${error.message}). Do NOT retry; check 'migration list' and the schema manually.`, 3);
   }
-  if (Number(state.recorded) === 0 && state.clubs_present === false) {
+  if (Number(state.recorded) === 0 && state.pending_present === false) {
     fail("no commit observed after the apply transaction ended: production is unchanged (no version recorded, no new object). Nothing to undo.");
   }
-  if (Number(state.recorded) !== VERSIONS.length || state.clubs_present !== true) {
-    fail(`INCONSISTENT state (recorded=${state.recorded}, clubs_present=${state.clubs_present}). Stop and investigate; do not retry.`, 3);
+  if (Number(state.recorded) !== VERSIONS.length || state.pending_present !== true) {
+    fail(`INCONSISTENT state (recorded=${state.recorded}, pending_present=${state.pending_present}). Stop and investigate; do not retry.`, 3);
   }
   console.log("The response was lost, but production confirms the commit (all versions recorded).");
 }
 console.log(`COMMITTED: ${VERSIONS.join(", ")} applied and recorded on ${PROJECT_REF}.`);
 
 // ---------------------------------------------------------------- 7) after COMMIT: read-only checks
-const rollbackHint = `Rollback files (exact on the replica), to run only after a decision, in this order:\n${[...PENDING].reverse().map(name => `  ${rollbackPath(name)}${name.startsWith("20261015120000") ? "   <- do NOT run unchanged: it re-opens public photos and anon grants (DEPLOYMENT_PLAN.md §5)" : ""}`).join("\n")}\nAfter a database rollback, also remove the 5 history rows (supabase migration repair --status reverted <version>).`;
+const rollbackHint = `Rollback files (exact on the replica), to run only after a decision, in this order:\n${[...PENDING].reverse().map(name => `  ${rollbackPath(name)}${name.startsWith("20261015120000") ? "   <- do NOT run unchanged: it re-opens public photos and anon grants (DEPLOYMENT_PLAN.md §5)" : ""}`).join("\n")}\nAfter a database rollback, also remove the ${VERSIONS.length} history row(s) (supabase migration repair --status reverted <version>).`;
 try {
   checkAfterApply(migrationHistory(), APPLIED, VERSIONS);
 } catch (error) {

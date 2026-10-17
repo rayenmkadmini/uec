@@ -227,7 +227,7 @@ export async function activateMember({ db, auth }, { subscriberId, method = "lin
 // ------------------------------------------------------------------
 // Reset of an existing account
 // ------------------------------------------------------------------
-export async function resetAccess({ db, auth }, { userId, method, newPassword = null, redirectTo = null, generatePassword = generateTemporaryPassword }) {
+export async function resetAccess({ db, auth }, { userId, callerId = null, method, newPassword = null, redirectTo = null, generatePassword = generateTemporaryPassword }) {
   if (!userId) return fail(400, "missing_user", "user_id requis.");
   if (!["link", "temporary_password", "chosen_password"].includes(method)) return fail(400, "invalid_method", "Méthode invalide.");
   if (method === "link" && !redirectTo) return fail(503, "link_unavailable", "Les liens de réinitialisation ne sont pas configurés (PUBLIC_SITE_URL).");
@@ -235,6 +235,15 @@ export async function resetAccess({ db, auth }, { userId, method, newPassword = 
   const { data: profile, error } = await db.from("profiles").select("id").eq("id", userId).maybeSingle();
   if (error) return fail(503, "lookup_failed", "Utilisateur introuvable pour le moment.");
   if (!profile) return fail(404, "not_found", "Utilisateur introuvable.");
+
+  // A SUPERADMIN cannot obtain access to another SUPERADMIN account (that would
+  // let one owner act as the other). Those resets are done by the project owner
+  // in the Supabase Dashboard. Unknown caller or role lookup error: refused.
+  const { data: targetRoles, error: rolesError } = await db.from("user_roles").select("role").eq("user_id", userId);
+  if (rolesError) return fail(503, "roles_unavailable", "Rôles du compte indisponibles. Réessayez.");
+  if ((targetRoles || []).some(r => String(r.role).toUpperCase() === "SUPERADMIN") && (!callerId || callerId !== userId)) {
+    return fail(403, "protected_account", "L’accès d’un autre compte SUPERADMIN ne peut pas être réinitialisé ici.");
+  }
 
   if (method === "link") {
     const { data: found, error: userError } = await auth.getUserById(userId);

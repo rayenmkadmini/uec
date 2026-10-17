@@ -159,7 +159,15 @@ async function withOwnPrivateFields(subscriber) {
   setupShell(ctx);
   const row = await sb.from("subscribers").select(OWN_MEMBER_COLUMNS).eq("user_id", ctx.user.id).maybeSingle();
   const { data: s, error } = row.error ? row : await withOwnPrivateFields(row.data);
-  if (error) { showAlert("#pageAlert","Impossible de charger votre profil.","error"); return; }
+  if (error) {
+    showAlert("#pageAlert","Impossible de charger votre profil.","error");
+    $("#statusBadge").textContent = "Statut indisponible";
+    $("#subscriberMemberCard").innerHTML = '<div class="empty-card">Impossible de charger votre carte membre. Rechargez la page.</div>';
+    const upcoming = $("#upcomingMatches");
+    if (upcoming) upcoming.innerHTML = '<div class="empty-card">Impossible de charger les matchs à venir.</div>';
+    $("#editBtn")?.classList.add("hidden");
+    return;
+  }
   if (!s) {
     // Staff accounts that also hold MEMBER may have no member record: send them to their profile page.
     if (can(ctx, "viewStaffProfile")) { location.href = "profile.html"; return; }

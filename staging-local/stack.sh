@@ -144,8 +144,8 @@ up() {
   psql_file /tmp/faculties_seed.sql
   psql_file /tmp/seed.sql
 
-  log "pending migrations"
-  for m in $(node -e 'import("file:///'"$REPO"'/scripts/lib/pending-migrations.mjs").then(m => console.log(m.PENDING.join(" ")))'); do
+  log "released + pending migrations"
+  for m in $(node -e 'import("file:///'"$REPO"'/scripts/lib/pending-migrations.mjs").then(m => console.log([...m.RELEASED, ...m.PENDING].join(" ")))'); do
     copy_in "$REPO/supabase/migrations/$m.sql" "/tmp/$m.sql"
     psql_file "/tmp/$m.sql" postgres
     log "  applied $m"

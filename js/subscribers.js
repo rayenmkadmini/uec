@@ -387,7 +387,7 @@ async function showAccess(title, result) {
   if (window.Swal) {
     await Swal.fire({
       ...swalBase(),
-      title,
+      titleText: title,
       html: `<p>${escapeHtml(explanation)}</p>
         <p><code class="temp-password">${escapeHtml(secret)}</code></p>
         <p class="hint">Le membre choisira son propre mot de passe à la première connexion.</p>`,
@@ -405,15 +405,21 @@ async function showAccess(title, result) {
 async function callAdminFunction(name, payload) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return { ok: false, status: 401, result: { error: "Session administrateur expirée." } };
-  const response = await fetch(`${UE_CONFIG.SUPABASE_URL}/functions/v1/${name}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: UE_CONFIG.SUPABASE_ANON_KEY,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
+  let response;
+  try {
+    response = await fetch(`${UE_CONFIG.SUPABASE_URL}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        apikey: UE_CONFIG.SUPABASE_ANON_KEY,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (_) {
+    // Network failure: the request may or may not have reached the server.
+    return { ok: false, status: 0, result: { error: "Le serveur n’a pas répondu. Rechargez la liste avant de réessayer : l’action a peut-être été enregistrée." } };
+  }
   let result = {};
   try { result = await response.json(); } catch (_) {}
   return { ok: response.ok, status: response.status, result };
@@ -452,23 +458,8 @@ window.deleteSub = async id => {
   if (!canManageMembers) return;
   if (!(await confirmDialog("Supprimer cet abonné et son compte ? Cette action est irréversible.", { confirmText: "Supprimer" }))) return;
 
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return showAlert("#pageAlert", "Session administrateur expirée.", "error");
-
-  const response = await fetch(`${UE_CONFIG.SUPABASE_URL}/functions/v1/admin-delete-user`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${session.access_token}`,
-      apikey: UE_CONFIG.SUPABASE_ANON_KEY,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ subscriber_id: id })
-  });
-
-  let result = {};
-  try { result = await response.json(); } catch (_) {}
-
-  if (!response.ok) return showAlert("#pageAlert", result.error || "Suppression impossible.", "error");
+  const call = await callAdminFunction("admin-delete-user", { subscriber_id: id });
+  if (!call.ok) return showAlert("#pageAlert", call.result.error || "Suppression impossible.", "error");
   await loadSubs();
 };
 
@@ -486,7 +477,7 @@ function importErrorListHtml(errors) {
 
 async function showImportErrors(title, intro, errors) {
   if (window.Swal) {
-    await Swal.fire({ ...swalBase(), title, html: `<p>${escapeHtml(intro)}</p>${importErrorListHtml(errors)}`, icon: "error", width: 760, confirmButtonText: "Fermer" });
+    await Swal.fire({ ...swalBase(), titleText: title, html: `<p>${escapeHtml(intro)}</p>${importErrorListHtml(errors)}`, icon: "error", width: 760, confirmButtonText: "Fermer" });
   } else {
     alert(`${title}\n${intro}\n\n${errors.slice(0, 20).map(e => e.message || e).join("\n")}`);
   }
@@ -678,8 +669,25 @@ async function init() {
   $("#closeMemberCardModal").onclick = () => $("#memberCardModal").classList.add("hidden");
 }
 
+// One save at a time: a second click while a member is being created would create it twice.
+let savingSubscriber = false;
 $("#subscriberForm").addEventListener("submit", async e => {
   e.preventDefault();
+  if (savingSubscriber) return;
+  savingSubscriber = true;
+  const submit = e.submitter || $("#subscriberForm [type=submit]");
+  submit?.setAttribute("disabled", "");
+  submit?.setAttribute("aria-busy", "true");
+  try {
+    await saveSubscriber();
+  } finally {
+    savingSubscriber = false;
+    submit?.removeAttribute("disabled");
+    submit?.removeAttribute("aria-busy");
+  }
+});
+
+async function saveSubscriber() {
   if (!canManageMembers) return showAlert("#pageAlert", "Vous avez un accès en lecture seule.", "error");
 
   const id = $("#editId").value;
@@ -728,23 +736,9 @@ $("#subscriberForm").addEventListener("submit", async e => {
     if (failure) return showAlert("#pageAlert", failure, "error");
     showAlert("#pageAlert", "Abonné modifié avec succès.");
   } else {
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) return showAlert("#pageAlert", "Session administrateur expirée.", "error");
-
-    const response = await fetch(`${UE_CONFIG.SUPABASE_URL}/functions/v1/admin-create-user`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        apikey: UE_CONFIG.SUPABASE_ANON_KEY,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    let result = {};
-    try { result = await response.json(); } catch (_) {}
-
-    if (!response.ok) return showAlert("#pageAlert", result.error || "Création impossible.", "error");
+    const call = await callAdminFunction("admin-create-user", payload);
+    const result = call.result;
+    if (!call.ok) return showAlert("#pageAlert", result.error || "Création impossible.", "error");
     if (result.activated) {
       showAlert("#pageAlert", "Abonné créé et compte activé.");
       await showAccess("Compte membre créé", result);
@@ -755,6 +749,6 @@ $("#subscriberForm").addEventListener("submit", async e => {
 
   $("#modal").classList.add("hidden");
   await loadSubs();
-});
+}
 
 init();

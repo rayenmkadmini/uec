@@ -5,22 +5,19 @@ export function normalizeRoles(value: unknown): string[] {
   return [...new Set(input.map((r: unknown) => String(r || "").trim().toUpperCase()).filter((r) => ALLOWED.has(r)))];
 }
 
+// Adds the new roles first, then removes the ones no longer wanted, so a failed
+// write never leaves the account without any role (user_roles key: user_id, role).
 export async function replaceRoles(db: any, userId: string, roles: string[]) {
   const normalized = normalizeRoles(roles);
   if (!normalized.length) throw new Error("Au moins un rôle valide est requis.");
 
-  const { error: delError } = await db.from("user_roles").delete().eq("user_id", userId);
-  if (delError) throw new Error(delError.message);
-
-  let { error: insError } = await db.from("user_roles").insert(
+  const { error: addError } = await db.from("user_roles").upsert(
     normalized.map((role) => ({ user_id: userId, role })),
+    { onConflict: "user_id,role", ignoreDuplicates: true },
   );
-  if (insError) {
-    const legacyResult = await db.from("user_roles").insert(
-      normalized.map((role_name) => ({ user_id: userId, role_name })),
-    );
-    insError = legacyResult.error;
-  }
-  if (insError) throw new Error(insError.message);
+  if (addError) throw new Error(addError.message);
+
+  const { error: removeError } = await db.from("user_roles").delete().eq("user_id", userId).not("role", "in", `(${normalized.join(",")})`);
+  if (removeError) throw new Error(removeError.message);
   return normalized;
 }

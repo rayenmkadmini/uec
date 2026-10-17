@@ -80,7 +80,8 @@ function showAlert(target, message, type = "success") {
         toast: true,
         position: "top-end",
         icon: type === "error" ? "error" : "success",
-        title: displayMessage,
+        // titleText renders as text: messages can carry server or user-supplied text.
+        titleText: displayMessage,
         showConfirmButton: false,
         timer: type === "error" ? 4500 : 3000,
         timerProgressBar: true
@@ -94,11 +95,14 @@ function userFacingError(message) {
     if (/permission|not authorized|forbidden|42501/.test(lower)) {
         return "Vous n’avez pas l’autorisation d’effectuer cette action.";
     }
-    if (/jwt|token|session expir|auth session/.test(lower)) {
+    if (/unauthorized|jwt|token|session expir|auth session/.test(lower)) {
         return "Votre session a expiré. Reconnectez-vous pour continuer.";
     }
     if (/network|fetch|timeout|offline|connexion impossible/.test(lower)) {
         return "Connexion impossible. Vérifiez votre réseau puis réessayez.";
+    }
+    if (/roles are unavailable|not authenticated|user_id required|method not allowed/.test(lower)) {
+        return "Le service est momentanément indisponible. Réessayez ou reconnectez-vous.";
     }
     if (/numero.?abonnement|subscription number/.test(lower)) {
         return "Le numéro d’abonnement est optionnel, mais le service d’inscription doit accepter cette valeur absente. Contactez l’administration.";
@@ -140,7 +144,7 @@ async function promptDialog(message, opts = {}) {
 
     const result = await Swal.fire({
         ...swalBase(),
-        title: message,
+        titleText: message,
         input: opts.input || "text",
         inputPlaceholder: opts.placeholder || "",
         inputValue: opts.value || "",
@@ -432,6 +436,15 @@ function authLinkError(loc = window.UE_AUTH_REDIRECT || location) {
 
 async function requireAuthenticated() {
     return requirePermission(null);
+}
+
+// Signed out in another tab, or the session could no longer be refreshed: leave
+// the protected page instead of showing data that can no longer be reloaded.
+// Not while an Auth link error is shown (supabase-js signs out when it rejects the link).
+if (window.sb?.auth && !/(^|\/)(index\.html)?$/i.test(location.pathname) && !authLinkError()) {
+    sb.auth.onAuthStateChange(event => {
+        if (event === "SIGNED_OUT") location.replace("index.html");
+    });
 }
 
 // Supabase returns success with 0 rows when RLS filters an UPDATE/DELETE.

@@ -10,13 +10,18 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describeTarget, runSqlFile } from "./lib/sql-target.mjs";
-import { PENDING, migrationPath } from "./lib/pending-migrations.mjs";
+import { describeTarget, runSqlFile, runSqlText } from "./lib/sql-target.mjs";
+import { RELEASED_PROBE_SQL, migrationPath, parseProbe, replayList } from "./lib/pending-migrations.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const withMigration = !process.argv.includes("--no-migration");
 
-const migrations = withMigration ? PENDING.map(name => readFileSync(join(root, migrationPath(name)), "utf8")) : [];
+const work = mkdtempSync(join(tmpdir(), "ue-rls-"));
+// Replays only what the target does not hold yet (the release, then the pending migrations).
+const replay = withMigration
+  ? replayList(parseProbe(runSqlText(RELEASED_PROBE_SQL, { root, tmp: join(work, "probe.sql") }), "UE_RELEASED"))
+  : [];
+const migrations = replay.map(name => readFileSync(join(root, migrationPath(name)), "utf8"));
 
 const report = `
 do $report$
@@ -35,10 +40,11 @@ $report$;
 
 const test = rel => readFileSync(join(root, "supabase", "tests", rel), "utf8");
 const sql = ["begin;", test("pre_migration_fixtures.sql"), ...migrations, test("rls_role_matrix.sql"), report].join("\n");
-const file = join(mkdtempSync(join(tmpdir(), "ue-rls-")), "run.sql");
+const file = join(work, "run.sql");
 writeFileSync(file, sql);
 
 console.log(`Target: ${describeTarget()}`);
+console.log(`Replayed in the transaction: ${replay.length ? replay.join(", ") : "none"}`);
 const output = runSqlFile(file, { root });
 
 const match = output.match(/RLS_TEST_REPORT total=(\d+) failed=(\d+) :: (.*?)(?:"|\\n|$)/s);

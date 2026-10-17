@@ -12,8 +12,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describeTarget, runSqlFile } from "./lib/sql-target.mjs";
-import { PENDING, migrationPath, rollbackPath } from "./lib/pending-migrations.mjs";
+import { describeTarget, runSqlFile, runSqlText } from "./lib/sql-target.mjs";
+import { RELEASED_PROBE_SQL, migrationPath, parseProbe, replayList, rollbackPath } from "./lib/pending-migrations.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const file = rel => readFileSync(join(root, rel), "utf8");
@@ -46,10 +46,14 @@ $report$;
 console.log(`Target: ${describeTarget()}`);
 let failures = 0;
 
-PENDING.forEach((name, index) => {
+// Checks every migration the target does not hold yet (the release, then the pending ones).
+const replay = replayList(parseProbe(runSqlText(RELEASED_PROBE_SQL, { root, tmp: join(mkdtempSync(join(tmpdir(), "ue-probe-")), "probe.sql") }), "UE_RELEASED"));
+console.log(`Migrations checked: ${replay.length}`);
+
+replay.forEach((name, index) => {
   const sql = [
     "begin;",
-    ...PENDING.slice(0, index).map(earlier => file(migrationPath(earlier))),
+    ...replay.slice(0, index).map(earlier => file(migrationPath(earlier))),
     file("supabase/tests/rollback_fingerprint.sql"),
     "select pg_temp.snap('before');",
     file(migrationPath(name)),

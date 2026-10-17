@@ -61,3 +61,9 @@ Every row below was run on 2026-10-17.
 | Vercel build of `743dd14` | allowlist build, 29 files, READY |
 
 Not run in production: logging in with real staff accounts. That is the owner's smoke test; no credentials were used and no test record was created.
+
+## 2026-10-17 (afternoon): completion audit
+
+Results of this pass (unit 127/127, role matrix 280/0, rollback 6/6, API e2e 162/0, browser
+e2e 71/0, production dry run of `20261017120000`, negative controls) are in
+`COMPLETION_AUDIT_2026-10-17.md` §3.

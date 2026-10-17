@@ -76,8 +76,11 @@ async function loadMatches() {
   ]);
   clubLogos = logos;
 
-  if (matchesResult.error) return showAlert("#pageAlert", matchesResult.error.message, "error");
-  if (participationResult.error) return showAlert("#pageAlert", participationResult.error.message, "error");
+  const loadError = matchesResult.error || participationResult.error;
+  if (loadError) {
+    $("#matchesGrid").innerHTML = '<div class="empty-card">Impossible de charger les matchs. Rechargez la page.</div>';
+    return showAlert("#pageAlert", loadError.message, "error");
+  }
 
   matches = matchesResult.data || [];
   myParticipation = new Map((participationResult.data || []).map(p => [p.match_id, p]));
@@ -92,6 +95,13 @@ function applyFilter() {
 
 function renderMatches() {
   const container = $("#matchesGrid");
+  if (!container.dataset.openReady) {
+    container.dataset.openReady = "true";
+    container.addEventListener("click", e => {
+      const button = e.target.closest("[data-open-match]");
+      if (button) openMatch(button.dataset.openMatch);
+    });
+  }
 
   if (!filteredMatches.length) {
     container.innerHTML = '<div class="empty-card">Aucun match programmé pour le moment.</div>';
@@ -107,6 +117,9 @@ function renderMatches() {
     const day = matchDate.toLocaleDateString("fr-TN", { day: "2-digit" });
     const month = matchDate.toLocaleDateString("fr-TN", { month: "short" }).replace(".", "").replace(".", "");
     const weekday = matchDate.toLocaleDateString("fr-TN", { weekday: "short" }).replace(".", "");
+    // Same rule as the seat RPCs: no choice or change once the match has started
+    // (match times are Tunis time, UTC+1 all year).
+    const started = Boolean(match.match_date) && new Date(`${match.match_date}T${match.match_time || "23:59:00"}+01:00`) <= new Date();
 
     return `
       <article class="match-card agenda-match-card">
@@ -134,7 +147,9 @@ function renderMatches() {
           <div class="match-info"><span>🕐 ${escapeHtml(formatTime(match.match_time))}</span>${match.stadium ? `<span>📍 ${escapeHtml(match.stadium)}</span>` : ""}</div>
           <div class="match-card-bottom">
             ${zone ? `<span class="choice-pill">✓ ${escapeHtml(zone.zone_name || zoneLabels[zone.zone_key] || "Place choisie")}</span>` : `<span class="muted-text">Aucune place choisie</span>`}
-            <button class="btn primary" onclick="openMatch('${match.id}')">${zone ? "Modifier" : "Choisir une place"}</button>
+            ${started
+              ? `<span class="muted-text">Match commencé</span>`
+              : `<button type="button" class="btn primary" data-open-match="${escapeHtml(match.id)}">${zone ? "Modifier" : "Choisir une place"}</button>`}
           </div>
         </div>
       </article>

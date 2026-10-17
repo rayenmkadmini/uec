@@ -110,6 +110,7 @@ where id in ('00000000-0000-4000-8000-0000000000b4', '00000000-0000-4000-8000-00
 update public.profiles set phone = '+216 00 000 099' where id = '00000000-0000-4000-8000-0000000000a2';
 insert into public.audit_logs (user_id, action, ip_address) values ('00000000-0000-4000-8000-0000000000a1', 'RLS_FIXTURE', '192.0.2.1');
 insert into public.notifications (user_id, title, message) values ('00000000-0000-4000-8000-0000000000ab', 'RLS', 'fixture');
+insert into public.notifications (user_id, title, message) values ('00000000-0000-4000-8000-0000000000a4', 'RLS', 'fixture');
 
 -- Production has one settings row; an empty schema-only test database has none.
 insert into public.site_settings (site_name) select 'UE Clubiste' where not exists (select 1 from public.site_settings);
@@ -291,6 +292,13 @@ select pg_temp.t('read matches + zones',    'member', $q$select 1 from public.ma
 select pg_temp.t('edit own phone/address',  'member', $q$update public.subscribers set phone = '+21600000000', adresse = 'Tunis' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'allow');
 select pg_temp.t('set own photo path',      'member', $q$update public.subscribers set photo_url = 'RLSMEMBER/me.jpg' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'allow');
 select pg_temp.t('point photo at other',    'member', $q$update public.subscribers set photo_url = 'RLSOTHER/x.jpg' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+-- 20261017120000: the photo path is <LOGIN>/<file name>, nothing else.
+select pg_temp.t('photo path with ..',      'member', $q$update public.subscribers set photo_url = 'RLSMEMBER/../RLSOTHER/existing.jpg' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('photo path in sub-folder', 'member', $q$update public.subscribers set photo_url = 'RLSMEMBER/a/b.jpg' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('photo path: generated name', 'member', $q$update public.subscribers set photo_url = 'RLSMEMBER/0b6c9f3e-1d2a-4c5b-9e8f-7a6b5c4d3e2f.webp' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'allow');
+select pg_temp.t('rewrite own notification', 'member', $q$update public.notifications set title = 'forged', message = 'forged' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
+select pg_temp.t('mark own notification read', 'member', $q$update public.notifications set is_read = true where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'allow');
+select pg_temp.t('seat availability (helper)', 'member', $q$select 1 where public.can_select_match_zone('00000000-0000-4000-8000-0000000000d1', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE'))$q$, 'allow');
 select pg_temp.t('edit own name',           'member', $q$update public.subscribers set nom = 'Hack' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
 select pg_temp.t('mark own card paid',      'member', $q$update public.subscribers set card_paid = true where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
 select pg_temp.t('change own status',       'member', $q$update public.subscribers set status = 'SUSPENDED' where user_id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
@@ -330,6 +338,8 @@ select pg_temp.t('read own profile',        'newmember', $q$select 1 from public
 select pg_temp.t('read own roles',          'newmember', $q$select 1 from public.user_roles where user_id = '00000000-0000-4000-8000-0000000000a7'$q$, 'allow');
 select pg_temp.t('read own member row before changing password', 'newmember', $q$select 1 from public.subscribers where user_id = '00000000-0000-4000-8000-0000000000a7'$q$, 'deny');
 select pg_temp.t('choose seat before changing password', 'newmember', $q$select public.set_match_participation('00000000-0000-4000-8000-0000000000d1', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE'))$q$, 'deny');
+select pg_temp.t('seat availability before changing password (helper)', 'newmember', $q$select 1 where public.can_select_match_zone('00000000-0000-4000-8000-0000000000d1', (select id from public.match_zones where match_id = '00000000-0000-4000-8000-0000000000d1' and zone_key = 'PELOUSE'))$q$, 'deny');
+select pg_temp.t('revoke sessions (service-role RPC)', 'superadmin', $q$select public.admin_revoke_user_sessions('00000000-0000-4000-8000-0000000000a4')$q$, 'deny');
 select pg_temp.t('own private fields before changing password', 'newmember', $q$select * from public.get_member_private_fields()$q$, 'deny');
 select pg_temp.t('complete password change before changing it', 'newmember', $q$select public.complete_password_change()$q$, 'deny');
 select pg_temp.t('legacy account: complete without changing', 'legacy', $q$select public.complete_password_change()$q$, 'deny');
@@ -471,6 +481,38 @@ where n.nspname = 'public' and c.relkind in ('r', 'p') and has_table_privilege(v
 
 insert into rls_results (test, passed, detail)
 select 'POST: authenticated holds no DELETE on notifications', not has_table_privilege('authenticated', 'public.notifications', 'DELETE'), '';
+
+-- 20261017120000
+insert into rls_results (test, passed, detail)
+select 'POST: authenticated may update notifications.is_read only',
+       has_column_privilege('authenticated', 'public.notifications', 'is_read', 'UPDATE')
+       and not has_column_privilege('authenticated', 'public.notifications', 'title', 'UPDATE')
+       and not has_column_privilege('authenticated', 'public.notifications', 'message', 'UPDATE')
+       and not has_column_privilege('authenticated', 'public.notifications', 'user_id', 'UPDATE'), '';
+
+insert into rls_results (test, passed, detail)
+select 'POST: no sequence privilege for anon/authenticated in public', count(*) = 0, coalesce(string_agg(c.relname, ','), '')
+from pg_class c
+where c.relnamespace = 'public'::regnamespace and c.relkind = 'S'
+  and (has_sequence_privilege('authenticated', c.oid, 'USAGE') or has_sequence_privilege('authenticated', c.oid, 'UPDATE')
+       or has_sequence_privilege('anon', c.oid, 'USAGE') or has_sequence_privilege('anon', c.oid, 'UPDATE'));
+
+insert into rls_results (test, passed, detail)
+select 'POST: default sequence privileges of postgres grant authenticated nothing', count(*) = 0, coalesce(string_agg(a.privilege_type, ','), '')
+from pg_default_acl d cross join lateral aclexplode(d.defaclacl) a
+where d.defaclnamespace in ('public'::regnamespace, 0) and d.defaclrole = 'postgres'::regrole and d.defaclobjtype = 'S'
+  and a.grantee = 'authenticated'::regrole;
+
+insert into rls_results (test, passed, detail)
+select 'POST: admin_revoke_user_sessions executable by service_role only',
+       coalesce((select has_function_privilege('service_role', f, 'EXECUTE')
+                        and not has_function_privilege('authenticated', f, 'EXECUTE')
+                        and not has_function_privilege('anon', f, 'EXECUTE')
+                 from to_regprocedure('public.admin_revoke_user_sessions(uuid)') f where f is not null), false), '';
+
+insert into rls_results (test, passed, detail)
+select 'POST: match-logos bucket refuses SVG', not ('image/svg+xml' = any(coalesce(allowed_mime_types, array[]::text[]))), coalesce(array_to_string(allowed_mime_types, ','), 'null')
+from storage.buckets where id = 'match-logos';
 
 insert into rls_results (test, passed, detail)
 select 'POST: default privileges of postgres grant anon nothing and authenticated no MAINTAIN', count(*) = 0, coalesce(string_agg(d.defaclobjtype::text || ':' || a.privilege_type, ','), '')

@@ -1,17 +1,33 @@
 document.addEventListener("DOMContentLoaded", async () => {
-  // Already signed in (page refresh / back button): go straight to the role's home.
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) {
-    const ctx = await getCurrentContext();
-    const home = ctx && homePageFor(ctx);
-    if (ctx && home) {
-      location.href = ctx.profile.must_change_password ? "change-password.html" : home;
-      return;
+  const form = document.querySelector("#loginForm");
+  if (!window.sb) {
+    // supabase-js did not load (CDN blocked or offline): say so instead of a dead button.
+    const err = document.querySelector("#loginError");
+    if (err) {
+      err.textContent = "Le service de connexion n’a pas pu être chargé. Vérifiez votre réseau puis rechargez la page.";
+      err.classList.remove("hidden");
     }
-    await sb.auth.signOut();
+    form?.querySelector("button[type=submit]")?.setAttribute("disabled", "");
+    return;
   }
 
-  const form = document.querySelector("#loginForm");
+  // Already signed in (page refresh / back button): go straight to the role's home.
+  // A failure here must never prevent the form below from working.
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      const ctx = await getCurrentContext();
+      const home = ctx && homePageFor(ctx);
+      if (ctx && home) {
+        location.href = ctx.profile.must_change_password ? "change-password.html" : home;
+        return;
+      }
+      await sb.auth.signOut();
+    }
+  } catch (error) {
+    console.error("Session check failed:", error);
+  }
+
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const err = document.querySelector("#loginError");

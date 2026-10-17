@@ -50,9 +50,9 @@ async function ensureMatchStorageAndSchema() {
 async function uploadMatchLogo(file) {
   if (!file) return null;
 
-  const allowed = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"];
+  const allowed = ["image/jpeg", "image/png", "image/webp"];
   if (!allowed.includes(file.type)) {
-    throw new Error("Format de logo invalide. Utilisez JPG, PNG, WebP ou SVG.");
+    throw new Error("Format de logo invalide. Utilisez JPG, PNG ou WebP.");
   }
   if (file.size > 2 * 1024 * 1024) {
     // Same limit as the match-logos bucket (migration 20261015120000).
@@ -111,7 +111,10 @@ async function loadMatches() {
     .order("match_date", { ascending: true })
     .order("match_time", { ascending: true });
 
-  if (error) return showAlert("#pageAlert", error.message, "error");
+  if (error) {
+    $("#adminMatchesGrid").innerHTML = '<div class="empty-card">Impossible de charger les matchs. Rechargez la page.</div>';
+    return showAlert("#pageAlert", error.message, "error");
+  }
 
   const all = data || [];
   const toTime = m => new Date(`${m.match_date || "2100-01-01"}T${m.match_time || "00:00:00"}`).getTime();
@@ -191,7 +194,7 @@ function renderZoneSettings(match) {
       ${zones.map(z => `
         <div class="zone-admin-row">
           <strong>${escapeHtml(z.zone_name)}</strong>
-          <label class="switch-label"><input type="checkbox" class="zone-available" data-zone-id="${z.id || ""}" data-zone-key="${z.zone_key}" ${z.is_available !== false ? "checked" : ""}> Disponible</label>
+          <label class="switch-label"><input type="checkbox" class="zone-available" data-zone-id="${escapeHtml(z.id || "")}" data-zone-key="${escapeHtml(z.zone_key)}" ${z.is_available !== false ? "checked" : ""}> Disponible</label>
           <label>Capacité<input type="number" min="0" class="zone-capacity" data-zone-id="${z.id || ""}" value="${z.capacity ?? ""}" placeholder="Illimitée"></label>
         </div>
       `).join("")}

@@ -70,6 +70,28 @@ would have granted those privileges in production; it was regenerated.
 
 Use `UE_TEST_DB_CONTAINER=<name>` to point the runners at another container.
 
+## Post-release replica (for migrations after 2026-10-17)
+
+`ue-phaseb-testdb` holds production's schema from **before** the 2026-10-17 release. The test
+runners detect that (`private.account_ok()` absent) and replay the released migrations first,
+so `npm run test:rls` / `test:rollback` keep working on it.
+
+`scripts/apply-migration.mjs` instead needs a replica that equals production **now**. Build it
+the same way, then apply the released migrations in one transaction:
+
+```sh
+# same docker run / restore / replica_alignment.sql steps as above, with --name ue-replica-postrelease, then:
+node --input-type=module -e '
+import { readFileSync } from "node:fs";
+import { RELEASED, migrationPath } from "./scripts/lib/pending-migrations.mjs";
+process.stdout.write(["begin;", ...RELEASED.map(n => readFileSync(migrationPath(n), "utf8")), "commit;"].join("\n"));' \
+  | docker exec -i ue-replica-postrelease psql -U postgres -d postgres -X -q -v ON_ERROR_STOP=1
+UE_TEST_DB_CONTAINER=ue-replica-postrelease node scripts/apply-migration.mjs --dry-run
+```
+
+On 2026-10-17 this replica matched production in all 13 fingerprint categories, which also
+confirms that production's schema is exactly the backup plus the five released migrations.
+
 ## Cleanup
 
 ```sh

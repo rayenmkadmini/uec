@@ -18,6 +18,11 @@ Verified after deployment:
 
 Still open: **OWNER** items only (self-signup, password policy, URL configuration).
 
+**Update 2026-10-17 (afternoon): completion audit** — see `COMPLETION_AUDIT_2026-10-17.md`.
+Self-signup is now verified **off**. A new review found 2 Medium (stored XSS in the
+faculty/zone editor; password reset did not end existing sessions) and several Low issues;
+all are fixed on branch `audit/2026-10-17-completion` and pending approval to deploy.
+
 ## 1. Targets (VERIFIED)
 
 | Item | Value |

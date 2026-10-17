@@ -222,6 +222,20 @@ try {
   await page.eval("window.showStats('10000000-0000-4000-8000-0000000000d1')");
   check("seat statistics include gender counts for SUPERADMIN", await page.waitFor("document.querySelector('#statsContent')?.textContent.includes('Hommes')"));
   check("matches page: no JS error / failed API call", clean(page), problems(page));
+
+  // Stored-XSS regression (2026-10-17 audit): a faculty name with quotes used to
+  // break out of the inline onclick of its "Modifier" button.
+  const evilName = `ZZ ${run} x');window.__ueXss=1;//"<img src=x onerror=window.__ueXss=2>`;
+  const evil = await service("POST", "/rest/v1/faculties", { name: evilName });
+  await page.goto(`${SITE}/faculties.html`);
+  await page.waitFor("document.querySelectorAll('#refGrid button[title=Modifier]').length > 0");
+  const clicked = await page.eval(`(() => { const card = [...document.querySelectorAll('#refGrid .ref-card')].find(c => c.textContent.includes(${JSON.stringify(`ZZ ${run}`)})); const button = card?.querySelector('button[title=Modifier]'); button?.click(); return Boolean(button); })()`);
+  await sleep(500);
+  check("hostile faculty name: edit button found and clicked", clicked === true);
+  check("hostile faculty name: no script runs on render or on edit", (await page.eval("window.__ueXss === undefined")) === true);
+  check("hostile faculty name: edit form shows the exact name", (await page.eval("document.querySelector('#refName')?.value")) === evilName);
+  check("faculties page: no inline handlers in the list", (await page.eval("document.querySelectorAll('#refGrid [onclick]').length")) === 0);
+  if (evil.json?.[0]?.id) await service("DELETE", `/rest/v1/faculties?id=eq.${evil.json[0].id}`);
   await page.close();
 
   begin("ADMIN pages (read-only, minimized)");

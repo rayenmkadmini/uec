@@ -1,4 +1,4 @@
-import { requireSuperAdmin, json, options, audit } from "./_shared/security.ts";
+import { requireSuperAdmin, json, options, audit, rateLimit, errorResponse, failureCode, readJson } from "./_shared/security.ts";
 
 Deno.serve(async req => {
   if (req.method === "OPTIONS") return options(req);
@@ -6,7 +6,8 @@ Deno.serve(async req => {
   let ctx;
   try {
     ctx = await requireSuperAdmin(req);
-    const { user_id } = await req.json();
+    await rateLimit(ctx.admin, ctx.caller.id, "DELETE_ADMIN", 10, 60);
+    const { user_id } = await readJson(req);
     const userId = String(user_id || "");
     if (!userId) return json(req, { error: "user_id required" }, 400);
     if (userId === ctx.caller.id) return json(req, { error: "Vous ne pouvez pas supprimer votre propre compte." }, 400);
@@ -25,6 +26,13 @@ Deno.serve(async req => {
     const roleList = [...roles];
     const hasAdminRole = roleList.some((role) => ["ADMIN", "SUPERADMIN"].includes(role));
     if (!hasAdminRole) return json(req, { error: "Seuls les comptes ADMIN/SUPERADMIN peuvent être supprimés ici." }, 404);
+
+    // Same rule as admin-update-admin (a SUPERADMIN cannot be deactivated or
+    // demoted): one SUPERADMIN cannot remove another. The project owner does it
+    // in the Supabase Dashboard.
+    if (roles.has("SUPERADMIN")) {
+      return json(req, { error: "Un compte SUPERADMIN ne peut pas être supprimé ici.", code: "protected_account" }, 403);
+    }
 
     if (roles.has("MEMBER")) {
       return json(req, { error: "Ce compte est aussi membre. Gérez d’abord son dossier membre depuis la page des abonnés." }, 409);
@@ -48,15 +56,16 @@ Deno.serve(async req => {
     }
 
     const { error } = await ctx.admin.auth.admin.deleteUser(userId);
-    if (error) return json(req, { error: error.message }, 400);
+    if (error) {
+      console.error("admin-delete-admin: deleteUser failed:", error.message);
+      await audit(ctx.admin, ctx.caller.id, "DELETE_ADMIN", userId, false, { code: "delete_failed" });
+      return json(req, { error: "Le compte n’a pas pu être supprimé. Réessayez." }, 502);
+    }
     await audit(ctx.admin, ctx.caller.id, "DELETE_ADMIN", userId, true, { roles: [...roleList] });
     return json(req, { ok: true });
   } catch (e) {
-    if (e instanceof Response) return e;
     // Details go to the function logs (project owners only), never to audit_logs (readable by ADMIN).
-    console.error("admin-delete-admin failed:", e instanceof Error ? e.message : String(e));
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "DELETE_ADMIN", null, false, { code: "unexpected" });
-    return json(req, { error: e instanceof Error ? e.message : String(e) }, 500);
+    if (ctx && !(e instanceof Response)) await audit(ctx.admin, ctx.caller.id, "DELETE_ADMIN", null, false, { code: failureCode(e) });
+    return errorResponse(req, "admin-delete-admin", e);
   }
 });
-

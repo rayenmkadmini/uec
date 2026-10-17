@@ -1,6 +1,9 @@
-import { requireSuperAdmin, json, options, rateLimit, audit, corsHeaders } from "./_shared/security.ts";
+import { requireSuperAdmin, json, options, rateLimit, audit, corsHeaders, errorResponse, failureCode, readJson, isUuid } from "./_shared/security.ts";
 import { normalizeOptionalSubscriptionNumber } from "./_shared/import-utils.mjs";
 import { activateMember, activationRedirect } from "./_shared/member-lifecycle.mjs";
+
+// Same limits as the CSV import (import-utils.mjs).
+const MAX_FIELD_LENGTHS: Record<string, number> = { nom: 100, prenom: 100, cin: 32, phone: 40, email: 254, adresse: 300 };
 
 // SUPERADMIN-only. Creates ONE member record, then activates it through the same
 // path as imported members (admin-activate-member): random unknown password,
@@ -14,7 +17,7 @@ Deno.serve(async (req) => {
   try {
     ctx = await requireSuperAdmin(req);
     await rateLimit(ctx.admin, ctx.caller.id, "CREATE_SUBSCRIBER", 50, 60);
-    const b = await req.json().catch(() => ({}));
+    const b = await readJson(req);
     for (const key of ["nom", "prenom", "login_name", "cin", "gender"]) {
       if (typeof b[key] !== "string" || !b[key].trim()) return json(req, { error: `Champ obligatoire manquant : ${key}` }, 400);
     }
@@ -25,6 +28,17 @@ Deno.serve(async (req) => {
     const loginName = b.login_name.trim().toUpperCase();
     if (!/^[A-Z0-9_-]{3,40}$/.test(loginName)) return json(req, { error: "Login invalide." }, 400);
     if (!/^[A-Za-z0-9-]+$/.test(b.cin.trim())) return json(req, { error: "CIN invalide (lettres, chiffres ou tiret)." }, 400);
+    for (const [key, max] of Object.entries(MAX_FIELD_LENGTHS)) {
+      if (b[key] != null && (typeof b[key] !== "string" || b[key].trim().length > max)) return json(req, { error: `Champ trop long ou invalide : ${key}` }, 400);
+    }
+    if (b.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.email.trim())) return json(req, { error: "Email invalide." }, 400);
+    // The app uploads photos to the private bucket as <LOGIN>/<file>; nothing else is stored.
+    if (b.photo_url && !new RegExp(`^${loginName}/[A-Za-z0-9_-][A-Za-z0-9._-]{0,120}$`).test(String(b.photo_url).trim())) {
+      return json(req, { error: "Photo invalide." }, 400);
+    }
+    for (const key of ["faculty_id", "zone_id"]) {
+      if (b[key] != null && b[key] !== "" && !isUuid(b[key])) return json(req, { error: `Référence invalide : ${key}` }, 400);
+    }
 
     const { data: record, error: insertError } = await ctx.admin.from("subscribers").insert({
       user_id: null, nom: b.nom.trim(), prenom: b.prenom.trim(), login_name: loginName,
@@ -57,8 +71,7 @@ Deno.serve(async (req) => {
       : { ok: true, subscriber_id: record.id, activated: false, activation_code: activation.body.code, activation_error: activation.body.error || null };
     return new Response(JSON.stringify(body), { status: 200, headers: { ...corsHeaders(req), "Cache-Control": "no-store" } });
   } catch (e) {
-    if (e instanceof Response) return e;
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "CREATE_SUBSCRIBER", null, false, { code: "unexpected" });
-    return json(req, { error: e instanceof Error ? e.message : "Erreur inattendue." }, 500);
+    if (ctx && !(e instanceof Response)) await audit(ctx.admin, ctx.caller.id, "CREATE_SUBSCRIBER", null, false, { code: failureCode(e) });
+    return errorResponse(req, "admin-create-user", e);
   }
 });

@@ -51,6 +51,12 @@ async function signIn(email, password) {
   const r = await http("POST", "/auth/v1/token?grant_type=password", { body: { email, password } });
   return r.status === 200 ? r.json.access_token : null;
 }
+// Full token response (access + refresh); used by the session-revocation checks.
+async function signInSession(email, password) {
+  const r = await http("POST", "/auth/v1/token?grant_type=password", { body: { email, password } });
+  return r.status === 200 ? { access: r.json.access_token, refresh: r.json.refresh_token } : null;
+}
+const refreshWith = refresh => http("POST", "/auth/v1/token?grant_type=refresh_token", { body: { refresh_token: refresh } });
 const setPassword = (token, password) => http("PUT", "/auth/v1/user", { token, body: { password } });
 const P = n => `Synthetic-Pass-${n}!x9Q`; // synthetic test passwords (local stack only)
 
@@ -192,6 +198,18 @@ await rpc(adminFlagged, "complete_password_change");
 admin.token = await signIn(admin.email, P(`admin-${run}-2`));
 check("ADMIN restored after own change", rows(await rest(admin.token, "subscribers?select=id")) > 0);
 
+begin("Reset ends existing sessions");
+const victim = await createUser(`revoke-${run}`, ["MEMBER"]);
+const stolen = await signInSession(victim.email, victim.password);
+check("positive control: the session can refresh before the reset", (await refreshWith(stolen?.refresh)).status === 200);
+const stolen2 = await signInSession(victim.email, victim.password);
+const vr = await edge(sa.token, "admin-reset-password", { user_id: victim.id, generate: true });
+check("reset reports sessions_revoked", vr.status === 200 && vr.json.sessions_revoked === true, vr.status);
+check("old refresh token refused after reset", (await refreshWith(stolen2?.refresh)).status >= 400);
+const hijack = await setPassword(stolen2?.access, P(`hijack-${run}`));
+check("old session cannot set its own password after reset", hijack.status >= 400, hijack.status);
+check("the new temporary password still works", Boolean(await signIn(victim.email, vr.json?.temporary_password || "x")));
+
 begin("ADMIN read-only and minimized");
 const one = `id=eq.${m1.id}`;
 check("names / number / status / faculty / zone allowed", rows(await rest(admin.token, `subscribers?select=nom,prenom,numero_abonnement,status,card_paid,faculty_id,zone_id&${one}`)) === 1);
@@ -284,6 +302,7 @@ check("the last active ADMIN cannot be deactivated", lastAdmin.status === 400, l
 await createUser(`admin2-${run}`, ["ADMIN"]);
 const off = await edge(sa.token, "admin-update-admin", { user_id: admin.id, is_active: false });
 check("SUPERADMIN deactivates ADMIN", off.status === 200, off.status);
+check("deactivation ends the ADMIN's Auth sessions", off.json?.sessions_revoked === true);
 check("deactivated ADMIN: members table (same token)", rows(await rest(admin.token, "subscribers?select=id")) === 0);
 check("deactivated ADMIN: audit log", rows(await rest(admin.token, "audit_logs?select=id")) === 0);
 check("deactivated ADMIN: seat list RPC", (await rpc(admin.token, "list_match_participants", { p_match_id: U })).status >= 400);
@@ -312,6 +331,13 @@ const a3 = (await service("GET", `/rest/v1/profiles?select=id,must_change_passwo
 check("new admin must change password at first login", a3?.must_change_password === true);
 check("admin-update-admin rename", (await edge(sa.token, "admin-update-admin", { user_id: a3?.id, display_name: "Staging Admin 3b" })).status === 200);
 check("admin-delete-admin refuses own account", (await edge(sa.token, "admin-delete-admin", { user_id: sa.id })).status >= 400);
+const delSa = await edge(sa.token, "admin-delete-admin", { user_id: sa2.id });
+check("admin-delete-admin refuses another SUPERADMIN", delSa.status === 403 && delSa.json?.code === "protected_account", delSa.status);
+for (const body of [{ method: "link" }, { generate: true }, { new_password: P(`sa2-${run}-x`) }]) {
+  const r = await edge(sa.token, "admin-reset-password", { user_id: sa2.id, ...body });
+  check(`reset of another SUPERADMIN refused (${Object.keys(body)[0]})`, r.status === 403 && r.json?.code === "protected_account" && !r.json?.temporary_password && !r.json?.activation_link, r.status);
+}
+check("SUPERADMIN still exists after refused delete", (await service("GET", `/auth/v1/admin/users/${sa2.id}`)).status === 200);
 check("admin-delete-admin", (await edge(sa.token, "admin-delete-admin", { user_id: a3?.id })).status === 200);
 
 begin("Create member + deletion");
@@ -329,6 +355,12 @@ check("staff account still exists", (await service("GET", `/auth/v1/admin/users/
 begin("Edge Function input handling");
 check("malformed JSON → 400, no crash", (await http("POST", "/functions/v1/admin-import-users", { token: sa.token, body: "{not json", raw: true, headers: { "Content-Type": "application/json", Origin: SITE } })).status === 400);
 check("GET not allowed", (await http("GET", "/functions/v1/admin-import-users", { token: sa.token })).status === 405);
+for (const fn of ["admin-create-admin", "admin-update-admin", "admin-delete-admin", "admin-reset-password"]) {
+  const r = await http("POST", `/functions/v1/${fn}`, { token: sa.token, body: "{not json", raw: true, headers: { "Content-Type": "application/json", Origin: SITE } });
+  check(`${fn}: malformed JSON → 400 with a fixed message`, r.status === 400 && r.json?.code === "invalid_body" && !/JSON|Unexpected token/i.test(r.json?.error || ""), r.status);
+}
+check("admin-delete-user: non-UUID id → 400", (await edge(sa.token, "admin-delete-user", { subscriber_id: "x' or 1=1" })).status === 400);
+check("CORS: Vary: Origin on a refused origin", /origin/i.test((await edge(sa.token, "admin-import-users", { rows: [] }, { Origin: "https://evil.example" })).headers.get("vary") || ""));
 check("CORS: foreign origin not allowed", !(await edge(sa.token, "admin-import-users", { rows: [] }, { Origin: "https://evil.example" })).headers.get("access-control-allow-origin"));
 check("forged JWT rejected at gateway", (await edge(`${sa.token.slice(0, -4)}AAAA`, "admin-import-users", { rows: [] })).status === 401);
 

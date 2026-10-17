@@ -207,6 +207,37 @@ test("reset with a temporary password changes it first, then flags (digest snaps
   assert.equal((await resetAccess(fake, { userId: data.user.id, method: "link" })).body.code, "link_unavailable");
 });
 
+test("reset of another SUPERADMIN account is refused; own account and other roles are allowed", async () => {
+  const { resetAccess } = await lifecycle;
+  const fake = createFake();
+  const { data: owner } = await fake.auth.createUser({ email: "synth-owner@example.invalid", password: "old-a", user_metadata: {} });
+  const { data: other } = await fake.auth.createUser({ email: "synth-other@example.invalid", password: "old-b", user_metadata: {} });
+  fake.tables.user_roles.push({ user_id: owner.user.id, role: "SUPERADMIN" }, { user_id: other.user.id, role: "SUPERADMIN" });
+  for (const p of fake.tables.profiles) p.must_change_password = false;
+
+  for (const method of ["link", "temporary_password", "chosen_password"]) {
+    const refused = await resetAccess(fake, { userId: other.user.id, callerId: owner.user.id, method, newPassword: "Synthetic-Pass-123!", redirectTo: REDIRECT });
+    assert.deepEqual([refused.status, refused.body.code], [403, "protected_account"], method);
+  }
+  const noCaller = await resetAccess(fake, { userId: other.user.id, method: "link", redirectTo: REDIRECT });
+  assert.equal(noCaller.body.code, "protected_account", "unknown caller is refused");
+  assert.equal(fake.users.find(u => u.id === other.user.id).password, "old-b", "nothing changed on the protected account");
+  assert.ok(!fake.tables.profiles.find(p => p.id === other.user.id).must_change_password, "protected account not flagged");
+
+  assert.equal((await resetAccess(fake, { userId: owner.user.id, callerId: owner.user.id, method: "link", redirectTo: REDIRECT })).status, 200, "own account");
+  const { data: member } = await fake.auth.createUser({ email: "synth-member@login.ueclubiste.local", password: "old-c", user_metadata: {} });
+  assert.equal((await resetAccess(fake, { userId: member.user.id, callerId: owner.user.id, method: "link", redirectTo: REDIRECT })).status, 200, "MEMBER account (positive control)");
+});
+
+test("reset fails closed when the target's roles cannot be read", async () => {
+  const { resetAccess } = await lifecycle;
+  const fake = createFake({ failures: { "select:user_roles": true } });
+  const { data } = await fake.auth.createUser({ email: "synth-x@login.ueclubiste.local", password: "old", user_metadata: {} });
+  const result = await resetAccess(fake, { userId: data.user.id, callerId: "caller", method: "temporary_password" });
+  assert.deepEqual([result.status, result.body.code], [503, "roles_unavailable"]);
+  assert.equal(fake.users[0].password, "old");
+});
+
 test("activation redirect accepts only https origins (or local development)", async () => {
   const { activationRedirect } = await lifecycle;
   assert.equal(activationRedirect("https://login.example.invalid/some/path"), "https://login.example.invalid/change-password.html");

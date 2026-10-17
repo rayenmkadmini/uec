@@ -1,4 +1,4 @@
-import { requireSuperAdmin, json, options, audit } from "./_shared/security.ts";
+import { requireSuperAdmin, json, options, audit, rateLimit, errorResponse, failureCode, readJson, isUuid } from "./_shared/security.ts";
 import { deleteMember } from "./_shared/member-lifecycle.mjs";
 
 // SUPERADMIN-only. Deletes a member record AND its login account (if any).
@@ -10,16 +10,17 @@ Deno.serve(async (req) => {
   let ctx;
   try {
     ctx = await requireSuperAdmin(req);
-    const body = await req.json().catch(() => ({}));
-    const subscriberId = String(body?.subscriber_id || "");
+    await rateLimit(ctx.admin, ctx.caller.id, "DELETE_SUBSCRIBER", 100, 60);
+    const body = await readJson(req);
+    const subscriberId = String(body.subscriber_id || "");
+    if (!isUuid(subscriberId)) return json(req, { error: "subscriber_id invalide.", code: "invalid_subscriber" }, 400);
     const result = await deleteMember({ db: ctx.admin, auth: ctx.admin.auth.admin }, { subscriberId });
     await audit(ctx.admin, ctx.caller.id, "DELETE_SUBSCRIBER", null, result.status === 200, {
       subscriber_id: subscriberId, code: result.body.code || "ok", account_deleted: Boolean(result.body.account_deleted),
     });
     return json(req, result.body, result.status);
   } catch (e) {
-    if (e instanceof Response) return e;
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "DELETE_SUBSCRIBER", null, false, { code: "unexpected" });
-    return json(req, { error: e instanceof Error ? e.message : "Erreur inattendue." }, 500);
+    if (ctx && !(e instanceof Response)) await audit(ctx.admin, ctx.caller.id, "DELETE_SUBSCRIBER", null, false, { code: failureCode(e) });
+    return errorResponse(req, "admin-delete-user", e);
   }
 });

@@ -1,4 +1,4 @@
-import { requireSuperAdmin, json, options, audit, rateLimit } from "./_shared/security.ts";
+import { requireSuperAdmin, json, options, audit, rateLimit, errorResponse, failureCode, readJson } from "./_shared/security.ts";
 import { importMembers } from "./_shared/member-lifecycle.mjs";
 
 // SUPERADMIN-only member import (logic in _shared/member-lifecycle.mjs):
@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   try {
     ctx = await requireSuperAdmin(req);
     await rateLimit(ctx.admin, ctx.caller.id, "IMPORT_SUBSCRIBERS", 20, 60);
-    const body = await req.json().catch(() => ({}));
+    const body = await readJson(req);
     const rows = Array.isArray(body?.rows) ? body.rows : [];
 
     const result = await importMembers(ctx.admin, rows);
@@ -32,8 +32,7 @@ Deno.serve(async (req) => {
     });
     return json(req, b, result.status);
   } catch (e) {
-    if (e instanceof Response) return e;
-    if (ctx) await audit(ctx.admin, ctx.caller.id, "IMPORT_SUBSCRIBERS", null, false, { code: "unexpected" });
-    return json(req, { error: e instanceof Error ? e.message : "Erreur inattendue." }, 500);
+    if (ctx && !(e instanceof Response)) await audit(ctx.admin, ctx.caller.id, "IMPORT_SUBSCRIBERS", null, false, { code: failureCode(e) });
+    return errorResponse(req, "admin-import-users", e);
   }
 });
