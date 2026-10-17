@@ -207,7 +207,11 @@ try {
     return { edit: document.querySelectorAll('#rows button[title="Modifier"]').length, add: visible(document.querySelector("#addBtn")), import: visible(document.querySelector("#importCsvBtn")) };
   })()`);
   check("add / import / edit controls shown", saControls && saControls.edit > 0 && saControls.add && saControls.import, JSON.stringify(saControls));
-  check("imported members shown as 'Non activé'", await page.eval("document.querySelector('#rows').textContent.includes('Non activé')"));
+  // Filter on this run's member: earlier runs' members accumulate in the stack and,
+  // sorted by surname with 10 per page, can push it off the first page.
+  await page.eval(`(() => { const s = document.querySelector('#search'); s.value = ${JSON.stringify(`B-${run}-1`)}; s.dispatchEvent(new Event('input')); return true; })()`);
+  check("imported members shown as 'Non activé'", await page.waitFor(`[...document.querySelectorAll('#rows tr')].some(r => r.textContent.includes(${JSON.stringify(`B-${run}-1`)}) && r.textContent.includes('Non activé'))`, 5000));
+  await page.eval(`(() => { const s = document.querySelector('#search'); s.value = ''; s.dispatchEvent(new Event('input')); return true; })()`);
   check("no JS error / failed API call", clean(page), problems(page));
   await page.goto(`${SITE}/admin-users.html`);
   await page.waitFor("document.querySelectorAll('#adminRows tr td').length > 2");

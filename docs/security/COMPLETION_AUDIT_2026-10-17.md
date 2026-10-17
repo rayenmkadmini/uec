@@ -51,6 +51,7 @@ implemented and tested on this branch, not deployed.
 | F17 | Low | Member match page offered "Choisir une place" after kick-off (server refused) | "Match commencé" instead | Frontend |
 | F18 | Info | `_shared/security.ts` and `roles.ts` canonical copies had drifted (formatting) from the deployed per-function copies, and the test only compared copies with each other | Synced; the test now requires all 4 shared files byte-identical to canonical | Functions |
 | F19 | Info | `CORS` sent `Vary: Origin` only for allowed origins | Always sent | Functions |
+| F20 | Low | The staff page (`js/admin-users.js`) loaded every account and then asked for roles with **all** ids in one `in.(…)` URL. It grows by ~37 bytes per account; on the local stack at 103 accounts the gateway answered 502 ("upstream sent too big header") and the page showed nothing. In production it would fail once enough members are activated | Roles fetched in batches of 50 ids (~2 KB per request); behaviour unchanged. The browser suite's staff-page checks (502 before, pass after) cover it | Frontend |
 
 An independent review of the whole diff found no significant bug or safety regression and
 7 low/nit items, all fixed: logo upload UI still offered SVG; the "reload before retrying"
@@ -79,6 +80,7 @@ matches were `$VAR` references and a placeholder), `npm audit` 0 vulnerabilities
 | `match_logos_public_read` lets anon list the (empty, public) bucket | Changing storage policies can only be fully tested on hosted Storage; low impact |
 | Reference data readable by an active account with no role | Only matches / settings (non-sensitive) |
 | Seat choice does not check `card_paid` | Business decision |
+| Lists load whole tables in one request (members, accounts, payments) | Hosted Supabase returns at most 1000 rows per request by default, so past ~1000 members those lists would be silently cut. Production has 2 members today; add paging before the member import grows past that |
 | No `deno.lock` for the functions | Direct imports are pinned (`supabase-js@2.117.2`); transitive versions are not |
 
 ## 3. Tests run in this pass (all by me, 2026-10-17)

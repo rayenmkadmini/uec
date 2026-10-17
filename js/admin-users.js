@@ -57,16 +57,18 @@ async function loadAdmins() {
   let roleRows = [];
 
   if (adminIds.length) {
-    const { data: rows, error: roleError } = await sb
-      .from("user_roles")
-      .select("user_id,role")
-      .in("user_id", adminIds);
+    // Batches of 50 ids: one in.(…) filter with every account id makes the URL (and
+    // the response headers echoing it) grow with each member, until the gateway
+    // refuses it. 50 UUIDs ≈ 2 KB per request.
+    const batches = [];
+    for (let i = 0; i < adminIds.length; i += 50) batches.push(adminIds.slice(i, i + 50));
+    const results = await Promise.all(batches.map(ids => sb.from("user_roles").select("user_id,role").in("user_id", ids)));
 
-    if (roleError) {
+    if (results.some(r => r.error)) {
       $("#adminRows").innerHTML = '<tr><td colspan="6" class="empty">Impossible de charger les rôles. Réessayez.</td></tr>';
       return showAlert("#pageAlert", "Impossible de charger les rôles des comptes.", "error");
     }
-    roleRows = rows || [];
+    roleRows = results.flatMap(r => r.data || []);
   }
 
   const byUser = {};
