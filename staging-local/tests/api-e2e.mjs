@@ -119,6 +119,11 @@ check("import created no login accounts", authUsersAfter === authUsersBefore, `$
 check("import response carries no CIN / contact values", !JSON.stringify(imported.json).match(new RegExp(`T${run}|example\\.invalid|\\+216`)));
 check("missing CIN rejected (whole file)", (await edge(sa.token, "admin-import-users", { rows: [csvRow(5), csvRow(6, { cin: "" })] })).status === 400);
 check("unknown faculty rejected", (await edge(sa.token, "admin-import-users", { rows: [csvRow(7, { faculty: "Faculté Inexistante" })] })).json?.errors?.[0]?.code === "unknown_reference");
+const nearFaculty = await edge(sa.token, "admin-import-users", { rows: [csvRow(7, { faculty: "Faculte Sciences Economiques Gestion Tunis" })] });
+check("unknown faculty error suggests existing names", nearFaculty.json?.errors?.[0]?.code === "unknown_reference" && nearFaculty.json.errors[0].suggestions?.[0] === fac && nearFaculty.json.errors[0].message.includes(`« ${fac} »`));
+const aliases = await edge(sa.token, "admin-import-users", { rows: [csvRow(12, { faculty: "Faculté des Sciences Economiques et de Gestion de Tunis" }), csvRow(13, { faculty: "Iset Kébili" })] });
+check("official long name and short name without (...) accepted", aliases.status === 200 && aliases.json.created === 2, `${aliases.status} created=${aliases.json?.created}`);
+check("faculty shared by two references refused as ambiguous", (await edge(sa.token, "admin-import-users", { rows: [csvRow(14, { faculty: "ISSI Gabès" })] })).json?.errors?.[0]?.code === "ambiguous_reference");
 check("unknown zone rejected", (await edge(sa.token, "admin-import-users", { rows: [csvRow(7, { zone: "ZONE Z" })] })).json?.errors?.[0]?.code === "unknown_reference");
 check("duplicate CIN in file rejected", (await edge(sa.token, "admin-import-users", { rows: [csvRow(8), csvRow(9, { cin: csvRow(8).cin })] })).status === 400);
 const conflict = await edge(sa.token, "admin-import-users", { rows: [csvRow(1, { numero_abonnement: `S-${run}-2` })] });

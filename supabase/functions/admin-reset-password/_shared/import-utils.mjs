@@ -68,34 +68,78 @@ export function referenceKey(raw) {
 }
 
 // Index of existing reference rows ({ id, name }). Faculty names look like
-// "FSEG Tunis — Faculté ..."; the short part before " — " is also accepted
-// when it is unique.
+// "FSEG Tunis — Faculté ..." or "ISET Kebili (Kébili) — Institut ...". Besides
+// the exact full name, these exact aliases are accepted: the short part before
+// " — ", the official long name after it, and the short part (or a name
+// without " — ") with any "(...)" removed. Every key is exact after
+// referenceKey(); nothing is fuzzy. An alias shared by several references is
+// ambiguous and never resolves.
 export function buildReferenceIndex(rows) {
   const full = new Map();
-  const short = new Map();
+  const alias = new Map();
+  const entries = [];
+  const put = (map, key, id) => map.set(key, map.has(key) && map.get(key) !== id ? null : id);
   for (const row of rows || []) {
     const name = String(row?.name ?? "");
     const fullKey = referenceKey(name);
-    if (fullKey) full.set(fullKey, full.has(fullKey) && full.get(fullKey) !== row.id ? null : row.id);
+    if (!fullKey) continue;
+    put(full, fullKey, row.id);
     const dash = name.indexOf(" — ");
-    if (dash > 0) {
-      const shortKey = referenceKey(name.slice(0, dash));
-      if (shortKey) short.set(shortKey, short.has(shortKey) && short.get(shortKey) !== row.id ? null : row.id);
-    }
+    const head = dash > 0 ? name.slice(0, dash) : name;
+    const aliases = new Set();
+    if (dash > 0) aliases.add(referenceKey(head)).add(referenceKey(name.slice(dash + 3)));
+    if (head.includes("(")) aliases.add(referenceKey(head.replace(/\([^)]*\)?/g, " ")));
+    aliases.delete("");
+    aliases.delete(fullKey);
+    for (const key of aliases) put(alias, key, row.id);
+    entries.push({ name, grams: [fullKey, ...aliases].map(bigrams) });
   }
-  return { full, short };
+  return { full, alias, entries, suggestions: new Map() };
 }
 
 // { id } (null when the cell is blank) or { error: "unknown" | "ambiguous" }.
 // A non-blank value that normalizes to nothing (e.g. "%", "-") is unknown.
+// An exact full name wins over an alias.
 export function resolveReference(index, raw) {
   if (!String(raw ?? "").trim()) return { id: null };
   const key = referenceKey(raw);
   if (!key) return { error: "unknown" };
-  for (const map of [index.full, index.short]) {
+  for (const map of [index.full, index.alias]) {
     if (map.has(key)) return map.get(key) ? { id: map.get(key) } : { error: "ambiguous" };
   }
   return { error: "unknown" };
+}
+
+function bigrams(key) {
+  const grams = new Set();
+  for (let i = 0; i < key.length - 1; i += 1) grams.add(key.slice(i, i + 2));
+  return grams;
+}
+
+function dice(a, b) {
+  if (!a.size || !b.size) return 0;
+  let shared = 0;
+  for (const gram of a) if (b.has(gram)) shared += 1;
+  return (2 * shared) / (a.size + b.size);
+}
+
+const SUGGESTION_MIN_SCORE = 0.4;
+
+// Up to `limit` existing reference names closest to an unknown value (bigram
+// similarity against the full name and its aliases). A hint for the error
+// message only: a suggestion is never applied to the row.
+export function suggestReferences(index, raw, limit = 3) {
+  const key = referenceKey(raw);
+  if (key.length < 2) return [];
+  if (!index.suggestions.has(key)) {
+    const grams = bigrams(key);
+    index.suggestions.set(key, index.entries
+      .map(entry => ({ name: entry.name, score: Math.max(...entry.grams.map(other => dice(grams, other))) }))
+      .filter(entry => entry.score >= SUGGESTION_MIN_SCORE)
+      .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name, "fr"))
+      .map(entry => entry.name));
+  }
+  return index.suggestions.get(key).slice(0, limit);
 }
 
 const FIELD_LABELS = {
@@ -155,7 +199,13 @@ export function validateImportBatch(rows, { faculties = [], zones = [], maxRows 
 
     for (const [field, index_, target] of [["faculty", facultyIndex, "faculty_id"], ["zone", zoneIndex, "zone_id"]]) {
       const resolved = resolveReference(index_, text(field));
-      if (resolved.error === "unknown") add(line, field, "unknown_reference", "inconnue. Créez-la d'abord dans les références ou corrigez le nom.");
+      if (resolved.error === "unknown") {
+        // Suggestions are existing reference names, never the submitted value.
+        const suggestions = suggestReferences(index_, text(field));
+        const hint = suggestions.length ? ` Suggestions : ${suggestions.map(name => `« ${name} »`).join(", ")}.` : "";
+        add(line, field, "unknown_reference", `inconnue. Créez-la d'abord dans les références ou corrigez le nom.${hint}`);
+        errors[errors.length - 1].suggestions = suggestions;
+      }
       else if (resolved.error === "ambiguous") add(line, field, "ambiguous_reference", "correspond à plusieurs entrées. Utilisez le nom complet.");
       else out[target] = resolved.id;
     }

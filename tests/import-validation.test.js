@@ -51,6 +51,52 @@ test("an ambiguous short faculty name is rejected; the full name works", async (
   assert.equal(full.prepared[0].faculty_id, "f4");
 });
 
+test("the official long name and the short name without (...) are accepted", async () => {
+  const { validateImportBatch } = await utilsPromise;
+  const faculties = [
+    ...FACULTIES,
+    { id: "f5", name: "FDSP Tunis — Faculté de Droit et des Sciences Politiques de Tunis" },
+    { id: "f6", name: "ISET Kebili (Kébili) — Institut Supérieur des Etudes Technologiques de Kebili" }
+  ];
+  const result = validateImportBatch([
+    row({ line: 2, faculty: "Faculté de Droit et des Sciences Politiques de Tunis" }),
+    row({ line: 3, cin: "00000002", faculty: "Iset Kébili" }),
+    row({ line: 4, cin: "00000003", faculty: "institut superieur de gestion de tunis" })
+  ], { faculties, zones: ZONES });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.prepared.map(r => r.faculty_id), ["f5", "f6", "f3"]);
+});
+
+test("a long name or (...)-less short name shared by several faculties is ambiguous", async () => {
+  const { validateImportBatch } = await utilsPromise;
+  const faculties = [
+    { id: "a", name: "ISET Kebili (Kébili) — Institut Supérieur des Etudes Technologiques de Kebili" },
+    { id: "b", name: "ISET Kebili (Douz) — Institut Supérieur des Etudes Technologiques de Kebili" }
+  ];
+  const result = validateImportBatch([
+    row({ faculty: "ISET Kebili" }),
+    row({ cin: "00000002", faculty: "Institut Supérieur des Etudes Technologiques de Kebili" }),
+    row({ cin: "00000003", faculty: "ISET Kebili (Douz)" })
+  ], { faculties, zones: ZONES });
+  assert.deepEqual(result.errors.map(e => [e.line, e.code]), [[2, "ambiguous_reference"], [3, "ambiguous_reference"]]);
+  assert.equal(result.prepared[2].faculty_id, "b");
+});
+
+test("an unknown faculty error suggests up to 3 existing names, never the submitted value", async () => {
+  const { validateImportBatch } = await utilsPromise;
+  const result = validateImportBatch([row({ faculty: "Fac Sciences Economiques Gestion Tunis 00000077" })], { faculties: FACULTIES, zones: ZONES });
+  const [error] = result.errors;
+  assert.equal(error.code, "unknown_reference");
+  assert.ok(error.suggestions.length >= 1 && error.suggestions.length <= 3, JSON.stringify(error.suggestions));
+  assert.equal(error.suggestions[0], FACULTIES[0].name);
+  assert.ok(error.suggestions.every(name => FACULTIES.some(f => f.name === name)));
+  assert.match(error.message, /^Ligne 2 — Faculté : inconnue\..* Suggestions : « FSEG Tunis — Faculté des Sciences Economiques et de Gestion de Tunis »/);
+  assert.ok(!error.message.includes("00000077"));
+  const none = validateImportBatch([row({ faculty: "zzzz" })], { faculties: FACULTIES, zones: ZONES }).errors[0];
+  assert.deepEqual(none.suggestions, []);
+  assert.doesNotMatch(none.message, /Suggestions/);
+});
+
 test("one invalid row invalidates the whole batch", async () => {
   const { validateImportBatch } = await utilsPromise;
   const result = validateImportBatch([row(), row({ cin: "00000002", gender: "X" })], { faculties: FACULTIES, zones: ZONES });
