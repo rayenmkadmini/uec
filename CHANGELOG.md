@@ -13,6 +13,7 @@
 
 ### Notes
 - Not applied to production. `npm run test:rls` / `test:rollback` were not run (no Docker on the authoring machine).
+- Release order: apply `20261018120000_smart_collections` in Supabase first, then deploy the frontend (the Collectes page reads the new columns and tables).
 
 ## 2026-09-30
 
