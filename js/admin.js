@@ -3,14 +3,19 @@ let facultyChart, zoneChart, facData, zoneData;
 function renderCharts(){
   if(!facData) return;
   const dark=document.documentElement.getAttribute("data-theme")==="dark";
-  const ink=dark?"#f2f3f5":"#111214", grid=dark?"#2a2d34":"#e7e8ec", muted=dark?"#a2a6ae":"#6c7078";
-  Chart.defaults.color=muted; Chart.defaults.font.family="Inter, system-ui, sans-serif";
-  const zonePalette=["#c8102e","#111214","#e51c3f","#4a4c52","#8c0b20","#ff8ea0"];
+  const ink=dark?"#f2f3f5":"#0f1115", grid=dark?"#23262d":"#eef0f3", muted=dark?"#9097a3":"#667085", surface=dark?"#13151a":"#ffffff";
+  Chart.defaults.color=muted; Chart.defaults.font.family="Inter, system-ui, sans-serif"; Chart.defaults.font.size=12;
+  const tooltip={backgroundColor:dark?"#f2f3f5":"#0f1115",titleColor:dark?"#0f1115":"#fff",bodyColor:dark?"#0f1115":"#fff",padding:10,cornerRadius:8,displayColors:false};
+  const zonePalette=["#c8102e",dark?"#e4e7ec":"#0f1115","#f04462","#667085","#fda29b","#98a2b3","#7a0b1d",dark?"#475467":"#d0d5dd"];
+  const fac=[...facData].sort((a,b)=>b[1]-a[1]);
+  const zones=[...zoneData].sort((a,b)=>b[1]-a[1]);
+  const short=label=>label.length>28?label.slice(0,27)+"…":label;
 
   facultyChart?.destroy(); zoneChart?.destroy();
 
-  facultyChart=new Chart($("#facultyChart"),{type:"bar",data:{labels:facData.map(x=>x[0]),datasets:[{label:"Abonnés",data:facData.map(x=>x[1]),borderRadius:8,backgroundColor:"#c8102e",hoverBackgroundColor:"#e51c3f",maxBarThickness:38}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:muted},grid:{display:false}},y:{beginAtZero:true,ticks:{precision:0,color:muted},grid:{color:grid}}}}});
-  zoneChart=new Chart($("#zoneChart"),{type:"doughnut",data:{labels:zoneData.map(x=>x[0]),datasets:[{data:zoneData.map(x=>x[1]),backgroundColor:zonePalette,borderColor:dark?"#16181c":"#ffffff",borderWidth:3,hoverOffset:6}]},options:{responsive:true,plugins:{legend:{position:"bottom",labels:{color:ink,usePointStyle:true,padding:16}}}}});
+  // Horizontal bars: long faculty names stay readable, largest first.
+  facultyChart=new Chart($("#facultyChart"),{type:"bar",data:{labels:fac.map(x=>short(x[0])),datasets:[{label:"Abonnés",data:fac.map(x=>x[1]),borderRadius:6,borderSkipped:false,backgroundColor:"#c8102e",hoverBackgroundColor:"#e51c3f",barThickness:"flex",maxBarThickness:22}]},options:{indexAxis:"y",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tooltip,callbacks:{title:items=>fac[items[0].dataIndex][0]}}},scales:{x:{beginAtZero:true,ticks:{precision:0,color:muted},grid:{color:grid},border:{display:false}},y:{ticks:{color:ink},grid:{display:false},border:{display:false}}}}});
+  zoneChart=new Chart($("#zoneChart"),{type:"doughnut",data:{labels:zones.map(x=>x[0]),datasets:[{data:zones.map(x=>x[1]),backgroundColor:zonePalette,borderColor:surface,borderWidth:3,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:"68%",plugins:{tooltip,legend:{position:"right",labels:{color:ink,usePointStyle:true,pointStyle:"circle",boxWidth:8,padding:14}}}}});
 }
 
 window.addEventListener("ue-theme-change", renderCharts);
