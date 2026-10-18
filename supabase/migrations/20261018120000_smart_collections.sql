@@ -78,6 +78,58 @@ before insert or update of collection_status on public.events
 for each row execute function private.sync_event_active_flag();
 
 -- ------------------------------------------------------------
+-- 1b) Reconcile with the earlier manual script (supabase/collections.sql of the
+--     old login.ueclubistes.tn repository), which may already have created these
+--     tables with slightly different names, triggers and admin-only policies.
+--     Nothing is deleted: columns are renamed, old triggers / policies replaced.
+-- ------------------------------------------------------------
+do $$
+begin
+  if to_regclass('public.collection_contributions') is not null
+     and exists (select 1 from information_schema.columns where table_schema = 'public'
+                  and table_name = 'collection_contributions' and column_name = 'client_request_id')
+     and not exists (select 1 from information_schema.columns where table_schema = 'public'
+                  and table_name = 'collection_contributions' and column_name = 'request_id') then
+    alter table public.collection_contributions rename column client_request_id to request_id;
+  end if;
+
+  -- The earlier script kept the collection status in events.status: carry it over.
+  if exists (select 1 from information_schema.columns where table_schema = 'public'
+              and table_name = 'events' and column_name = 'status') then
+    execute $q$
+      update public.events set collection_status = status
+       where status in ('DRAFT','ACTIVE','COMPLETED','CANCELLED') and collection_status is distinct from status
+    $q$;
+  end if;
+end $$;
+
+do $$
+begin
+  if to_regclass('public.collection_contributions') is not null then
+    drop trigger if exists collection_contributions_guard on public.collection_contributions;
+    drop trigger if exists collection_contributions_audit on public.collection_contributions;
+    drop policy if exists contributions_admin_select on public.collection_contributions;
+    drop policy if exists contributions_admin_insert on public.collection_contributions;
+    drop policy if exists contributions_admin_update on public.collection_contributions;
+  end if;
+  if to_regclass('public.collection_member_targets') is not null then
+    drop policy if exists member_targets_admin_all on public.collection_member_targets;
+  end if;
+end $$;
+
+drop function if exists public.guard_contribution_update();
+drop function if exists public.audit_contribution();
+drop function if exists public.sync_event_active_flag();
+
+-- Its separate audit table is kept (history) but no longer exposed: audit_logs is used now.
+do $$
+begin
+  if to_regclass('public.collection_contribution_audit') is not null then
+    revoke all on public.collection_contribution_audit from public, anon, authenticated;
+  end if;
+end $$;
+
+-- ------------------------------------------------------------
 -- 2) Individual payments
 -- ------------------------------------------------------------
 create table if not exists public.collection_contributions (
