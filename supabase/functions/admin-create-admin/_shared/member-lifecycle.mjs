@@ -275,40 +275,64 @@ export async function resetAccess({ db, auth }, { userId, callerId = null, metho
 const HAS_PAYMENTS_MESSAGE = "Ce membre a des paiements enregistrés dans les collectes : pour préserver l’historique financier, il ne peut pas être supprimé. Désactivez-le à la place.";
 const isMissingRelation = error => ["42P01", "PGRST205"].includes(String(error?.code || ""));
 
-export async function deleteMember({ db, auth }, { subscriberId }) {
+export async function deleteMember({ db, auth }, { subscriberId, force = false }) {
   if (!subscriberId) return fail(400, "missing_subscriber", "subscriber_id requis.");
   const { data: member, error } = await db.from("subscribers").select("id,user_id").eq("id", subscriberId).maybeSingle();
   if (error) return fail(503, "lookup_failed", "Membre introuvable pour le moment. Réessayez.");
   if (!member) return fail(404, "not_found", "Membre introuvable.");
 
-  // Collection payments are kept forever (ON DELETE RESTRICT): check them BEFORE
-  // touching the login account, so a refused deletion never leaves a member
-  // without an account.
+  // Collection payments are kept (ON DELETE RESTRICT): check them BEFORE touching
+  // the login account, so a refused deletion never leaves a member without an
+  // account. A forced deletion (SUPERADMIN, checked by the caller) removes them.
   const { data: payments, error: paymentsError } = await db.from("collection_contributions")
-    .select("id").eq("subscriber_id", member.id).limit(1);
+    .select("id,event_id,amount,status").eq("subscriber_id", member.id);
   if (paymentsError && !isMissingRelation(paymentsError)) {
     return fail(503, "payments_unavailable", "Paiements du membre indisponibles. Réessayez.");
   }
-  if (payments?.length) return fail(409, "has_payments", HAS_PAYMENTS_MESSAGE);
+  const memberPayments = paymentsError ? [] : (payments || []);
+  if (memberPayments.length && !force) return fail(409, "has_payments", HAS_PAYMENTS_MESSAGE);
 
+  // Accounts that also hold a staff role are never deleted from here. A forced
+  // deletion removes only the member record and keeps that staff account.
+  let deleteAccount = Boolean(member.user_id);
   if (member.user_id) {
     const { data: roles, error: rolesError } = await db.from("user_roles").select("role").eq("user_id", member.user_id);
     if (rolesError) return fail(503, "roles_unavailable", "Rôles du compte indisponibles. Réessayez.");
     if ((roles || []).some(r => r.role !== "MEMBER")) {
-      return fail(409, "staff_account", "Ce compte a aussi un rôle du personnel. Retirez ses rôles dans la gestion des administrateurs avant de supprimer le membre.");
+      if (!force) {
+        return fail(409, "staff_account", "Ce compte a aussi un rôle du personnel. Retirez ses rôles dans la gestion des administrateurs avant de supprimer le membre.");
+      }
+      deleteAccount = false;
     }
+  }
+
+  // Forced: payments first. If this fails nothing else has been touched.
+  if (memberPayments.length) {
+    const { error: purgeError } = await db.from("collection_contributions").delete().eq("subscriber_id", member.id);
+    if (purgeError) return fail(500, "payments_delete_failed", "Les paiements du membre n’ont pas pu être supprimés. Rien n’a été supprimé.");
+  }
+  const purged = {
+    payments_deleted: memberPayments.length,
+    payments: memberPayments.map(p => ({ id: p.id, event_id: p.event_id, amount: p.amount, status: p.status })),
+  };
+
+  if (deleteAccount) {
     const { error: authError } = await auth.deleteUser(member.user_id);
-    if (authError) return fail(502, "account_delete_failed", "Le compte de connexion n’a pas pu être supprimé. Rien n’a été supprimé.");
+    if (authError) {
+      return fail(502, "account_delete_failed", memberPayments.length
+        ? "Paiements supprimés, mais le compte de connexion n’a pas pu être supprimé. Relancez la suppression forcée."
+        : "Le compte de connexion n’a pas pu être supprimé. Rien n’a été supprimé.", purged);
+    }
   }
 
   const { error: deleteError } = await db.from("subscribers").delete().eq("id", member.id);
   if (deleteError) {
     // A payment recorded between the check above and the delete.
     if (String(deleteError.code || "") === "23503") {
-      return fail(409, "has_payments", HAS_PAYMENTS_MESSAGE, { account_deleted: Boolean(member.user_id) });
+      return fail(409, "has_payments", HAS_PAYMENTS_MESSAGE, { account_deleted: deleteAccount, ...purged });
     }
     return fail(500, "record_delete_failed", "La fiche membre n’a pas pu être supprimée. Réessayez la suppression.",
-      { account_deleted: Boolean(member.user_id) });
+      { account_deleted: deleteAccount, ...purged });
   }
-  return { status: 200, body: { ok: true, account_deleted: Boolean(member.user_id) } };
+  return { status: 200, body: { ok: true, account_deleted: deleteAccount, account_kept: Boolean(member.user_id) && !deleteAccount, ...purged } };
 }

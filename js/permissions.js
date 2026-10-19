@@ -29,6 +29,8 @@
         viewMemberIdentity: ["SUPERADMIN", "ADMIN"],
         manageMembers: ["SUPERADMIN", "ADMIN"],
         importMembers: ["SUPERADMIN"],
+        // Deletes a member AND their collection payments, whatever their state.
+        forceDeleteMembers: ["SUPERADMIN"],
         resetMemberAccess: ["SUPERADMIN"],
         manageCardPayments: ["SUPERADMIN", "TREASURER"],
         viewEvents: ["SUPERADMIN", "ADMIN", "TREASURER"],

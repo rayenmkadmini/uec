@@ -11,6 +11,7 @@ let canViewDetails = false;
 let canViewIdentity = false;
 let canImportMembers = false;
 let canResetAccess = false;
+let canForceDelete = false;
 const pendingCardToggles = new Set();
 const { parseMemberCsv } = window.UE_CSV;
 
@@ -215,6 +216,7 @@ async function render() {
           ? (canResetAccess ? `<button class="icon-btn" aria-label="Nouvel accès pour ${escapeHtml(s.nom || "le membre")}" title="Nouvel accès (lien ou mot de passe temporaire)" onclick="resetPassword('${s.user_id}')">${ICONS.refresh}</button>` : "")
           : `<button class="icon-btn" aria-label="Activer le compte de ${escapeHtml(s.nom || "le membre")}" title="Activer le compte" onclick="activateMember('${s.id}')">${ICONS.play}</button>`}
         <button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(s.nom || "le membre")}" title="Supprimer" onclick="deleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
+        ${canForceDelete ? `<button class="icon-btn force-delete-btn" aria-label="Suppression forcée de ${escapeHtml(s.nom || "le membre")} (paiements inclus)" title="Suppression forcée : membre + paiements des collectes" onclick="forceDeleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
       </td>
     </tr>
   `).join("") || `<tr><td colspan="${columnCount()}" class="empty">Aucun résultat</td></tr>`;
@@ -456,11 +458,37 @@ window.resetPassword = async userId => {
   await issueAccess("admin-reset-password", { user_id: userId }, "Nouvel accès généré");
 };
 
+// SUPERADMIN only (the server checks it too): deletes the member and ALL their
+// collection payments, whatever their state. Recorded in the audit log.
+window.forceDeleteSub = async (id, reason = "") => {
+  if (!canForceDelete) return;
+  const member = allSubs.find(x => x.id === id);
+  const name = `${member?.prenom || ""} ${member?.nom || ""}`.trim() || "ce membre";
+  const typed = await promptDialog(`Suppression forcée de ${name}`, {
+    placeholder: "Tapez SUPPRIMER pour confirmer",
+    confirmText: "Supprimer définitivement",
+    validator: value => (String(value || "").trim().toUpperCase() === "SUPPRIMER" ? undefined : "Tapez SUPPRIMER pour confirmer."),
+    text: `${reason ? reason + " " : ""}Le membre, son compte de connexion et TOUS ses paiements dans les collectes seront supprimés définitivement (action enregistrée dans le journal).`
+  });
+  if (typed === null) return;
+  const call = await callAdminFunction("admin-delete-user", { subscriber_id: id, force: true });
+  if (!call.ok) {
+    if (call.result.code === "account_delete_failed" || call.result.code === "record_delete_failed") await loadSubs();
+    return showAlert("#pageAlert", call.result.error || "Suppression impossible.", "error");
+  }
+  const parts = [`${name} supprimé`];
+  if (call.result.payments_deleted) parts.push(`${call.result.payments_deleted} paiement(s) supprimé(s)`);
+  if (call.result.account_kept) parts.push("compte du personnel conservé");
+  showAlert("#pageAlert", parts.join(" · ") + ".");
+  await loadSubs();
+};
+
 window.deleteSub = async id => {
   if (!canManageMembers) return;
   if (!(await confirmDialog("Supprimer cet abonné et son compte ? Cette action est irréversible.", { confirmText: "Supprimer" }))) return;
 
   const call = await callAdminFunction("admin-delete-user", { subscriber_id: id });
+  if (!call.ok && call.result.code === "has_payments" && canForceDelete) return forceDeleteSub(id, call.result.error);
   if (!call.ok && call.result.code === "has_payments") {
     // Members with collection payments are kept: offer to deactivate instead.
     const member = allSubs.find(x => x.id === id);
@@ -646,6 +674,7 @@ async function init() {
   canViewIdentity = can(ctx, "viewMemberIdentity");
   canImportMembers = can(ctx, "importMembers");
   canResetAccess = can(ctx, "resetMemberAccess");
+  canForceDelete = can(ctx, "forceDeleteMembers");
   if (!canViewDetails) {
     $$(".col-private").forEach(th => th.remove());
     $("#genderFilter")?.remove();

@@ -306,3 +306,44 @@ test("a member with collection payments is refused before the login account is t
   })(race.db.from.bind(race.db));
   assert.equal((await deleteMember(race, { subscriberId: "s3" })).body.code, "has_payments");
 });
+
+test("forced deletion (SUPERADMIN) removes the member and all their collection payments", async () => {
+  const { deleteMember } = await lifecycle;
+  const fake = createFake({ tables: {
+    subscribers: [{ id: "s1", user_id: "u1" }, { id: "s2", user_id: null }],
+    user_roles: [{ user_id: "u1", role: "MEMBER" }],
+    collection_contributions: [
+      { id: "c1", subscriber_id: "s1", event_id: "e1", amount: "12.000", status: "VALID" },
+      { id: "c2", subscriber_id: "s1", event_id: "e1", amount: "5.000", status: "CANCELLED" },
+      { id: "c3", subscriber_id: "s2", event_id: "e1", amount: "7.000", status: "VALID" }
+    ]
+  } });
+  const done = await deleteMember(fake, { subscriberId: "s1", force: true });
+  assert.deepEqual([done.status, done.body.account_deleted, done.body.payments_deleted], [200, true, 2]);
+  assert.deepEqual(done.body.payments.map(p => p.id).sort(), ["c1", "c2"], "deleted payments are returned for the audit log");
+  assert.deepEqual(fake.tables.collection_contributions.map(c => c.id), ["c3"], "other members' payments untouched");
+  assert.deepEqual(fake.tables.subscribers.map(s => s.id), ["s2"]);
+  assert.equal(fake.users.length, 0);
+});
+
+test("forced deletion keeps a staff account and stops cleanly if the payments cannot be removed", async () => {
+  const { deleteMember } = await lifecycle;
+  const staff = createFake({ tables: {
+    subscribers: [{ id: "s1", user_id: "u1" }],
+    user_roles: [{ user_id: "u1", role: "MEMBER" }, { user_id: "u1", role: "ADMIN" }],
+    collection_contributions: [{ id: "c1", subscriber_id: "s1", amount: "3.000", status: "VALID" }]
+  } });
+  const done = await deleteMember(staff, { subscriberId: "s1", force: true });
+  assert.deepEqual([done.status, done.body.account_deleted, done.body.account_kept], [200, false, true]);
+  assert.ok(!staff.calls.some(c => c.auth === "deleteUser"), "staff login account never deleted here");
+  assert.equal(staff.tables.subscribers.length, 0);
+
+  const stuck = createFake({
+    tables: { subscribers: [{ id: "s1", user_id: "u1" }], user_roles: [{ user_id: "u1", role: "MEMBER" }], collection_contributions: [{ id: "c1", subscriber_id: "s1" }] },
+    failures: { "delete:collection_contributions": true }
+  });
+  const failed = await deleteMember(stuck, { subscriberId: "s1", force: true });
+  assert.equal(failed.body.code, "payments_delete_failed");
+  assert.equal(stuck.tables.subscribers.length, 1, "record kept");
+  assert.ok(!stuck.calls.some(c => c.auth === "deleteUser"), "account kept");
+});

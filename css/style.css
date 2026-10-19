@@ -1303,3 +1303,6 @@ html[data-theme="light"] .hero-card::after{opacity:.30}
   .auth-page{background-position:center top}
 }
 @media print{.hero-card::after,.sidebar::after,.auth-page::after{display:none}}
+/* SUPERADMIN forced deletion: solid red so it is never confused with the normal delete */
+.icon-btn.force-delete-btn{background:var(--red);border-color:var(--red);color:#fff}
+.icon-btn.force-delete-btn:hover{background:var(--red-hover);border-color:var(--red-hover);color:#fff}

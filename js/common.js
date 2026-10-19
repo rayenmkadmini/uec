@@ -145,6 +145,7 @@ async function promptDialog(message, opts = {}) {
     const result = await Swal.fire({
         ...swalBase(),
         titleText: message,
+        text: opts.text || undefined,
         input: opts.input || "text",
         inputPlaceholder: opts.placeholder || "",
         inputValue: opts.value || "",
