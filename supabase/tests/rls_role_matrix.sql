@@ -176,14 +176,13 @@ select pg_temp.t('read internal notes',     'admin', $q$select notes from public
 select pg_temp.t('select * on members',     'admin', $q$select * from public.subscribers$q$, 'deny');
 select pg_temp.t('filter members by CIN',   'admin', $q$select id from public.subscribers where cin = '00000005'$q$, 'deny');
 select pg_temp.t('CIN via member-card view','admin', $q$select cin from public.v_member_cards$q$, 'deny');
-select pg_temp.t('private fields RPC (other member)', 'admin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5')$q$, 'deny');
-select pg_temp.t('private fields RPC (all members)',  'admin', $q$select * from public.get_member_private_fields()$q$, 'deny');
+select pg_temp.t('private fields RPC (other member)', 'admin', $q$select * from public.get_member_private_fields('00000000-0000-4000-8000-0000000000b5') where cin is not null$q$, 'allow');
+select pg_temp.t('private fields RPC (all members)',  'admin', $q$select * from public.get_member_private_fields() where cin is not null$q$, 'allow');
 select pg_temp.t('read allowed member fields', 'admin', $q$select nom, prenom, numero_abonnement, status, card_paid, faculty_id, zone_id, user_id from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
 select pg_temp.t('read member gender',      'admin', $q$select gender from public.subscribers$q$, 'deny');
 select pg_temp.t('read member photo path',  'admin', $q$select photo_url from public.subscribers$q$, 'deny');
 select pg_temp.t('filter members by gender','admin', $q$select id from public.subscribers where gender = 'FEMALE'$q$, 'deny');
-select pg_temp.t('seat list (names, zones)','admin', $q$select * from public.list_match_participants('00000000-0000-4000-8000-0000000000d1') where gender is null$q$, 'allow');
-select pg_temp.t('seat list exposes gender','admin', $q$select * from public.list_match_participants('00000000-0000-4000-8000-0000000000d1') where gender is not null$q$, 'deny');
+select pg_temp.t('seat list with gender',   'admin', $q$select * from public.list_match_participants('00000000-0000-4000-8000-0000000000d1') where gender is not null$q$, 'allow');
 select pg_temp.t('read member phone',       'admin', $q$select phone from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
 select pg_temp.t('read member email',       'admin', $q$select email from public.subscribers$q$, 'deny');
 select pg_temp.t('filter members by phone', 'admin', $q$select id from public.subscribers where phone like '+216%'$q$, 'deny');
@@ -208,13 +207,15 @@ select pg_temp.t('change profile app_role', 'admin', $q$update public.profiles s
 select pg_temp.t('deactivate a user',       'admin', $q$update public.profiles set is_active = false where id = '00000000-0000-4000-8000-0000000000a4'$q$, 'deny');
 select pg_temp.t('delete a member',         'admin', $q$delete from public.subscribers where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
 select pg_temp.t('read payment member list','admin', $q$select * from public.list_payment_members()$q$, 'allow');
-select pg_temp.t('read member photo files', 'admin', $q$select 1 from storage.objects where bucket_id = 'subscriber-photos' and name = 'RLSOTHER/existing.jpg'$q$, 'deny');
+select pg_temp.t('read member photo files', 'admin', $q$select 1 from storage.objects where bucket_id = 'subscriber-photos' and name = 'RLSOTHER/existing.jpg'$q$, 'allow');
 select pg_temp.t('read seat choices',       'admin', $q$select 1 from public.match_participations$q$, 'allow');
 select pg_temp.t('read roles of users',     'admin', $q$select 1 from public.user_roles$q$, 'allow');
 select pg_temp.t('create event',            'admin', $q$insert into public.events (title, amount) values ('AD event', 5)$q$, 'deny');
 select pg_temp.t('edit event',              'admin', $q$update public.events set amount = 1 where id = '00000000-0000-4000-8000-0000000000c1'$q$, 'deny');
 select pg_temp.t('delete event',            'admin', $q$delete from public.events where id = '00000000-0000-4000-8000-0000000000c1'$q$, 'deny');
-select pg_temp.t('edit member',             'admin', $q$update public.subscribers set nom = 'X' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
+select pg_temp.t('edit member',             'admin', $q$update public.subscribers set nom = 'X', phone = '+21600000000', status = 'ACTIVE' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'allow');
+select pg_temp.t('edit member CIN',         'admin', $q$update public.subscribers set cin = '99999999' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
+select pg_temp.t('edit member login',       'admin', $q$update public.subscribers set login_name = 'HIJACK' where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
 select pg_temp.t('create member',           'admin', $q$insert into public.subscribers (nom, prenom) values ('A','B')$q$, 'deny');
 select pg_temp.t('mark card paid (table)',  'admin', $q$update public.subscribers set card_paid = true where id = '00000000-0000-4000-8000-0000000000b5'$q$, 'deny');
 select pg_temp.t('mark card paid (RPC)',    'admin', $q$select public.set_card_payment_status('00000000-0000-4000-8000-0000000000b5', true)$q$, 'deny');
@@ -228,7 +229,8 @@ select pg_temp.t('update site settings',    'admin', $q$update public.site_setti
 select pg_temp.t('grant self SUPERADMIN',   'admin', $q$insert into public.user_roles (user_id, role) values ('00000000-0000-4000-8000-0000000000a2', 'SUPERADMIN')$q$, 'deny');
 select pg_temp.t('edit own profile',        'admin', $q$update public.profiles set display_name = 'X' where id = '00000000-0000-4000-8000-0000000000a2'$q$, 'deny');
 select pg_temp.t('upload match logo',       'admin', $q$insert into storage.objects (bucket_id, name) values ('match-logos', 'rls/ad.png')$q$, 'deny');
-select pg_temp.t('upload member photo',     'admin', $q$insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'RLSOTHER/ad.jpg')$q$, 'deny');
+select pg_temp.t('upload member photo',     'admin', $q$insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'RLSOTHER/ad.jpg')$q$, 'allow');
+select pg_temp.t('upload staff avatar',     'admin', $q$insert into storage.objects (bucket_id, name) values ('subscriber-photos', 'profiles/00000000-0000-4000-8000-0000000000a1/x.jpg')$q$, 'deny');
 
 -- ---------------- TREASURER ----------------
 select pg_temp.t('payment member list',     'treasurer', $q$select * from public.list_payment_members()$q$, 'allow');

@@ -1,11 +1,11 @@
-import { requireSuperAdmin, json, options, rateLimit, audit, corsHeaders, errorResponse, failureCode, readJson, isUuid } from "./_shared/security.ts";
+import { requireMemberManager, json, options, rateLimit, audit, corsHeaders, errorResponse, failureCode, readJson, isUuid } from "./_shared/security.ts";
 import { normalizeOptionalSubscriptionNumber } from "./_shared/import-utils.mjs";
 import { activateMember, activationRedirect } from "./_shared/member-lifecycle.mjs";
 
 // Same limits as the CSV import (import-utils.mjs).
 const MAX_FIELD_LENGTHS: Record<string, number> = { nom: 100, prenom: 100, cin: 32, phone: 40, email: 254, adresse: 300 };
 
-// SUPERADMIN-only. Creates ONE member record, then activates it through the same
+// SUPERADMIN or ADMIN (member management). Creates ONE member record, then activates it through the same
 // path as imported members (admin-activate-member): random unknown password,
 // access returned once as a recovery link (default) or, if requested, a
 // temporary password. Never the CIN. If activation fails the record is kept,
@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json(req, { error: "Method not allowed" }, 405);
   let ctx;
   try {
-    ctx = await requireSuperAdmin(req);
+    ctx = await requireMemberManager(req);
     await rateLimit(ctx.admin, ctx.caller.id, "CREATE_SUBSCRIBER", 50, 60);
     const b = await readJson(req);
     for (const key of ["nom", "prenom", "login_name", "cin", "gender"]) {

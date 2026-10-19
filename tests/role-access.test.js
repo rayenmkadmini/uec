@@ -78,7 +78,8 @@ function goTo(context, page) {
 
 const EXPECTED = {
   SUPERADMIN: Object.keys(PERMS.PERMISSIONS).filter(p => !["useMemberArea", "editOwnProfile", "chooseOwnSeat"].includes(p)),
-  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile"],
+  // 20261019120000: ADMIN manages members and sees their identity fields.
+  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewMemberIdentity", "manageMembers", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile"],
   TREASURER: ["viewMembers", "manageCardPayments", "viewEvents", "manageEventPaymentStatuses", "viewFinancialReports", "viewStaffProfile"],
   MEMBER: ["useMemberArea", "editOwnProfile", "chooseOwnSeat"]
 };
@@ -90,10 +91,12 @@ for (const [role, allowed] of Object.entries(EXPECTED)) {
   });
 }
 
-test("ADMIN / SUPERVISOR has no write permission at all", () => {
-  const writes = Object.keys(PERMS.PERMISSIONS).filter(p => /^(manage|edit|choose)/.test(p));
-  for (const permission of writes) assert.equal(PERMS.can({ roles: ["ADMIN"] }, permission), false, permission);
-  assert.equal(PERMS.isReadOnlyStaff({ roles: ["ADMIN"] }), true);
+test("ADMIN writes members only: no import, reset, payments, events, matches, users or settings", () => {
+  const writes = Object.keys(PERMS.PERMISSIONS).filter(p => /^(manage|edit|choose|import|reset)/.test(p));
+  for (const permission of writes) {
+    assert.equal(PERMS.can({ roles: ["ADMIN"] }, permission), permission === "manageMembers", permission);
+  }
+  assert.equal(PERMS.isReadOnlyStaff({ roles: ["ADMIN"] }), false);
 });
 
 test("TREASURER cannot create/edit events, collections, members, users or settings", () => {
@@ -133,12 +136,13 @@ test("home page per role, and every home page is accessible to its role (no redi
   }
 });
 
-test("combined ADMIN + TREASURER keeps payment-status rights but gains no management rights", () => {
+test("combined ADMIN + TREASURER: payment-status rights and member management, nothing more", () => {
   const ctx = { roles: ["ADMIN", "TREASURER"] };
   assert.equal(PERMS.can(ctx, "manageEventPaymentStatuses"), true);
   assert.equal(PERMS.can(ctx, "manageCardPayments"), true);
   assert.equal(PERMS.can(ctx, "manageEvents"), false);
-  assert.equal(PERMS.can(ctx, "manageMembers"), false);
+  assert.equal(PERMS.can(ctx, "manageMembers"), true);
+  assert.equal(PERMS.can(ctx, "importMembers"), false);
   assert.equal(PERMS.isReadOnlyStaff(ctx), false);
 });
 
@@ -307,12 +311,13 @@ test("TREASURER never receives member personal data in the UI", () => {
   }
 });
 
-test("only SUPERADMIN sees protected identity fields (CIN, address) in the UI", () => {
-  for (const role of ["ADMIN", "TREASURER", "MEMBER"]) {
+test("only SUPERADMIN and ADMIN see protected identity fields (CIN, address) in the UI", () => {
+  for (const role of ["TREASURER", "MEMBER"]) {
     assert.equal(PERMS.can({ roles: [role] }, "viewMemberIdentity"), false, role);
   }
   assert.equal(PERMS.can({ roles: ["SUPERADMIN"] }, "viewMemberIdentity"), true);
-  assert.equal(PERMS.can({ roles: ["ADMIN", "TREASURER", "MEMBER"] }, "viewMemberIdentity"), false);
+  assert.equal(PERMS.can({ roles: ["ADMIN"] }, "viewMemberIdentity"), true);
+  assert.equal(PERMS.can({ roles: ["TREASURER", "MEMBER"] }, "viewMemberIdentity"), false);
 
   const members = read("js/subscribers.js");
   assert.match(members, /canViewIdentity \? sb\.rpc\("get_member_private_fields"\)/);
@@ -367,7 +372,10 @@ test("account emails are shown to SUPERADMIN only and loaded through the checked
 
 test("members without an account are activated per member; no bulk secrets in the page", () => {
   const members = read("js/subscribers.js");
-  assert.match(members, /s\.user_id\s*\?\s*`<button[^`]*resetPassword\('\$\{s\.user_id\}'\)/);
+  // Resetting an existing account stays SUPERADMIN-only (resetMemberAccess).
+  assert.match(members, /s\.user_id\s*\?\s*\(canResetAccess \? `<button[^`]*resetPassword\('\$\{s\.user_id\}'\)/);
+  assert.match(members, /window\.resetPassword = async userId => \{\s*if \(!canResetAccess/);
+  assert.match(members, /async function importMembersCsv\(file\) \{\s*if \(!canImportMembers\) return;/);
   assert.match(members, /:\s*`<button[^`]*activateMember\('\$\{s\.id\}'\)/);
   assert.match(members, /issueAccess\("admin-activate-member", \{ subscriber_id: subscriberId \}/);
   assert.match(members, /callAdminFunction\(functionName, \{ \.\.\.payload, method: "link" \}\)/, "links are tried first");

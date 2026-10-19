@@ -16,6 +16,15 @@ Everything else is denied, even with a still-valid session.
 
 Legend: ✔ allowed · own = own row only · — denied · RPC = only through the named function
 
+> **Update 20261019120000 (owner decision, 2026-10-19).** ADMIN now manages members:
+> it reads every protected member field through `get_member_private_fields()` (RPC),
+> edits member records (not `user_id`, `login_name`, `cin` or card fields, and not a
+> record linked to a SUPERADMIN account), reads and uploads member photos (not staff
+> avatars), sees gender in `list_match_participants()`, and creates / activates /
+> deletes members through the Edge Functions. Direct column access is unchanged
+> (still RPC-only). CSV import, password resets, card payments and staff accounts are
+> unchanged. Where the tables below say "—" for ADMIN on those member fields, read "RPC".
+
 ## Members (`public.subscribers`)
 
 | Field | SUPERADMIN | ADMIN | TREASURER | MEMBER |

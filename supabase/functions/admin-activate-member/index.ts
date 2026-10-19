@@ -1,7 +1,7 @@
-import { requireSuperAdmin, json, options, audit, rateLimit, corsHeaders, errorResponse, failureCode, readJson, isUuid } from "./_shared/security.ts";
+import { requireMemberManager, json, options, audit, rateLimit, corsHeaders, errorResponse, failureCode, readJson, isUuid } from "./_shared/security.ts";
 import { activateMember, activationRedirect } from "./_shared/member-lifecycle.mjs";
 
-// SUPERADMIN-only. Creates the Auth account of ONE member record that has none
+// SUPERADMIN or ADMIN (member management). Creates the Auth account of ONE member record that has none
 // yet and returns access once (no-store):
 //   { subscriber_id, method: "link" }                single-use, expiring recovery link (default)
 //   { subscriber_id, method: "temporary_password" }  fallback when links are unavailable
@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
 
   let ctx;
   try {
-    ctx = await requireSuperAdmin(req);
+    ctx = await requireMemberManager(req);
     await rateLimit(ctx.admin, ctx.caller.id, "ACTIVATE_MEMBER", 200, 60);
     const body = await readJson(req);
     const method = body.method === "temporary_password" ? "temporary_password" : body.method === undefined || body.method === "link" ? "link" : "invalid";

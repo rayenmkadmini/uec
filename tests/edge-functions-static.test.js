@@ -129,12 +129,21 @@ test("role replacement adds before it removes (never leaves an account without r
   assert.match(body, /\.not\("role", "in"/, "only roles no longer wanted are deleted");
 });
 
-test("every admin Edge Function requires an active, re-secured SUPERADMIN", () => {
-  for (const name of functionNames) assert.match(indexSource(name), /await requireSuperAdmin\(req\)/, name);
+// Member management (create / activate / delete ONE member) is open to ADMIN since
+// 20261019120000; CSV import, password resets and staff accounts stay SUPERADMIN-only.
+const MEMBER_MANAGER_FUNCTIONS = ["admin-create-user", "admin-activate-member", "admin-delete-user"];
+
+test("every admin Edge Function requires an active, re-secured SUPERADMIN (or ADMIN for member management)", () => {
+  for (const name of functionNames) {
+    const expected = MEMBER_MANAGER_FUNCTIONS.includes(name) ? /await requireMemberManager\(req\)/ : /await requireSuperAdmin\(req\)/;
+    assert.match(indexSource(name), expected, name);
+  }
   for (const file of ["supabase/functions/_shared/security.ts", ...functionNames.map(n => `supabase/functions/${n}/_shared/security.ts`)]) {
     const source = read(file);
     assert.match(source, /select\("id,is_active,must_change_password"\)/, file);
-    assert.match(source, /profile\.is_active !== true \|\| profile\.must_change_password !== false \|\| !roles\.has\("SUPERADMIN"\)/, file);
+    assert.match(source, /profile\.is_active !== true \|\| profile\.must_change_password !== false \|\| !allowed\.some\(\(role\) => roles\.has\(role\)\)/, file);
+    assert.match(source, /requireSuperAdmin\(req: Request\) \{\s*return requireRoles\(req, \["SUPERADMIN"\]\);/, file);
+    assert.match(source, /requireMemberManager\(req: Request\) \{\s*return requireRoles\(req, \["SUPERADMIN", "ADMIN"\]\);/, file);
   }
 });
 

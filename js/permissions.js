@@ -22,10 +22,14 @@
         viewMemberDetails: ["SUPERADMIN", "ADMIN"],
         // Protected identity and contact data (CIN, address, date of birth, phone,
         // email, gender, photo): the database withholds these columns from every API role and
-        // serves them only through get_member_private_fields() /
-        // get_account_contacts() to SUPERADMIN (or the person themself).
-        viewMemberIdentity: ["SUPERADMIN"],
-        manageMembers: ["SUPERADMIN"],
+        // serves them only through get_member_private_fields() (SUPERADMIN, ADMIN, or the
+        // member themself) / get_account_contacts() (SUPERADMIN or the person themself).
+        // Since 20261019120000 ADMIN manages members (create, edit, delete) and reads
+        // their identity fields; CSV import and password resets stay SUPERADMIN-only.
+        viewMemberIdentity: ["SUPERADMIN", "ADMIN"],
+        manageMembers: ["SUPERADMIN", "ADMIN"],
+        importMembers: ["SUPERADMIN"],
+        resetMemberAccess: ["SUPERADMIN"],
         manageCardPayments: ["SUPERADMIN", "TREASURER"],
         viewEvents: ["SUPERADMIN", "ADMIN", "TREASURER"],
         manageEvents: ["SUPERADMIN"],
@@ -99,15 +103,16 @@
     }
 
     // True when the user can see administrative data but change none of it.
+    const WRITE_PERMISSIONS = Object.keys(PERMISSIONS).filter(p => /^(manage|import|reset)/.test(p));
     function isReadOnlyStaff(subject) {
         const roles = rolesOf(subject);
-        return roles.includes("ADMIN") && !roles.includes("SUPERADMIN") && !roles.includes("TREASURER");
+        return roles.includes("ADMIN") && !WRITE_PERMISSIONS.some(p => can(subject, p));
     }
 
     function primaryRoleLabel(subject) {
         const roles = rolesOf(subject);
         if (roles.includes("SUPERADMIN")) return "Super administrateur";
-        if (roles.includes("ADMIN")) return "Superviseur (lecture seule)";
+        if (roles.includes("ADMIN")) return "Administrateur";
         if (roles.includes("TREASURER")) return "Trésorier";
         if (roles.includes("MEMBER")) return "Membre";
         return "Aucun rôle";

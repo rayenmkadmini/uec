@@ -9,6 +9,8 @@ let canManageMembers = false;
 let canMarkCard = false;
 let canViewDetails = false;
 let canViewIdentity = false;
+let canImportMembers = false;
+let canResetAccess = false;
 const pendingCardToggles = new Set();
 const { parseMemberCsv } = window.UE_CSV;
 
@@ -210,7 +212,7 @@ async function render() {
         ${canManageMembers ? `<button class="icon-btn" aria-label="Modifier ${escapeHtml(s.nom || "le membre")}" title="Modifier" onclick="editSub('${s.id}')">${ICONS.edit}</button>
         <button class="icon-btn" aria-label="${s.status === "ACTIVE" ? "Désactiver" : "Activer"} ${escapeHtml(s.nom || "le membre")}" title="Activer/Désactiver" onclick="toggleSub('${s.id}')">${s.status === "ACTIVE" ? ICONS.pause : ICONS.play}</button>
         ${s.user_id
-          ? `<button class="icon-btn" aria-label="Nouvel accès pour ${escapeHtml(s.nom || "le membre")}" title="Nouvel accès (lien ou mot de passe temporaire)" onclick="resetPassword('${s.user_id}')">${ICONS.refresh}</button>`
+          ? (canResetAccess ? `<button class="icon-btn" aria-label="Nouvel accès pour ${escapeHtml(s.nom || "le membre")}" title="Nouvel accès (lien ou mot de passe temporaire)" onclick="resetPassword('${s.user_id}')">${ICONS.refresh}</button>` : "")
           : `<button class="icon-btn" aria-label="Activer le compte de ${escapeHtml(s.nom || "le membre")}" title="Activer le compte" onclick="activateMember('${s.id}')">${ICONS.play}</button>`}
         <button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(s.nom || "le membre")}" title="Supprimer" onclick="deleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
       </td>
@@ -449,7 +451,7 @@ window.activateMember = async subscriberId => {
 };
 
 window.resetPassword = async userId => {
-  if (!canManageMembers || !userId) return;
+  if (!canResetAccess || !userId) return;
   if (!(await confirmDialog("Générer un nouvel accès pour ce membre ? Il devra choisir un nouveau mot de passe.", { confirmText: "Générer", icon: "question" }))) return;
   await issueAccess("admin-reset-password", { user_id: userId }, "Nouvel accès généré");
 };
@@ -488,7 +490,7 @@ async function showImportErrors(title, intro, errors) {
 // re-validates everything (including faculty / zone names and duplicates)
 // before writing.
 async function importMembersCsv(file) {
-  if (!canManageMembers) return;
+  if (!canImportMembers) return;
   let parsed;
   try {
     parsed = parseMemberCsv(await file.text());
@@ -631,6 +633,8 @@ async function init() {
   canMarkCard = can(ctx, "manageCardPayments");
   canViewDetails = can(ctx, "viewMemberDetails");
   canViewIdentity = can(ctx, "viewMemberIdentity");
+  canImportMembers = can(ctx, "importMembers");
+  canResetAccess = can(ctx, "resetMemberAccess");
   if (!canViewDetails) {
     $$(".col-private").forEach(th => th.remove());
     $("#genderFilter")?.remove();
@@ -661,7 +665,7 @@ async function init() {
 
   $("#addBtn").onclick = () => { if (canManageMembers) openModal(); };
   $("#addBtn").classList.toggle("hidden", !canManageMembers);
-  $("#importCsvBtn").classList.toggle("hidden", !canManageMembers);
+  $("#importCsvBtn").classList.toggle("hidden", !canImportMembers);
   $("#importCsvBtn").onclick = () => $("#csvFile").click();
   $("#csvFile").addEventListener("change", async e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) await importMembersCsv(file); });
   $("#closeModal").onclick = () => $("#modal").classList.add("hidden");

@@ -1,5 +1,14 @@
 # UE CLUBISTE CHANGELOG
 
+## 2026-10-19 — ADMIN manages members
+
+### Changed (owner decision)
+- ADMIN can create, edit (including status) and delete members, and reads / writes their protected identity fields (CIN, address, date of birth, phone, email, gender, photo). CSV import, password resets, card payments and staff accounts stay SUPERADMIN-only (card payments: TREASURER too).
+- Migration `20261019120000_admin_member_management` (with rollback): update policy, field guard (ADMIN cannot change `user_id`, `login_name`, `cin` or card fields, nor a member record linked to a SUPERADMIN account), `get_member_private_fields()`, `list_match_participants()` (gender) and member photo storage policies.
+- Edge Functions `admin-create-user`, `admin-activate-member`, `admin-delete-user` accept SUPERADMIN or ADMIN (`requireMemberManager`); the others still require SUPERADMIN.
+- UI: `manageMembers` / `viewMemberIdentity` include ADMIN; new `importMembers` / `resetMemberAccess` (SUPERADMIN). ADMIN is labelled "Administrateur" and no longer shows the read-only pill.
+- Tests and `supabase/tests/rls_role_matrix.sql` updated to the new matrix (the RLS matrix was not run: no Docker on the authoring machine).
+
 ## 2026-10-18 — Smart collections (individual contributions)
 
 ### Added

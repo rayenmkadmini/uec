@@ -22,7 +22,10 @@ export const RELEASED = [
 
 // Add the next migration here; scripts/apply-migration.mjs refuses to run with nothing pending.
 // Also update RELEASED_PROBE_SQL / PENDING_PROBE_SQL below to objects of the new state.
-export const PENDING = ["20261018120000_smart_collections"];
+// 20261018120000 was applied by hand in the SQL editor on 2026-10-18 (not recorded in the
+// migration history): record it first with `supabase migration repair --status applied
+// 20261018120000` and move it to RELEASED before running scripts/apply-migration.mjs.
+export const PENDING = ["20261018120000_smart_collections", "20261019120000_admin_member_management"];
 
 export const versionOf = name => name.split("_")[0];
 export const APPLIED_VERSIONS = [...BASE_APPLIED, ...RELEASED.map(versionOf)];
@@ -37,7 +40,7 @@ export const RELEASED_PROBE_SQL = "select 'UE_RELEASED=' || (to_regprocedure('pu
 
 // Prints UE_PENDING_PRESENT=true|false: whether PENDING objects already exist (must be false
 // before an apply). public.collection_contributions is created by 20261018120000.
-export const PENDING_PROBE_SQL = "select 'UE_PENDING_PRESENT=' || (to_regclass('public.collection_contributions') is not null)::text as probe;";
+export const PENDING_PROBE_SQL = "select 'UE_PENDING_PRESENT=' || (to_regclass('public.collection_contributions') is not null or pg_get_functiondef('public.get_member_private_fields(uuid)'::regprocedure) like '%private.is_admin() and private.account_ok()%')::text as probe;";
 
 export function parseProbe(output, key) {
   const match = String(output).match(new RegExp(`${key}=(true|false)`));

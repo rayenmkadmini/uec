@@ -113,6 +113,16 @@ async function countRecentAuditRows(admin: ReturnType<typeof createClient>, call
 }
 
 export async function requireSuperAdmin(req: Request) {
+  return requireRoles(req, ["SUPERADMIN"]);
+}
+
+// Member management (create, activate, delete one member): SUPERADMIN or ADMIN.
+// CSV import, password resets and staff accounts stay SUPERADMIN-only.
+export async function requireMemberManager(req: Request) {
+  return requireRoles(req, ["SUPERADMIN", "ADMIN"]);
+}
+
+async function requireRoles(req: Request, allowed: string[]) {
   const authorization = req.headers.get("Authorization") || "";
   const token = authorization.replace(/^Bearer\s+/i, "").trim();
   if (!token) throw new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders(req) });
@@ -132,7 +142,7 @@ export async function requireSuperAdmin(req: Request) {
 
   const roles = new Set((rolesData || []).map((row: any) => String(row.role_name || "").toUpperCase()));
   // Same account rule as the database (private.account_ok): active, password re-secured.
-  if (!profile || profile.is_active !== true || profile.must_change_password !== false || !roles.has("SUPERADMIN")) {
+  if (!profile || profile.is_active !== true || profile.must_change_password !== false || !allowed.some((role) => roles.has(role))) {
     throw new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: corsHeaders(req) });
   }
 
