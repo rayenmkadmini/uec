@@ -598,7 +598,86 @@ function setupShell(ctx = null) {
         });
     }
 
+    setupMobileTabbar(sidebar, menuButton);
+    setupResponsiveTables();
     setupAccessibleDialogs();
+}
+
+/* ============================================================
+   MOBILE: bottom tab bar + tables as cards
+============================================================ */
+
+// Phone navigation: the first visible sidebar links (already filtered by role)
+// become a bottom tab bar, plus a "Menu" tab that opens the full drawer.
+function setupMobileTabbar(sidebar, menuButton) {
+    if (!sidebar || document.querySelector(".mobile-tabbar")) return;
+    const links = [...sidebar.querySelectorAll("nav a")].filter(link => !link.classList.contains("hidden"));
+    if (links.length < 2) return;
+
+    const bar = document.createElement("nav");
+    bar.className = "mobile-tabbar";
+    bar.setAttribute("aria-label", "Navigation rapide");
+
+    const max = links.length > 5 ? 4 : links.length;
+    const active = links.findIndex(link => link.classList.contains("active"));
+    // Keep the current page in the bar even when it is not among the first ones.
+    const chosen = links.slice(0, max);
+    if (active >= max) chosen[max - 1] = links[active];
+
+    for (const link of chosen) {
+        const tab = document.createElement("a");
+        tab.href = link.getAttribute("href");
+        tab.className = "tab-item" + (link.classList.contains("active") ? " active" : "");
+        if (link.classList.contains("active")) tab.setAttribute("aria-current", "page");
+        const icon = link.querySelector("svg")?.cloneNode(true);
+        if (icon) { icon.setAttribute("aria-hidden", "true"); tab.appendChild(icon); }
+        const label = document.createElement("span");
+        label.textContent = (link.querySelector("span:not([aria-hidden])")?.textContent || link.textContent || "").trim();
+        tab.appendChild(label);
+        bar.appendChild(tab);
+    }
+
+    if (links.length > max && menuButton) {
+        const more = document.createElement("button");
+        more.type = "button";
+        more.className = "tab-item";
+        more.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>Menu</span>';
+        more.addEventListener("click", () => menuButton.click());
+        bar.appendChild(more);
+    }
+
+    document.body.appendChild(bar);
+    document.body.classList.add("has-tabbar");
+}
+
+// On phones every data table is shown as a list of cards: each cell gets the
+// text of its column header as a label (data-label), read by the CSS.
+function labelTableCells(table) {
+    const headers = [...table.querySelectorAll("thead th")].map(th => th.textContent.trim());
+    if (!headers.length) return;
+    table.classList.add("responsive-table");
+    for (const row of table.tBodies[0]?.rows || []) {
+        [...row.cells].forEach((cell, index) => {
+            if (cell.colSpan > 1) { cell.classList.add("cell-full"); return; }
+            const label = headers[index] || "";
+            if (label) cell.setAttribute("data-label", label);
+            else cell.removeAttribute("data-label");
+        });
+    }
+}
+
+function setupResponsiveTables() {
+    if (window.__ueTablesReady || !document.body) return;
+    window.__ueTablesReady = true;
+    const scan = () => document.querySelectorAll(".table-wrap table").forEach(labelTableCells);
+    scan();
+    // Table bodies are re-rendered by each page: label new rows as they appear.
+    let queued = false;
+    new MutationObserver(() => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; scan(); });
+    }).observe(document.body, { childList: true, subtree: true });
 }
 
 function setupAccessibleDialogs() {

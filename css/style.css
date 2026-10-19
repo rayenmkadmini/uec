@@ -1164,3 +1164,104 @@ html[data-theme="dark"] .theme-toggle::before{-webkit-mask-image:url("data:image
   .kpi-value{font-size:19px}
   .topbar .theme-toggle{margin-inline-end:4px}
 }
+
+/* ============================================================
+   MOBILE LAYER (2026-10-19) — last on purpose: it wins over the
+   older mobile rules that were placed before their base rules.
+   ============================================================ */
+
+/* Bottom tab bar (built from the role-filtered sidebar links, see common.js) */
+.mobile-tabbar{display:none}
+@media(max-width:900px){
+  .mobile-tabbar{position:fixed;inset:auto 0 0 0;z-index:18;display:flex;justify-content:space-around;gap:2px;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:color-mix(in srgb,var(--surface) 92%,transparent);
+    -webkit-backdrop-filter:saturate(180%) blur(14px);backdrop-filter:saturate(180%) blur(14px);border-top:1px solid var(--line)}
+  .mobile-tabbar .tab-item{flex:1;min-width:0;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    padding:4px 2px;border:0;border-radius:12px;background:none;color:var(--muted);font:inherit;font-size:10.5px;font-weight:600;text-decoration:none;cursor:pointer}
+  .mobile-tabbar .tab-item svg{width:22px;height:22px}
+  .mobile-tabbar .tab-item span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-tabbar .tab-item.active{color:var(--red);background:var(--red-soft)}
+  .mobile-tabbar .tab-item:active{transform:scale(.96)}
+  body.has-tabbar .main{padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  body.has-tabbar .swal2-container.swal2-bottom-end,body.has-tabbar .swal2-container.swal2-top-end{padding-bottom:80px}
+  body.nav-open .mobile-tabbar{display:none}
+}
+
+@media(max-width:900px){
+  /* Grids that older rules failed to collapse */
+  .ref-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid-form{grid-template-columns:minmax(0,1fr)}
+  .grid-form > *,.form-stack > *,.toolbar > *,.ref-card > *,.panel-head > *{min-width:0}
+  .grid-form input,.grid-form select,.grid-form textarea,.form-stack input,.toolbar .search,.toolbar select{width:100%;max-width:100%}
+  .hero-card{flex-direction:column;align-items:stretch;gap:16px}
+  .hero-actions{align-items:stretch;width:100%}
+  .topbar{padding-top:env(safe-area-inset-top);height:calc(var(--topbar-h) + env(safe-area-inset-top))}
+}
+
+@media(max-width:640px){
+  /* iOS zooms into any field under 16px: keep fields at 16px on phones */
+  input,select,textarea,.search{font-size:16px!important}
+
+  .content{padding:16px 14px 28px}
+  .top-kicker,.topbar .top-user-meta{display:none}
+  .topbar h1{font-size:18px}
+  .panel{padding:16px;border-radius:14px}
+  .panel-head{gap:12px}
+  .panel-head-actions,.head-actions{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+  .panel-head-actions .btn,.head-actions .btn{width:100%}
+  .page-head > .btn.primary{width:100%}
+  .ref-grid{grid-template-columns:minmax(0,1fr)}
+  .ref-card{gap:10px}
+
+  /* Filters: search on its own line, filters two by two */
+  .toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .toolbar .search{grid-column:1/-1}
+
+  /* Comfortable touch targets */
+  .btn,.btn.sm{min-height:42px}
+  .icon-btn{width:42px;height:42px}
+  .link-btn{min-height:40px;display:inline-flex;align-items:center}
+  .close{width:40px;height:40px;min-height:40px}
+
+  /* Data tables become cards */
+  .table-wrap:has(.responsive-table){border:0;background:none;overflow:visible;margin:0}
+  table.responsive-table{min-width:0!important;width:100%;display:block}
+  .responsive-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  .responsive-table tbody{display:flex;flex-direction:column;gap:10px}
+  .responsive-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;padding:14px;
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow-xs)}
+  .responsive-table tbody tr:hover{background:var(--surface)}
+  .responsive-table td{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0;padding:0;border:0;
+    white-space:normal;overflow-wrap:anywhere;font-size:14px;text-align:left!important}
+  .responsive-table td::before{content:attr(data-label);font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .responsive-table td:not([data-label])::before,.responsive-table td.cell-full::before{display:none}
+  .responsive-table td.cell-full,.responsive-table td.empty,.responsive-table td.loading-state{grid-column:1/-1;align-items:center;text-align:center!important}
+  .responsive-table td:first-child{grid-column:1/-1}
+  .responsive-table td.member-thumb-cell{grid-column:auto}
+  .responsive-table td.member-thumb-cell::before{display:none}
+  .responsive-table td.actions,.responsive-table td.actions-cell{grid-column:1/-1;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;gap:8px;
+    padding-top:10px;border-top:1px solid var(--line)}
+  .responsive-table td.actions::before,.responsive-table td.actions-cell::before{display:none}
+  .responsive-table td.num{align-items:flex-start}
+  .responsive-table .note-cell{max-width:none}
+
+  /* Modals open as bottom sheets */
+  .modal{align-items:end!important;place-items:end stretch;padding:0!important}
+  .modal-box{width:100%!important;max-width:100%!important;max-height:92dvh!important;border-radius:20px 20px 0 0!important;
+    padding:8px 16px calc(16px + env(safe-area-inset-bottom))!important;animation:sheetUp .28s var(--ease) both}
+  .modal-box::before{content:"";display:block;width:40px;height:4px;border-radius:99px;background:var(--line-strong);margin:4px auto 12px}
+  .modal-head{position:sticky;top:-8px;z-index:2;background:var(--surface);padding-top:4px}
+  .form-actions{position:sticky;bottom:calc(-16px - env(safe-area-inset-bottom));background:var(--surface);padding-bottom:12px;margin-bottom:-4px;z-index:2}
+  .drawer{width:100%;border-radius:20px 20px 0 0;height:92dvh;margin-top:auto;padding:16px}
+  .drawer-backdrop{align-items:flex-end}
+  .drawer-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+  /* Collections dashboard details */
+  .fin-amount{font-size:30px}
+  .fin-side{grid-template-columns:1fr 1fr}
+  .tabs{overflow-x:auto;scrollbar-width:none}
+  .pager{justify-content:center}
+  .pager > span{width:100%;text-align:center}
+}
+@keyframes sheetUp{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
+@media(prefers-reduced-motion:reduce){.modal-box{animation:none!important}}
