@@ -461,6 +461,17 @@ window.deleteSub = async id => {
   if (!(await confirmDialog("Supprimer cet abonné et son compte ? Cette action est irréversible.", { confirmText: "Supprimer" }))) return;
 
   const call = await callAdminFunction("admin-delete-user", { subscriber_id: id });
+  if (!call.ok && call.result.code === "has_payments") {
+    // Members with collection payments are kept: offer to deactivate instead.
+    const member = allSubs.find(x => x.id === id);
+    if (member?.status === "ACTIVE" && await confirmDialog(
+      `${call.result.error} Désactiver ${member.prenom || ""} ${member.nom || ""} maintenant ?`.trim(),
+      { title: "Suppression impossible", confirmText: "Désactiver", icon: "info" })) {
+      await toggleSub(id);
+      return showAlert("#pageAlert", "Membre désactivé (son historique de paiements est conservé).");
+    }
+    return showAlert("#pageAlert", call.result.error, "error");
+  }
   if (!call.ok) return showAlert("#pageAlert", call.result.error || "Suppression impossible.", "error");
   await loadSubs();
 };

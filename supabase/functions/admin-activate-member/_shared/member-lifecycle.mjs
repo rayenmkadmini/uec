@@ -272,11 +272,24 @@ export async function resetAccess({ db, auth }, { userId, callerId = null, metho
 // would leave the member record (CIN, contact data) behind. Both are deleted
 // here; payments and seats cascade with the record. An account that also holds
 // a staff role is refused: staff accounts are managed separately.
+const HAS_PAYMENTS_MESSAGE = "Ce membre a des paiements enregistrés dans les collectes : pour préserver l’historique financier, il ne peut pas être supprimé. Désactivez-le à la place.";
+const isMissingRelation = error => ["42P01", "PGRST205"].includes(String(error?.code || ""));
+
 export async function deleteMember({ db, auth }, { subscriberId }) {
   if (!subscriberId) return fail(400, "missing_subscriber", "subscriber_id requis.");
   const { data: member, error } = await db.from("subscribers").select("id,user_id").eq("id", subscriberId).maybeSingle();
   if (error) return fail(503, "lookup_failed", "Membre introuvable pour le moment. Réessayez.");
   if (!member) return fail(404, "not_found", "Membre introuvable.");
+
+  // Collection payments are kept forever (ON DELETE RESTRICT): check them BEFORE
+  // touching the login account, so a refused deletion never leaves a member
+  // without an account.
+  const { data: payments, error: paymentsError } = await db.from("collection_contributions")
+    .select("id").eq("subscriber_id", member.id).limit(1);
+  if (paymentsError && !isMissingRelation(paymentsError)) {
+    return fail(503, "payments_unavailable", "Paiements du membre indisponibles. Réessayez.");
+  }
+  if (payments?.length) return fail(409, "has_payments", HAS_PAYMENTS_MESSAGE);
 
   if (member.user_id) {
     const { data: roles, error: rolesError } = await db.from("user_roles").select("role").eq("user_id", member.user_id);
@@ -290,6 +303,10 @@ export async function deleteMember({ db, auth }, { subscriberId }) {
 
   const { error: deleteError } = await db.from("subscribers").delete().eq("id", member.id);
   if (deleteError) {
+    // A payment recorded between the check above and the delete.
+    if (String(deleteError.code || "") === "23503") {
+      return fail(409, "has_payments", HAS_PAYMENTS_MESSAGE, { account_deleted: Boolean(member.user_id) });
+    }
     return fail(500, "record_delete_failed", "La fiche membre n’a pas pu être supprimée. Réessayez la suppression.",
       { account_deleted: Boolean(member.user_id) });
   }

@@ -277,3 +277,32 @@ test("member deletion refuses staff accounts and stops if the account cannot be 
   const recordFails = createFake({ tables: { subscribers: [{ id: "s1", user_id: null }] }, failures: { "delete:subscribers": true } });
   assert.equal((await deleteMember(recordFails, { subscriberId: "s1" })).body.code, "record_delete_failed");
 });
+
+test("a member with collection payments is refused before the login account is touched", async () => {
+  const { deleteMember } = await lifecycle;
+  const fake = createFake({ tables: {
+    subscribers: [{ id: "s1", user_id: "u1" }],
+    user_roles: [{ user_id: "u1", role: "MEMBER" }],
+    collection_contributions: [{ id: "c1", subscriber_id: "s1", amount: "12.000", status: "VALID" }]
+  } });
+  const refused = await deleteMember(fake, { subscriberId: "s1" });
+  assert.deepEqual([refused.status, refused.body.code], [409, "has_payments"]);
+  assert.match(refused.body.error, /Désactivez-le/);
+  assert.equal(fake.tables.subscribers.length, 1, "record kept");
+  assert.ok(!fake.calls.some(c => c.auth === "deleteUser"), "login account untouched");
+
+  // Cancelled payments are history too.
+  const cancelled = createFake({ tables: { subscribers: [{ id: "s2", user_id: null }], collection_contributions: [{ id: "c2", subscriber_id: "s2", status: "CANCELLED" }] } });
+  assert.equal((await deleteMember(cancelled, { subscriberId: "s2" })).body.code, "has_payments");
+
+  // A payment that appears between the check and the delete (foreign key) gets the same answer.
+  const race = createFake({ tables: { subscribers: [{ id: "s3", user_id: null }] }, failures: { "delete:subscribers": true } });
+  race.db.from = (orig => table => {
+    const q = orig(table);
+    if (table !== "subscribers") return q;
+    const then = q.then.bind(q);
+    q.then = (res, rej) => then(r => res(r.error ? { ...r, error: { ...r.error, code: "23503" } } : r), rej);
+    return q;
+  })(race.db.from.bind(race.db));
+  assert.equal((await deleteMember(race, { subscriberId: "s3" })).body.code, "has_payments");
+});
