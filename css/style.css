@@ -1306,3 +1306,26 @@ html[data-theme="light"] .hero-card::after{opacity:.30}
 /* SUPERADMIN forced deletion: solid red so it is never confused with the normal delete */
 .icon-btn.force-delete-btn{background:var(--red);border-color:var(--red);color:#fff}
 .icon-btn.force-delete-btn:hover{background:var(--red-hover);border-color:var(--red-hover);color:#fff}
+
+/* ============================================================
+   UEC IDENTITY (2026-10-19): official round logo, club crest,
+   scarf banner, tifo — each on a dark surface, never behind data.
+   ============================================================ */
+/* Round official logo: no square frame around it */
+.side-brand img,.brand-mark img,.mobile-logo img{border-radius:50%;background:none;box-shadow:0 0 0 2px rgba(255,255,255,.08);padding:0;object-fit:cover}
+.brand-mark{border-radius:50%}
+
+/* Red / white scarf stripes (pure CSS) on the sidebar top and the login card */
+.sidebar::before,.auth-shell::before{content:"";position:absolute;left:0;right:0;top:0;height:5px;z-index:2;pointer-events:none;
+  background:repeating-linear-gradient(90deg,#e31b23 0 28px,#fff 28px 56px)}
+.auth-shell{position:relative}
+
+/* Sidebar watermark: the Club Africain crest */
+.sidebar::after{background-image:url("../assets/ca-crest.webp");opacity:.08;height:170px}
+
+/* Login brand panel: the UEC scarf banner */
+.auth-brand::before{background-image:url("../assets/uec-scarf.webp");opacity:.38;background-size:cover;background-position:center}
+
+/* Member area (Mon espace, Matchs): the supporters' tifo */
+body[data-page="subscriber"] .hero-card::after{background-image:url("../assets/uec-tifo.webp");background-position:right center;opacity:.42}
+@media(max-width:640px){body[data-page="subscriber"] .hero-card::after{opacity:.28}}

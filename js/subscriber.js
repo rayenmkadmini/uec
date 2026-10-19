@@ -34,7 +34,7 @@ async function renderMemberCard(subscriber) {
     <div class="member-card premium-card">
       <div class="member-card-topbar">
         <div class="member-brand">
-          <img src="assets/logo.png" alt="UE Clubiste">
+          <img src="assets/uec-logo-192.webp" alt="UE Clubiste">
           <div>
             <span>UE CLUBISTE</span>
             <strong>Carte membre</strong>
