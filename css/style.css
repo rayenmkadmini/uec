@@ -1562,3 +1562,15 @@ td.m-summary{display:none}
 @keyframes wsIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes wsOut{to{opacity:0;transform:translateY(-10px)}}
 @media(prefers-reduced-motion:reduce){.welcome-screen,.welcome-features li,.welcome-done .auth-shell{animation:none!important}}
+
+/* Checkboxes / radios are never stretched by the "full-width field" phone rules */
+input[type="checkbox"],input[type="radio"]{width:20px!important;height:20px!important;min-width:20px;min-height:0!important;max-width:20px;flex:none;padding:0!important;margin:0;box-shadow:none!important}
+.role-checkbox-group .check-row,.form-stack label.check-row{display:flex!important;flex-direction:row!important;align-items:center;justify-content:flex-start;gap:12px;
+  min-height:48px;padding:10px 14px;font-weight:600;color:var(--ink);cursor:pointer}
+.role-checkbox-group .check-row:has(input:checked){border-color:var(--red);background:var(--red-soft)}
+.role-checkbox-group legend{font-size:13px}
+@media(max-width:900px){
+  .modal-box,.modal-box *{min-width:0}
+  .modal-box{overflow-x:hidden;box-sizing:border-box}
+  .modal-box form,.modal-box .form-stack,.modal-box .grid-form{width:100%;max-width:100%}
+}

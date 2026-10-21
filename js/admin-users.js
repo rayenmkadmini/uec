@@ -152,6 +152,8 @@ window.openAdminActions = id => {
 function openAdmin(a = null) {
   $("#adminModal").classList.remove("hidden");
   $("#adminModalTitle").textContent = a ? "Modifier l'administrateur" : "Ajouter un administrateur";
+  const kicker = $("#adminModal .modal-head .mini-label");
+  if (kicker) kicker.textContent = a ? "COMPTE" : "NOUVEL ADMIN";
   $("#adminId").value = a?.id || "";
   $("#adminName").value = a?.display_name || "";
   $("#adminEmail").value = a?.email || "";
