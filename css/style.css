@@ -1331,3 +1331,66 @@ body[data-page="subscriber"] .hero-card::after{background-image:url("../assets/u
 @media(max-width:640px){body[data-page="subscriber"] .hero-card::after{opacity:.28}}
 
 .sidebar nav a.nav-switch{margin-top:10px;border-top:1px solid var(--side-line);border-radius:0 0 10px 10px;padding-top:12px}
+
+/* ============================================================
+   MOBILE LAYER 2 (2026-10-21) — grids that older rules never
+   collapsed (their media queries sit before the base rules),
+   readable minimum sizes, and lighter rendering on phones.
+   ============================================================ */
+
+/* Snappier taps everywhere: no double-tap zoom delay, no grey flash */
+a,button,input,select,textarea,label,.collection-card,.tab-item{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* Tablet & phone (sidebar becomes a drawer) */
+@media(max-width:900px){
+  .charts-grid,.matches-grid,.admin-matches-grid,.events-grid{grid-template-columns:minmax(0,1fr)}
+  .match-stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .zone-admin-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .auth-shell{grid-template-columns:minmax(0,1fr)}
+  .topbar .theme-toggle{width:40px;height:40px;min-height:40px}
+}
+
+/* Phones */
+@media(max-width:640px){
+  .stats-grid,.pay-stats,.csv-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .stat-card{min-width:0}
+  .stat-card > span:not(.stat-icon){padding-right:40px}
+  .zones-grid,.zone-admin-row,.member-card-main,.role-checkbox-group{grid-template-columns:minmax(0,1fr)}
+  .member-card-main{justify-items:center}
+  .member-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+  /* Filters never wider than their column */
+  .toolbar select,.toolbar input{min-width:0!important}
+
+  /* Nothing smaller than 11px on a phone */
+  .mini-label,.eyebrow,.top-kicker,.kpi-label,.field-optional,.field-required,.badge,.status-badge,
+  .gender-badge,.sport-pill,.choice-pill,.vs-badge,.side-role-summary,.role-summary,
+  .mobile-tabbar .tab-item,.responsive-table td::before,.stat-card small,.kpi small,.cc-foot,.muted-chip{font-size:11px!important}
+  .hint,.page-sub,.modal-subtitle,.member-cell small,.activity li small{font-size:12px}
+
+  /* Long lists: let the browser skip off-screen cards (faster scrolling) */
+  .responsive-table tbody tr{content-visibility:auto;contain-intrinsic-size:auto 200px}
+
+  /* Blur is expensive on phones: solid bars instead */
+  .topbar,.mobile-tabbar{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:var(--surface)!important}
+  .modal,.sidebar-backdrop.visible{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+}
+
+/* Very small phones (≤ 360px) */
+@media(max-width:360px){
+  .stats-grid,.pay-stats,.kpi-grid{gap:8px}
+  .stat-card,.kpi{padding:12px}
+  .stat-card strong{font-size:22px}
+}
+
+@media(max-width:640px){
+  /* Filter labels fit their column: tighter arrow padding, label truncates cleanly */
+  .toolbar select{padding:10px 26px 10px 10px;text-overflow:ellipsis;background-position:right 8px center}
+}
+
+@media(max-width:900px){
+  .btn.sm{min-height:40px}
+  .ref-card{gap:10px}
+  .ref-card > div:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .ref-card .actions{flex:none;gap:6px}
+}

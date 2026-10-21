@@ -9,7 +9,8 @@ function renderCharts(){
   const zonePalette=["#c8102e",dark?"#e4e7ec":"#0f1115","#f04462","#667085","#fda29b","#98a2b3","#7a0b1d",dark?"#475467":"#d0d5dd"];
   const fac=[...facData].sort((a,b)=>b[1]-a[1]);
   const zones=[...zoneData].sort((a,b)=>b[1]-a[1]);
-  const short=label=>label.length>28?label.slice(0,27)+"…":label;
+  const max=window.innerWidth<640?16:28; // phones: short labels keep the bars readable
+  const short=label=>label.length>max?label.slice(0,max-1)+"…":label;
 
   facultyChart?.destroy(); zoneChart?.destroy();
 
