@@ -610,6 +610,48 @@ function setupShell(ctx = null) {
             sidebar.classList.contains("open") ? closeDrawer() : openDrawer();
         });
         backdrop.addEventListener("click", () => closeDrawer());
+
+        // Phone drawer: profile card + close button at the top, quick bar
+        // (theme + logout) at the bottom, swipe to open / close.
+        if (!sidebar.querySelector(".drawer-profile")) {
+            const name = ctx?.profile?.display_name || "Utilisateur";
+            const profile = document.createElement("div");
+            profile.className = "drawer-profile";
+            profile.innerHTML = `<span class="drawer-avatar" aria-hidden="true">${escapeHtml(Array.from(name.trim())[0]?.toLocaleUpperCase() || "U")}</span>
+                <div class="drawer-who"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(ctx ? PERMS.primaryRoleLabel(ctx) : "")}</small></div>
+                <button type="button" class="drawer-close" aria-label="Fermer le menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+            sidebar.querySelector(".side-brand")?.insertAdjacentElement("afterend", profile);
+            profile.querySelector(".drawer-close").addEventListener("click", () => closeDrawer());
+
+            const quick = document.createElement("div");
+            quick.className = "drawer-quick";
+            quick.innerHTML = `<button type="button" class="drawer-theme"><span class="drawer-theme-icon" aria-hidden="true"></span><span>Thème</span></button>`;
+            quick.querySelector(".drawer-theme").addEventListener("click", () => document.querySelector(".theme-toggle")?.click());
+            const logout = sidebar.querySelector(".side-logout");
+            if (logout) { logout.insertAdjacentElement("beforebegin", quick); quick.appendChild(logout); }
+            else sidebar.appendChild(quick);
+        }
+
+        // Swipe: from the left screen edge to open, to the left on the drawer to close.
+        const mobile = () => window.matchMedia("(max-width: 900px)").matches;
+        let startX = null, startY = 0, fromEdge = false;
+        document.addEventListener("touchstart", event => {
+            if (!mobile() || event.touches.length !== 1) return;
+            const t = event.touches[0];
+            const open = sidebar.classList.contains("open");
+            fromEdge = !open && t.clientX < 24;
+            if (open || fromEdge) { startX = t.clientX; startY = t.clientY; } else startX = null;
+        }, { passive: true });
+        document.addEventListener("touchend", event => {
+            if (startX === null) return;
+            const t = event.changedTouches[0];
+            const dx = t.clientX - startX, dy = Math.abs(t.clientY - startY);
+            if (dy < 60) {
+                if (fromEdge && dx > 60) openDrawer();
+                else if (!fromEdge && sidebar.classList.contains("open") && dx < -60) closeDrawer(false);
+            }
+            startX = null;
+        }, { passive: true });
         sidebar.querySelectorAll("nav a").forEach(link => link.addEventListener("click", () => closeDrawer(false)));
         document.addEventListener("keydown", event => {
             if (event.key === "Escape" && sidebar.classList.contains("open")) closeDrawer();
