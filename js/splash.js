@@ -1,13 +1,17 @@
 /* ============================================================
    UEC21 MEMBERS — phone splash screen
-   Shown once per browser session, on phones only, when the site is
-   opened: 5 seconds (tap to skip). Loaded in <head> so it covers the
+   Shown on phones when the site is opened and on every refresh:
+   5 seconds (tap to skip); not between pages of the site. Loaded in <head> so it covers the
    page before anything else is painted.
 ============================================================ */
 (function () {
     try {
         if (!window.matchMedia("(max-width: 900px)").matches) return;
-        if (sessionStorage.getItem("uec-splash-seen")) return;
+        // Shown when the site is opened and on every refresh (pull-to-refresh / reload),
+        // but not when moving from one page of the site to another.
+        const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
+        const reloaded = nav ? nav.type === "reload" : (performance.navigation && performance.navigation.type === 1);
+        if (sessionStorage.getItem("uec-splash-seen") && !reloaded) return;
         sessionStorage.setItem("uec-splash-seen", "1");
     } catch (_) {
         return; // storage blocked: never risk showing it on every page
