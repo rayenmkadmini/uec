@@ -89,7 +89,8 @@ async function loadAdmins() {
   }
 
   admins = (data || [])
-    .filter(a => rolesFor(a).length > 0)
+    // Staff page: only ADMIN / SUPERADMIN accounts. Members are listed on the Abonnés page.
+    .filter(a => rolesFor(a).some(role => role === "ADMIN" || role === "SUPERADMIN"))
     .map(a => ({
       ...a,
       email: emails.get(a.id) ?? null,
