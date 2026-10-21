@@ -274,33 +274,7 @@ function memberActionList(s) {
 
 window.openMemberActions = id => {
   const s = allSubs.find(x => x.id === id);
-  if (!s) return;
-  document.querySelector(".action-sheet")?.remove();
-  const sheet = document.createElement("div");
-  sheet.className = "action-sheet";
-  sheet.setAttribute("role", "dialog");
-  sheet.setAttribute("aria-modal", "true");
-  sheet.innerHTML = `<div class="action-sheet-panel">
-      <div class="action-sheet-title"><strong>${escapeHtml(`${s.prenom || ""} ${s.nom || ""}`.trim())}</strong><small>${escapeHtml(s.numero_abonnement ? `N° ${s.numero_abonnement}` : "Membre")}</small></div>
-      <div class="action-sheet-list"></div>
-      <button type="button" class="btn secondary action-sheet-cancel">Annuler</button>
-    </div>`;
-  const listEl = sheet.querySelector(".action-sheet-list");
-  for (const action of memberActionList(s)) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "action-sheet-item" + (action.danger ? " danger" : "") + (action.strong ? " strong" : "");
-    b.textContent = action.label;
-    b.addEventListener("click", () => { close(); action.run(); });
-    listEl.appendChild(b);
-  }
-  const close = () => { sheet.remove(); document.removeEventListener("keydown", onKey); };
-  const onKey = e => { if (e.key === "Escape") close(); };
-  sheet.addEventListener("click", e => { if (e.target === sheet) close(); });
-  sheet.querySelector(".action-sheet-cancel").addEventListener("click", close);
-  document.addEventListener("keydown", onKey);
-  document.body.appendChild(sheet);
-  sheet.querySelector(".action-sheet-item")?.focus();
+  if (s) openActionSheet(`${s.prenom || ""} ${s.nom || ""}`.trim(), s.numero_abonnement ? `N° ${s.numero_abonnement}` : "Membre", memberActionList(s));
 };
 
 async function openMemberCard(subscriber) {

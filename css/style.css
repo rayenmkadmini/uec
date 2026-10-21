@@ -1437,3 +1437,13 @@ td.m-summary{display:none}
 .action-sheet-item.danger{color:var(--danger)}
 .action-sheet-item.strong{color:#fff;background:var(--red);margin-top:6px}
 .action-sheet-cancel{width:100%;min-height:48px;margin-top:4px}
+
+@media(max-width:640px){
+  .m-amount{flex:none;font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
+  .m-amount.is-cancelled{color:var(--muted);text-decoration:line-through}
+  .m-note{flex-basis:100%;font-size:12.5px;color:var(--muted);line-height:1.4}
+  .m-actions.m-actions-single{grid-template-columns:1fr}
+  .m-actions.m-actions-two{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  .m-chips .badge{font-size:11px}
+  .responsive-table tr.clickable:has(> td.m-summary):active{background:var(--hover)}
+}

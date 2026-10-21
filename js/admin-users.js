@@ -119,12 +119,35 @@ function render() {
           <button class="icon-btn" aria-label="Réinitialiser le mot de passe" title="Réinitialiser mot de passe" onclick="resetAdmin('${a.id}')">${ICONS.refresh}</button>
           ${mayDeleteAccount ? `<button class="icon-btn danger" aria-label="Supprimer le compte ${escapeHtml(a.display_name || "")}" title="Supprimer le compte administrateur" onclick="deleteAdmin('${a.id}')">${ICONS.trash}</button>` : ""}
         ` : "—"}</td>
+        <td class="m-summary">
+          <div class="m-head">
+            <span class="m-avatar">${escapeHtml((a.display_name || "?").trim().charAt(0).toUpperCase())}</span>
+            <div class="m-id"><strong>${escapeHtml(a.display_name || "—")}</strong><small>${superAdmin ? escapeHtml(a.email || "—") : "Adresse masquée"}</small></div>
+            ${statusBadge(a.is_active === false ? "INACTIVE" : "ACTIVE")}
+          </div>
+          <div class="m-chips">${renderRoleBadges(a.roles)}<span class="m-chip">Créé le ${escapeHtml(new Date(a.created_at).toLocaleDateString("fr-TN"))}</span></div>
+          ${superAdmin ? `<div class="m-actions">
+            <button type="button" class="btn secondary sm" onclick="editAdmin('${a.id}')">${ICONS.edit} Modifier</button>
+            <button type="button" class="btn secondary sm" onclick="resetAdmin('${a.id}')">${ICONS.refresh} Accès</button>
+            <button type="button" class="btn secondary sm m-more" aria-label="Plus d’actions" onclick="openAdminActions('${a.id}')">${MORE_ICON}</button>
+          </div>` : ""}
+        </td>
       </tr>
     `;
   }).join("") || '<tr><td colspan="6" class="empty">Aucun compte à afficher</td></tr>';
 
   $("#addAdminBtn").style.display = superAdmin ? "" : "none";
 }
+
+window.openAdminActions = id => {
+  const a = admins.find(x => x.id === id);
+  if (!a) return;
+  const actions = [{ label: a.is_active === false ? "Réactiver le compte" : "Désactiver le compte", run: () => toggleAdmin(a.id) }];
+  if (!a.roles.includes("MEMBER") && a.roles.some(role => ["ADMIN", "SUPERADMIN"].includes(role))) {
+    actions.push({ label: "Supprimer le compte", danger: true, run: () => deleteAdmin(a.id) });
+  }
+  openActionSheet(a.display_name || "Compte", a.roles.join(" · "), actions);
+};
 
 function openAdmin(a = null) {
   $("#adminModal").classList.remove("hidden");

@@ -901,3 +901,40 @@ function setupAccessibleDialogs() {
         addToggle();
     }
 })();
+
+
+/* ============================================================
+   PHONE ACTION SHEET — "•••" menus on compact cards
+   actions: [{ label, run, danger?, strong? }]
+============================================================ */
+const MORE_ICON = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>';
+
+function openActionSheet(title, subtitle, actions) {
+    document.querySelector(".action-sheet")?.remove();
+    const sheet = document.createElement("div");
+    sheet.className = "action-sheet";
+    sheet.setAttribute("role", "dialog");
+    sheet.setAttribute("aria-modal", "true");
+    sheet.innerHTML = `<div class="action-sheet-panel">
+        <div class="action-sheet-title"><strong>${escapeHtml(title || "")}</strong>${subtitle ? `<small>${escapeHtml(subtitle)}</small>` : ""}</div>
+        <div class="action-sheet-list"></div>
+        <button type="button" class="btn secondary action-sheet-cancel">Annuler</button>
+      </div>`;
+    const close = () => { sheet.remove(); document.removeEventListener("keydown", onKey); };
+    const onKey = e => { if (e.key === "Escape") close(); };
+    const list = sheet.querySelector(".action-sheet-list");
+    for (const action of actions) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "action-sheet-item" + (action.danger ? " danger" : "") + (action.strong ? " strong" : "");
+        b.textContent = action.label;
+        b.addEventListener("click", () => { close(); action.run(); });
+        list.appendChild(b);
+    }
+    sheet.addEventListener("click", e => { if (e.target === sheet) close(); });
+    sheet.querySelector(".action-sheet-cancel").addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(sheet);
+    sheet.querySelector(".action-sheet-item")?.focus();
+}
+window.openActionSheet = openActionSheet;

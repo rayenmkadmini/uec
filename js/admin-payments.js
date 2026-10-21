@@ -616,6 +616,15 @@ function renderMembers() {
             <td class="no-print actions-cell">${canRecordFor(r.sub) ? `
                 <button type="button" class="btn ghost sm needs-record" data-action="member-pay" data-member="${escapeHtml(r.id)}" aria-label="Ajouter un paiement pour ${escapeHtml(memberName(r.sub))}">+ Paiement</button>` : ""}
             </td>
+            <td class="m-summary">
+                <div class="m-head">
+                    <span class="m-avatar">${escapeHtml(initials(r.sub))}</span>
+                    <div class="m-id"><strong>${escapeHtml(memberName(r.sub))}</strong><small>N° ${escapeHtml(r.sub?.numero_abonnement || "—")}${facultyOf(r.sub) ? ` · ${escapeHtml(facultyOf(r.sub))}` : ""}${inactive ? " · inactif" : ""}</small></div>
+                    <span class="m-amount">${r.total ? fmt(r.total) : "—"}</span>
+                </div>
+                <div class="m-chips">${badge(label, tone)}${r.count ? `<span class="m-chip">${r.count} paiement${r.count > 1 ? "s" : ""}</span>` : ""}${r.lastPaid ? `<span class="m-chip">Dernier : ${fmtDate(r.lastPaid)}</span>` : ""}${r.personalTarget ? `<span class="m-chip">Objectif ${fmt(r.personalTarget)} · reste ${fmt(r.personalRemaining)}</span>` : ""}</div>
+                ${canRecordFor(r.sub) ? `<div class="m-actions m-actions-single"><button type="button" class="btn secondary sm needs-record" data-action="member-pay" data-member="${escapeHtml(r.id)}">+ Enregistrer un paiement</button></div>` : ""}
+            </td>
         </tr>`;
     }).join("") : rowsMessage(8, state.subscribers.length ? "Aucun membre ne correspond à ces filtres." : "Aucun membre dans la base.");
 
@@ -676,6 +685,18 @@ function ledgerRow(p, withMember) {
         <td class="no-print actions-cell">${cancelled ? "" : `
             <button type="button" class="btn ghost sm needs-record" data-action="edit-payment" data-id="${escapeHtml(p.id)}">Modifier</button>
             <button type="button" class="btn ghost sm danger-text needs-record" data-action="cancel-payment" data-id="${escapeHtml(p.id)}">Annuler</button>`}
+        </td>
+        <td class="m-summary">
+            <div class="m-head">
+                <div class="m-id"><strong>${withMember ? escapeHtml(memberName(sub)) : fmtDate(p.paid_on)}</strong><small>${withMember ? `${fmtDate(p.paid_on)} · ` : ""}${escapeHtml(METHOD_LABELS[p.method] || p.method)}${p.reference ? ` · ${escapeHtml(p.reference)}` : ""}</small></div>
+                <span class="m-amount${cancelled ? " is-cancelled" : ""}">${fmtAmount(p.amount)}</span>
+            </div>
+            <div class="m-chips">${cancelled ? badge("Annulé", "danger") : p.source === "LEGACY" ? badge("Importé", "info") : badge("Valide", "success")}${(cancelled ? p.cancel_reason : p.notes) ? `<span class="m-note">${escapeHtml(cancelled ? `Motif : ${p.cancel_reason}` : p.notes)}</span>` : ""}</div>
+            ${cancelled ? "" : `<div class="m-actions m-actions-two">
+                ${withMember ? `<button type="button" class="btn secondary sm" data-action="open-member" data-member="${escapeHtml(p.subscriber_id)}">Fiche</button>` : ""}
+                <button type="button" class="btn secondary sm needs-record" data-action="edit-payment" data-id="${escapeHtml(p.id)}">Modifier</button>
+                <button type="button" class="btn secondary sm danger-text needs-record" data-action="cancel-payment" data-id="${escapeHtml(p.id)}">Annuler</button>
+            </div>`}
         </td>
     </tr>`;
 }
