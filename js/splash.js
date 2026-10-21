@@ -41,7 +41,10 @@
 #uec-splash.sp-page .sp-logo{width:92px;height:92px}
 #uec-splash.sp-page .sp-title{font-size:20px}
 #uec-splash.sp-page .sp-sub,#uec-splash.sp-page .sp-skip{display:none}
-#uec-splash.sp-page .sp-bar{width:120px;margin-top:0}
+#uec-splash.sp-page .sp-bar{display:none}
+#uec-splash .sp-spin{display:none}
+#uec-splash.sp-page .sp-spin{display:block;width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#e51c3f;border-right-color:#e51c3f;animation:spSpin .8s linear infinite}
+@keyframes spSpin{to{transform:rotate(360deg)}}
 @keyframes spIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
 @keyframes spUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes spPulse{from{opacity:.9;transform:scale(.92)}to{opacity:0;transform:scale(1.25)}}
@@ -62,6 +65,7 @@
       <p class="sp-title">UEC<span>21</span></p>
       <p class="sp-sub">MEMBERS</p>
       <div class="sp-bar"><i></i></div>
+      <span class="sp-spin" aria-hidden="true"></span>
       <span class="sp-skip">Touchez pour continuer</span>`;
     document.documentElement.appendChild(splash);
 
