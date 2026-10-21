@@ -525,6 +525,26 @@ function setupShell(ctx = null) {
             nav.appendChild(profileLink);
         }
 
+        // Staff who are also members reach their member area from the admin menu,
+        // and members who are also staff reach the administration from the member menu.
+        const memberIcon = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg>';
+        const adminIcon = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="8" height="8" rx="1.6"/><rect x="13" y="3" width="8" height="8" rx="1.6"/><rect x="3" y="13" width="8" height="8" rx="1.6"/><rect x="13" y="13" width="8" height="8" rx="1.6"/></svg>';
+        if (nav && adminSidebar && can(ctx, "useMemberArea") && !nav.querySelector('a[href="subscriber.html"]')) {
+            const link = document.createElement("a");
+            link.href = "subscriber.html";
+            link.className = "nav-switch";
+            link.innerHTML = `${memberIcon}<span>Mon espace membre</span>`;
+            nav.appendChild(link);
+        }
+        const staffHome = homePageFor({ ...ctx, roles: (ctx.roles || []).filter(role => String(role).toUpperCase() !== "MEMBER") });
+        if (nav && !adminSidebar && staffHome && !nav.querySelector(`a[href="${staffHome}"]`)) {
+            const link = document.createElement("a");
+            link.href = staffHome;
+            link.className = "nav-switch";
+            link.innerHTML = `${adminIcon}<span>Administration</span>`;
+            nav.appendChild(link);
+        }
+
         // Only show links to pages this user may open (guards still enforce it).
         nav?.querySelectorAll("a").forEach(link => {
             const href = link.getAttribute("href") || "";

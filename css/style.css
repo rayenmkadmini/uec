@@ -1329,3 +1329,5 @@ html[data-theme="light"] .hero-card::after{opacity:.30}
 /* Member area (Mon espace, Matchs): the supporters' tifo */
 body[data-page="subscriber"] .hero-card::after{background-image:url("../assets/uec-tifo.webp");background-position:right center;opacity:.42}
 @media(max-width:640px){body[data-page="subscriber"] .hero-card::after{opacity:.28}}
+
+.sidebar nav a.nav-switch{margin-top:10px;border-top:1px solid var(--side-line);border-radius:0 0 10px 10px;padding-top:12px}
