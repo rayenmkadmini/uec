@@ -218,6 +218,7 @@ async function render() {
         <button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(s.nom || "le membre")}" title="Supprimer" onclick="deleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
         ${canForceDelete ? `<button class="icon-btn force-delete-btn" aria-label="Suppression forcée de ${escapeHtml(s.nom || "le membre")} (paiements inclus)" title="Suppression forcée : membre + paiements des collectes" onclick="forceDeleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
       </td>
+      ${mobileMemberCell(s, photoUrls.get(s.id))}
     </tr>
   `).join("") || `<tr><td colspan="${columnCount()}" class="empty">Aucun résultat</td></tr>`;
 
@@ -226,6 +227,81 @@ async function render() {
   $("#prev").disabled = page <= 1;
   $("#next").disabled = page >= totalPages;
 }
+
+/* ------------------------------------------------------------
+   Phone layout: one compact card per member (CSS shows this cell
+   instead of the table cells below 640px) + an action sheet.
+------------------------------------------------------------ */
+function mobileMemberCell(s, photoUrl) {
+  const name = `${s.prenom || ""} ${s.nom || ""}`.trim() || "Sans nom";
+  const initial = escapeHtml((s.prenom || s.nom || "?").charAt(0).toUpperCase());
+  const meta = [s.numero_abonnement ? `N° ${s.numero_abonnement}` : "", facultyShort(s.faculties?.name) || ""].filter(Boolean).join(" · ");
+  const chips = [
+    canViewDetails && s.zones?.name ? `<span class="m-chip">${escapeHtml(s.zones.name)}</span>` : "",
+    canViewIdentity ? genderLabel(s.gender) : "",
+    canViewIdentity && s.cin ? `<span class="m-chip">CIN ${escapeHtml(s.cin)}</span>` : "",
+    cardLabel(s),
+    s.user_id ? "" : '<span class="status-badge warning">Non activé</span>'
+  ].filter(Boolean).join("");
+  return `<td class="m-summary">
+    <div class="m-head">
+      <span class="m-avatar">${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="">` : initial}</span>
+      <div class="m-id"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(meta || "—")}</small></div>
+      ${statusBadge(s.status)}
+    </div>
+    <div class="m-chips">${chips}</div>
+    <div class="m-actions">
+      <button type="button" class="btn secondary sm" onclick="showMemberCard('${s.id}')">▣ Carte</button>
+      ${canManageMembers ? `<button type="button" class="btn secondary sm" onclick="editSub('${s.id}')">${ICONS.edit} Modifier</button>` : ""}
+      ${memberActionList(s).length ? `<button type="button" class="btn secondary sm m-more" aria-label="Plus d’actions pour ${escapeHtml(name)}" onclick="openMemberActions('${s.id}')"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>` : ""}
+    </div>
+  </td>`;
+}
+
+// Secondary actions offered in the phone action sheet (same permissions as the table buttons).
+function memberActionList(s) {
+  const list = [];
+  if (canToggleCardOf(s)) list.push({ label: s.card_paid ? "Marquer la carte non payée" : "Marquer la carte payée", run: () => toggleCard(s.id) });
+  if (canManageMembers) {
+    list.push({ label: s.status === "ACTIVE" ? "Désactiver le membre" : "Réactiver le membre", run: () => toggleSub(s.id) });
+    if (s.user_id && canResetAccess) list.push({ label: "Nouvel accès (lien / mot de passe)", run: () => resetPassword(s.user_id) });
+    if (!s.user_id) list.push({ label: "Activer le compte de connexion", run: () => activateMember(s.id) });
+    list.push({ label: "Supprimer", danger: true, run: () => deleteSub(s.id) });
+  }
+  if (canForceDelete) list.push({ label: "Suppression forcée (paiements inclus)", danger: true, strong: true, run: () => forceDeleteSub(s.id) });
+  return list;
+}
+
+window.openMemberActions = id => {
+  const s = allSubs.find(x => x.id === id);
+  if (!s) return;
+  document.querySelector(".action-sheet")?.remove();
+  const sheet = document.createElement("div");
+  sheet.className = "action-sheet";
+  sheet.setAttribute("role", "dialog");
+  sheet.setAttribute("aria-modal", "true");
+  sheet.innerHTML = `<div class="action-sheet-panel">
+      <div class="action-sheet-title"><strong>${escapeHtml(`${s.prenom || ""} ${s.nom || ""}`.trim())}</strong><small>${escapeHtml(s.numero_abonnement ? `N° ${s.numero_abonnement}` : "Membre")}</small></div>
+      <div class="action-sheet-list"></div>
+      <button type="button" class="btn secondary action-sheet-cancel">Annuler</button>
+    </div>`;
+  const listEl = sheet.querySelector(".action-sheet-list");
+  for (const action of memberActionList(s)) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "action-sheet-item" + (action.danger ? " danger" : "") + (action.strong ? " strong" : "");
+    b.textContent = action.label;
+    b.addEventListener("click", () => { close(); action.run(); });
+    listEl.appendChild(b);
+  }
+  const close = () => { sheet.remove(); document.removeEventListener("keydown", onKey); };
+  const onKey = e => { if (e.key === "Escape") close(); };
+  sheet.addEventListener("click", e => { if (e.target === sheet) close(); });
+  sheet.querySelector(".action-sheet-cancel").addEventListener("click", close);
+  document.addEventListener("keydown", onKey);
+  document.body.appendChild(sheet);
+  sheet.querySelector(".action-sheet-item")?.focus();
+};
 
 async function openMemberCard(subscriber) {
   const user = subscriber || {};
