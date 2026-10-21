@@ -20,11 +20,12 @@
 </aside>
 <div class="main">
 <header class="topbar"><button class="menu-btn" id="menuBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div><span class="top-kicker">ADMINISTRATION</span><h1>Dashboard</h1></div><div class="top-user"><div class="avatar">A</div><span id="adminName">Admin</span></div></header>
-<main class="content">
+<main class="content dashboard-content">
   <div id="pageAlert"></div>
   <section class="hero-card">
-    <div><span class="mini-label">TABLEAU DE BORD</span><h2>Bonjour, <span id="adminGreetName">Admin</span></h2><p>Voici un aperçu de l’activité de la plateforme aujourd’hui.</p></div>
+    <div><span class="mini-label">TABLEAU DE BORD</span><h2><span id="greetWord">Bonjour</span>, <span id="adminGreetName">Admin</span></h2><p class="hero-date" id="heroDate"></p><p>Voici un aperçu de l’activité de la plateforme aujourd’hui.</p></div>
   </section>
+  <section class="quick-actions" id="quickActions" aria-label="Actions rapides"></section>
   <section class="stats-grid">
     <article class="stat-card"><span class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.6-5.6 5.5-5.6s5.5 2.3 5.5 5.6"/><circle cx="17" cy="8.5" r="2.4"/><path d="M15.8 14.7c2.5.3 4.3 2.3 4.3 5.3"/></svg></span><span>Total abonnés</span><strong id="total">—</strong><small>inscrits dans la plateforme</small></article>
     <article class="stat-card"><span class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span><span>Actifs</span><strong id="active">—</strong><small>abonnements actifs</small></article>
