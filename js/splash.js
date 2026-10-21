@@ -1,23 +1,25 @@
 /* ============================================================
    UEC21 MEMBERS — phone splash screen
    Shown on phones when the site is opened and on every refresh:
-   5 seconds (tap to skip); not between pages of the site. Loaded in <head> so it covers the
+   5 seconds; between pages of the site a short 2-second loader (tap to skip). Loaded in <head> so it covers the
    page before anything else is painted.
 ============================================================ */
 (function () {
+    let pageChange = false;
     try {
         if (!window.matchMedia("(max-width: 900px)").matches) return;
         // Shown when the site is opened and on every refresh (pull-to-refresh / reload),
         // but not when moving from one page of the site to another.
         const nav = performance.getEntriesByType && performance.getEntriesByType("navigation")[0];
         const reloaded = nav ? nav.type === "reload" : (performance.navigation && performance.navigation.type === 1);
-        if (sessionStorage.getItem("uec-splash-seen") && !reloaded) return;
+        // Moving between pages of the site: a short loader instead of the full splash.
+        pageChange = Boolean(sessionStorage.getItem("uec-splash-seen")) && !reloaded;
         sessionStorage.setItem("uec-splash-seen", "1");
     } catch (_) {
         return; // storage blocked: never risk showing it on every page
     }
 
-    const DURATION = 5000;
+    const DURATION = pageChange ? 2000 : 5000;
     const css = `
 #uec-splash{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;
   background:radial-gradient(520px 420px at 50% 38%,rgba(229,28,63,.32),transparent 70%),#07080a;color:#fff;
@@ -35,6 +37,11 @@
 #uec-splash .sp-bar{width:160px;height:4px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:8px;animation:spUp .7s .7s both}
 #uec-splash .sp-bar i{display:block;height:100%;width:100%;border-radius:inherit;background:linear-gradient(90deg,#e51c3f,#ff6b82);transform-origin:left;animation:spLoad ${DURATION}ms linear both}
 #uec-splash .sp-skip{position:absolute;bottom:calc(26px + env(safe-area-inset-bottom));font-size:11px;letter-spacing:.12em;color:#7d828d}
+#uec-splash.sp-page{gap:16px;background:#07080a}
+#uec-splash.sp-page .sp-logo{width:92px;height:92px}
+#uec-splash.sp-page .sp-title{font-size:20px}
+#uec-splash.sp-page .sp-sub,#uec-splash.sp-page .sp-skip{display:none}
+#uec-splash.sp-page .sp-bar{width:120px;margin-top:0}
 @keyframes spIn{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
 @keyframes spUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes spPulse{from{opacity:.9;transform:scale(.92)}to{opacity:0;transform:scale(1.25)}}
@@ -47,6 +54,7 @@
 
     const splash = document.createElement("div");
     splash.id = "uec-splash";
+    if (pageChange) splash.classList.add("sp-page");
     splash.setAttribute("role", "status");
     splash.setAttribute("aria-label", "UEC21 Members, chargement");
     splash.innerHTML = `
