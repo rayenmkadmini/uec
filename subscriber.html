@@ -27,11 +27,12 @@
       <section id="profil" class="panel">
         <div class="panel-head"><div><span class="mini-label">PROFIL</span><h2>Informations personnelles</h2></div><button id="editBtn" class="btn secondary">Modifier</button></div>
         <form id="profileForm" class="grid-form">
-          <label>Nom<input id="nom" autocomplete="family-name" disabled></label><label>Prénom<input id="prenom" autocomplete="given-name" disabled></label>
-          <label>N° abonnement <span class="field-optional">Optionnel</span><input id="numero" disabled></label><label>Téléphone<input id="phone" autocomplete="tel"></label>
-          <label>Email<input id="email" type="email"></label><label>Faculté<input id="faculte" disabled></label>
-          <label>Adresse<input id="adresse"></label><label>Photo<input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp"><small class="hint">JPG, PNG ou WebP — 5 Mo max.</small></label><label>Zone<input id="zone" disabled></label>
-          <label>CIN<input id="cin" disabled></label><label>Sexe<input id="gender" disabled></label>
+          <label>Nom<input id="nom" autocomplete="family-name" maxlength="100" disabled></label><label>Prénom<input id="prenom" autocomplete="given-name" maxlength="100" disabled></label>
+          <label>N° abonnement <span class="field-optional">Géré par le bureau</span><input id="numero" disabled></label><label>Téléphone<input id="phone" autocomplete="tel" maxlength="40" disabled></label>
+          <label>Email<input id="email" type="email" maxlength="254" disabled></label><label>Faculté<select id="faculte" disabled><option value="">—</option></select></label>
+          <label>Adresse<input id="adresse" maxlength="300" disabled></label><label>Photo<input id="photoFile" type="file" accept="image/jpeg,image/png,image/webp"><small class="hint">JPG, PNG ou WebP — 5 Mo max.</small></label><label>Zone<select id="zone" disabled><option value="">—</option></select></label>
+          <label>CIN<input id="cin" maxlength="32" disabled></label><label>Sexe<select id="gender" disabled><option value="">Non renseigné</option><option value="MALE">Homme</option><option value="FEMALE">Femme</option></select></label>
+          <label>Date de naissance<input id="dateNaissance" type="date" disabled></label>
           <div id="saveRow" class="form-actions hidden"><button type="button" id="cancelBtn" class="btn secondary">Annuler</button><button class="btn primary" type="submit">Enregistrer</button></div>
         </form>
       </section>

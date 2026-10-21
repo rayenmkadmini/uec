@@ -182,10 +182,9 @@ async function withOwnPrivateFields(subscriber) {
   $("#avatar").textContent = (s.prenom || s.nom || "U").charAt(0).toUpperCase();
   $("#statusBadge").outerHTML = `<span id="statusBadge" class="badge ${s.status === "ACTIVE" ? "active" : "inactive"}">${s.status === "ACTIVE" ? "Abonnement actif" : "Abonnement désactivé"}</span>`;
   $("#nom").value=s.nom||""; $("#prenom").value=s.prenom||""; $("#numero").value=s.numero_abonnement||"";
-  $("#phone").value=s.phone||""; $("#email").value=s.email||""; $("#faculte").value=facultyShort(s.faculties?.name)||"";
-  $("#adresse").value=s.adresse||""; $("#zone").value=s.zones?.name||""; $("#cin").value=s.cin||"";
-  if ($("#gender")) $("#gender").value = s.gender === "FEMALE" ? "Femme" : s.gender === "MALE" ? "Homme" : "Non renseigné";
-  $("#editBtn").onclick=()=>{ ["phone","email","adresse"].forEach(id=>$( "#"+id).disabled=false); $("#saveRow").classList.remove("hidden"); $("#editBtn").classList.add("hidden"); };
+  await loadProfileChoices(s);
+  fillProfileForm(s);
+  $("#editBtn").onclick=()=>{ setProfileEditable(true); $("#saveRow").classList.remove("hidden"); $("#editBtn").classList.add("hidden"); $("#nom").focus(); };
   $("#cancelBtn").onclick=()=>location.reload();
     await renderMemberCard(s);
   const cardPanel = document.querySelector("#subscriberMemberCard")?.closest(".panel");
@@ -227,9 +226,12 @@ async function saveMemberProfile() {
   }
   const email = $("#email").value.trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showAlert("#pageAlert","Adresse email invalide.","error");
-  // Only these fields are editable by a member; the database enforces the same whitelist.
+  const nom = $("#nom").value.trim(), prenom = $("#prenom").value.trim(), cin = $("#cin").value.trim();
+  if (!nom || !prenom) return showAlert("#pageAlert","Le nom et le prénom sont obligatoires.","error");
+  if (cin && !/^[A-Za-z0-9-]+$/.test(cin)) return showAlert("#pageAlert","CIN invalide (lettres, chiffres ou tiret).","error");
+  // Everything except the subscription number (and administrative fields); the database enforces the same whitelist.
   const result = await sb.from("subscribers")
-    .update({ phone: $("#phone").value.trim() || null, email: email || null, adresse: $("#adresse").value.trim() || null, photo_url: photoUrl })
+    .update({ nom: nom, prenom: prenom, cin: cin || null, gender: $("#gender").value || null, date_naissance: $("#dateNaissance").value || null, phone: $("#phone").value.trim() || null, email: email || null, adresse: $("#adresse").value.trim() || null, photo_url: photoUrl, faculty_id: $("#faculte").value || null, zone_id: $("#zone").value || null })
     .eq("user_id", original.user_id)
     .select(OWN_MEMBER_COLUMNS);
   const failure = writeError(result);
@@ -241,7 +243,9 @@ async function saveMemberProfile() {
     gender: original.gender, photo_url: photoUrl
   };
   if ($("#photoFile")) $("#photoFile").value = "";
-  ["phone","email","adresse"].forEach(id => $("#" + id).disabled = true);
+  setProfileEditable(false);
+  fillProfileForm(original);
+  $("#welcomeName").textContent = `Bienvenue ${original.prenom || ""} ${original.nom || ""}`.trim();
   await renderMemberCard(original);
   showAlert("#pageAlert","Informations et photo mises à jour."); $("#saveRow").classList.add("hidden"); $("#editBtn").classList.remove("hidden");
 }
@@ -257,3 +261,35 @@ $("#passwordForm").addEventListener("submit", async e=>{
   showAlert("#passwordAlert","Mot de passe changé avec succès.");
   setTimeout(()=>location.href="subscriber.html",800);
 });
+
+
+// ---------- Member profile form ----------
+// Editable by the member: everything except the subscription number.
+const EDITABLE_PROFILE_FIELDS = ["nom", "prenom", "cin", "gender", "dateNaissance", "phone", "email", "adresse", "faculte", "zone"];
+
+function setProfileEditable(on) {
+  EDITABLE_PROFILE_FIELDS.forEach(id => { const el = $("#" + id); if (el) el.disabled = !on; });
+  $("#numero").disabled = true;
+}
+
+function fillProfileForm(s) {
+  $("#nom").value = s.nom || ""; $("#prenom").value = s.prenom || ""; $("#numero").value = s.numero_abonnement || "";
+  $("#phone").value = s.phone || ""; $("#email").value = s.email || ""; $("#adresse").value = s.adresse || "";
+  $("#cin").value = s.cin || ""; $("#gender").value = s.gender || "";
+  $("#dateNaissance").value = (s.date_naissance || "").slice(0, 10);
+  $("#faculte").value = s.faculty_id || ""; $("#zone").value = s.zone_id || "";
+}
+
+async function loadProfileChoices(s) {
+  const [fac, zon] = await Promise.all([
+    sb.from("faculties").select("id,name").order("name"),
+    sb.from("zones").select("id,name").order("name")
+  ]);
+  const fill = (select, rows, currentId, currentName) => {
+    const list = rows || [];
+    if (currentId && !list.some(r => r.id === currentId)) list.push({ id: currentId, name: currentName || "Actuelle" });
+    select.innerHTML = '<option value="">—</option>' + list.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`).join("");
+  };
+  fill($("#faculte"), fac.data, s.faculty_id, s.faculties?.name);
+  fill($("#zone"), zon.data, s.zone_id, s.zones?.name);
+}

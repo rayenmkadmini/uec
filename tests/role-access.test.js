@@ -288,7 +288,9 @@ test("member profile updates only whitelisted fields", () => {
   const source = read("js/subscriber.js");
   const update = source.match(/\.update\(\{([^}]*)\}\)/)[1];
   const keys = [...update.matchAll(/(\w+):/g)].map(match => match[1]).sort();
-  assert.deepEqual(keys, ["adresse", "email", "phone", "photo_url"]);
+  // Everything except the subscription number (20261022120000).
+  assert.deepEqual(keys, ["adresse", "cin", "date_naissance", "email", "faculty_id", "gender", "nom", "phone", "photo_url", "prenom", "zone_id"]);
+  assert.doesNotMatch(update, /numero_abonnement|login_name|status|card_paid|user_id/);
 });
 
 test("browser config never contains a service-role or secret key", () => {
