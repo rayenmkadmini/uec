@@ -375,3 +375,17 @@ test("import refuses the same nom + prenom twice in one file", async () => {
   assert.equal(result.body.code, "conflicts");
   assert.equal(fake.tables.subscribers.length, 0);
 });
+
+test("activation never leaves a second record when a trigger auto-created one for the new account", async () => {
+  const { activateMember } = await lifecycle;
+  const fake = createFake({ tables: { subscribers: [{ id: "a", user_id: null, nom: "TEST", prenom: "X", login_name: "SYNTHX", gender: "M", status: "ACTIVE" }], profiles: [], user_roles: [] } });
+  const createUser = fake.auth.createUser.bind(fake.auth);
+  fake.auth.createUser = async (...args) => {
+    const res = await createUser(...args);
+    fake.tables.subscribers.push({ id: "auto", user_id: res.data.user.id, nom: "X", prenom: "X", login_name: "SYNTHX1", status: "ACTIVE" });
+    return res;
+  };
+  const ok = await activateMember(fake, { subscriberId: "a", method: "initial_password", initialPassword: "x".repeat(9) });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(fake.tables.subscribers.map(s => s.id), ["a"]);
+});

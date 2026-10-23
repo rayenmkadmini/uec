@@ -30,6 +30,7 @@ function createFake({ tables = {}, failures = {} } = {}) {
       upsert(value) { op = "upsert"; payload = value; return builder; },
       delete() { op = "delete"; return builder; },
       eq(column, value) { filters.push(row => row[column] === value); return builder; },
+      neq(column, value) { filters.push(row => row[column] !== value); return builder; },
       is(column, value) { filters.push(row => (row[column] ?? null) === value); return builder; },
       in(column, values) { filters.push(row => values.includes(row[column])); return builder; },
       limit(n) { limit = n; return builder; },

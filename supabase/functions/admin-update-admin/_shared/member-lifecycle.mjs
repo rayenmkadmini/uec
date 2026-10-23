@@ -217,10 +217,16 @@ export async function activateMember({ db, auth }, { subscriberId, method = "lin
   }
   const userId = created.data.user.id;
 
+  // A database trigger may already have created a blank member record for this
+  // brand-new account (MEMBER role granted on sign-up). Drop it: the account
+  // belongs to the existing record, otherwise the member appears twice.
+  const dropAutoRecords = () => db.from("subscribers").delete().eq("user_id", userId).neq("id", member.id);
   const undo = async (unlink) => {
     if (unlink) await db.from("subscribers").update({ user_id: null }).eq("id", member.id).eq("user_id", userId);
+    await dropAutoRecords();
     await auth.deleteUser(userId);
   };
+  await dropAutoRecords();
 
   // Link only if still unlinked (two concurrent activations cannot both win).
   const linked = await db.from("subscribers").update({ user_id: userId }).eq("id", member.id).is("user_id", null).select("id");
