@@ -211,6 +211,11 @@ function facultyShort(name) {
         : name.slice(0, index);
 }
 
+const BUILT_IN_CLUB_LOGOS = {
+    "club africain": "assets/ca-crest.webp",
+    "ca": "assets/ca-crest.webp"
+};
+
 function getTeamLogo(teamName, fallbackLabel, customUrl) {
     if (customUrl && String(customUrl).trim()) {
         try {
@@ -222,6 +227,10 @@ function getTeamLogo(teamName, fallbackLabel, customUrl) {
             // Invalid or unsafe stored URLs fall back to the generated logo.
         }
     }
+
+    // Built-in crest when no logo was uploaded for the club.
+    const builtIn = BUILT_IN_CLUB_LOGOS[clubKey(teamName)];
+    if (builtIn) return builtIn;
 
     const team = (teamName || fallbackLabel || "TEAM").trim();
 
