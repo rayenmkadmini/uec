@@ -103,8 +103,8 @@ async function saveProfile(event) {
             .from("profiles")
             .update({
                 display_name: displayName,
-                nom: $("#pNom").value.trim() || null,
-                prenom: $("#pPrenom").value.trim() || null,
+                nom: $("#pNom").value.trim().toUpperCase() || null,
+                prenom: $("#pPrenom").value.trim().toUpperCase() || null,
                 phone: $("#pPhone").value.trim() || null,
                 avatar_url: avatarUrl
             })

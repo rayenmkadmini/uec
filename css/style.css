@@ -1650,3 +1650,6 @@ input[type="checkbox"],input[type="radio"]{width:20px!important;height:20px!impo
 .vcard-info dt{font-size:clamp(7.5px,2vw,8.5px)}
 .vcard-info dd{font-size:clamp(10px,2.7vw,11.5px)}
 .vcard-motto{margin:0 12px 7px;padding-top:4px;font-size:clamp(7.5px,2.1vw,9.5px)}
+
+/* member names are always in capitals */
+#nom,#prenom,#fNom,#fPrenom,#pNom,#pPrenom{text-transform:uppercase}

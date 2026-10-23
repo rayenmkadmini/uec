@@ -194,7 +194,7 @@ async function saveMemberProfile() {
   }
   const email = $("#email").value.trim();
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return showAlert("#pageAlert","Adresse email invalide.","error");
-  const nom = $("#nom").value.trim(), prenom = $("#prenom").value.trim(), cin = $("#cin").value.trim();
+  const nom = $("#nom").value.trim().toUpperCase(), prenom = $("#prenom").value.trim().toUpperCase(), cin = $("#cin").value.trim();
   if (!nom || !prenom) return showAlert("#pageAlert","Le nom et le prénom sont obligatoires.","error");
   if (cin && !/^[A-Za-z0-9-]+$/.test(cin)) return showAlert("#pageAlert","CIN invalide (lettres, chiffres ou tiret).","error");
   // Everything except the subscription number (and administrative fields); the database enforces the same whitelist.

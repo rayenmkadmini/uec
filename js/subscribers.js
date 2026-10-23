@@ -803,8 +803,8 @@ async function saveSubscriber() {
   }
 
   const payload = {
-    nom: $("#fNom").value.trim(),
-    prenom: $("#fPrenom").value.trim(),
+    nom: $("#fNom").value.trim().toUpperCase(),
+    prenom: $("#fPrenom").value.trim().toUpperCase(),
     numero_abonnement: $("#fNumero").value.trim() || null,
     gender,
     phone: $("#fPhone").value.trim(),
