@@ -30,39 +30,7 @@ async function renderMemberCard(subscriber) {
   const photoUrl = await getSubscriberPhotoUrl(subscriber.photo_url);
   const photo = photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Photo du membre" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : "";
 
-  card.innerHTML = `
-    <div class="member-card premium-card">
-      <div class="member-card-topbar">
-        <div class="member-brand">
-          <img src="assets/uec-logo-192.webp" alt="UE Clubiste">
-          <div>
-            <span>UE CLUBISTE</span>
-            <strong>Carte membre</strong>
-          </div>
-        </div>
-        <span class="member-card-status ${subscriber.status === "ACTIVE" ? "active" : "inactive"}">${subscriber.status === "ACTIVE" ? "Actif" : "Désactivé"}</span>
-      </div>
-      <div class="member-card-main">
-        <div class="member-photo-wrap">
-          ${photo}
-          <span class="member-photo-fallback" ${photoUrl ? 'style="display:none;"' : ''}>${escapeHtml(initials)}</span>
-        </div>
-        <div class="member-card-meta">
-          <div class="member-card-name">${escapeHtml(fullName)}</div>
-          <div class="member-card-row"><span>N° abonnement</span><strong>${escapeHtml(subscriber.numero_abonnement || "—")}</strong></div>
-          <div class="member-card-row"><span>CIN</span><strong>${escapeHtml(subscriber.cin || "—")}</strong></div>
-          <div class="member-card-row"><span>Faculté</span><strong>${escapeHtml(subscriber.faculties?.name || "—")}</strong></div>
-          <div class="member-card-row"><span>Zone</span><strong>${escapeHtml(subscriber.zones?.name || "—")}</strong></div>
-        </div>
-      </div>
-      <div class="member-card-grid">
-        <div><span>Téléphone</span><strong>${escapeHtml(subscriber.phone || "—")}</strong></div>
-        <div><span>Email</span><strong>${escapeHtml(subscriber.email || "—")}</strong></div>
-        <div><span>Adresse</span><strong>${escapeHtml(subscriber.adresse || "—")}</strong></div>
-        <div><span>Sexe</span><strong>${subscriber.gender === "FEMALE" ? "Femme" : subscriber.gender === "MALE" ? "Homme" : "Non renseigné"}</strong></div>
-      </div>
-    </div>
-  `;
+  card.innerHTML = renderVirtualMemberCard(subscriber, { photoUrl });
 }
 
 async function loadUpcomingMatches() {

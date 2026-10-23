@@ -280,8 +280,8 @@ window.openMemberActions = id => {
 async function openMemberCard(subscriber) {
   const user = subscriber || {};
   const photoUrl = canViewIdentity ? await getSubscriberPhotoUrl(user.photo_url) : "";
-  const card = `
-    <div class="member-card-wrap">
+  const card = renderVirtualMemberCard(user, { photoUrl }) + `
+    <div class="member-card-wrap vcard-staff-details">
       <div class="member-card-header">
         <div class="member-card-avatar">
           ${photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Photo membre" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : ""}

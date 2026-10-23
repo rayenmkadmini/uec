@@ -1574,3 +1574,79 @@ input[type="checkbox"],input[type="radio"]{width:20px!important;height:20px!impo
   .modal-box{overflow-x:hidden;box-sizing:border-box}
   .modal-box form,.modal-box .form-stack,.modal-box .grid-form{width:100%;max-width:100%}
 }
+
+/* ============================================================
+   VIRTUAL MEMBER CARD (official UEC design)
+   ============================================================ */
+.vcard{width:min(100%,460px);aspect-ratio:1.6/1;margin:0 auto;perspective:1400px;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent}
+.vcard:focus-visible .vcard-inner{box-shadow:0 0 0 4px var(--red-ring),0 24px 50px -18px rgba(200,16,46,.6)}
+.vcard-inner{position:relative;width:100%;height:100%;border-radius:20px;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.2,.8,.2,1);
+  box-shadow:0 24px 50px -18px rgba(200,16,46,.6),0 6px 16px rgba(0,0,0,.25)}
+.vcard.flipped .vcard-inner{transform:rotateY(180deg)}
+.vcard-face{position:absolute;inset:0;border-radius:20px;overflow:hidden;backface-visibility:hidden;-webkit-backface-visibility:hidden;color:#fff}
+.vcard-face::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;
+  background:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.18) 48%,transparent 60%);background-size:250% 100%;animation:vcardShine 5s ease-in-out infinite}
+@keyframes vcardShine{0%,60%{background-position:120% 0}100%{background-position:-60% 0}}
+
+/* Recto: the official card + the holder */
+.vcard-front{background:#d10f24 url("../assets/card-front.webp") center/cover no-repeat}
+.vcard-front-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;
+  padding:14px 16px;background:linear-gradient(0deg,rgba(90,0,10,.75),transparent)}
+.vcard-holder{display:flex;flex-direction:column;min-width:0}
+.vcard-holder small{font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;opacity:.85}
+.vcard-holder strong{font-size:17px;font-weight:800;letter-spacing:.02em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcard-holder span{font-size:12px;font-weight:600;opacity:.9;font-variant-numeric:tabular-nums}
+.vcard-pill{flex:none;display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em}
+.vcard-pill.ok{background:#fff;color:#0f7a3a}
+.vcard-pill.ko{background:rgba(0,0,0,.35);color:#fff;border:1px solid rgba(255,255,255,.4)}
+
+/* Verso: tribune photo + member details on a halftone red */
+.vcard-back{transform:rotateY(180deg);display:flex;flex-direction:column;
+  background:radial-gradient(circle at 1px 1px,rgba(0,0,0,.18) 1px,transparent 1.4px) 0 0/6px 6px,linear-gradient(160deg,#e3172f,#b20a1e 70%,#8f0716)}
+.vcard-tribune{flex:none;height:30%;margin:10px 10px 0;border-radius:12px;border:2px solid #fff;background:#111 url("../assets/card-tribune.webp") center/cover no-repeat}
+.vcard-body{flex:1;display:flex;align-items:center;gap:12px;padding:10px 14px 4px;min-height:0}
+.vcard-photo{flex:none;position:relative;width:24%;aspect-ratio:1;border-radius:14px;overflow:hidden;border:2px solid #fff;background:rgba(0,0,0,.25);display:grid;place-items:center}
+.vcard-photo span{font-size:26px;font-weight:900}
+.vcard-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vcard-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.vcard-info strong{font-size:15px;font-weight:900;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcard-badges{display:flex;gap:5px;flex-wrap:wrap}
+.vcard-badges .vcard-pill{font-size:9.5px;padding:2px 7px}
+.vcard-info dl{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:3px 10px}
+.vcard-info dl div{min-width:0}
+.vcard-info dt{font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;opacity:.8}
+.vcard-info dd{margin:0;font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcard-motto{flex:none;margin:0 14px 10px;padding-top:6px;border-top:1px solid rgba(255,255,255,.6);font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;text-align:center}
+.vcard-hint{margin:10px 0 0;text-align:center;font-size:12px;color:var(--muted)}
+.vcard-staff-details{margin-top:18px}
+#subscriberMemberCard{flex-direction:column;align-items:center}
+
+@media(prefers-reduced-motion:reduce){.vcard-inner{transition:none}.vcard-face::after{animation:none}}
+@media(max-width:380px){.vcard-holder strong{font-size:15px}.vcard-info dd{font-size:10.5px}}
+
+/* Print: both faces, one under the other, no 3D */
+@media print{
+  .vcard{perspective:none;width:85.6mm;height:auto;aspect-ratio:auto}
+  .vcard-inner{transform:none!important;box-shadow:none;height:auto;display:flex;flex-direction:column;gap:6mm}
+  .vcard-face{position:relative;transform:none!important;backface-visibility:visible;aspect-ratio:1.6/1;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .vcard-face::after,.vcard-hint{display:none}
+}
+
+/* virtual card: compact layout (phones) */
+.vcard-front-bottom{padding:8px 12px;background:linear-gradient(0deg,rgba(70,0,8,.85),rgba(70,0,8,.55) 70%,transparent);align-items:center}
+.vcard-holder{flex-direction:row;align-items:baseline;gap:8px}
+.vcard-holder strong{font-size:clamp(12px,3.6vw,16px)}
+.vcard-holder span{font-size:clamp(10px,2.8vw,12px);white-space:nowrap}
+.vcard-pill{font-size:clamp(9.5px,2.6vw,11px);padding:3px 9px}
+.vcard-tribune{height:32%;margin:8px 8px 0;border-radius:10px}
+.vcard-body{padding:8px 12px;gap:10px}
+.vcard-photo{width:22%;border-radius:12px}
+.vcard-info{gap:3px}
+.vcard-info strong{font-size:clamp(12px,3.4vw,15px)}
+.vcard-state{display:flex;align-items:center;gap:6px;font-size:clamp(9.5px,2.6vw,11px);font-weight:700}
+.vcard-state i{width:7px;height:7px;border-radius:50%;background:#9ef0bf;box-shadow:0 0 0 2px rgba(255,255,255,.35)}
+.vcard-state i.ko{background:#ffd0d6}
+.vcard-info dl{grid-template-columns:auto 1fr 1fr;gap:2px 10px;margin-top:2px}
+.vcard-info dt{font-size:clamp(7.5px,2vw,8.5px)}
+.vcard-info dd{font-size:clamp(10px,2.7vw,11.5px)}
+.vcard-motto{margin:0 12px 7px;padding-top:4px;font-size:clamp(7.5px,2.1vw,9.5px)}

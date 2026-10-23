@@ -980,3 +980,63 @@ function openActionSheet(title, subtitle, actions) {
     sheet.querySelector(".action-sheet-item")?.focus();
 }
 window.openActionSheet = openActionSheet;
+
+
+/* ============================================================
+   VIRTUAL MEMBER CARD — official design, recto / verso, tap to flip
+   s: subscriber row; opts.photoUrl: signed photo URL (optional)
+============================================================ */
+function memberCardSeason(date = new Date()) {
+    const y = date.getFullYear();
+    const start = date.getMonth() >= 6 ? y : y - 1; // season starts in July
+    return `${start}-${start + 1}`;
+}
+
+function renderVirtualMemberCard(s, opts = {}) {
+    const name = `${s.prenom || ""} ${s.nom || ""}`.trim() || "Membre";
+    const initial = escapeHtml((s.prenom || s.nom || "U").charAt(0).toUpperCase());
+    const paid = Boolean(s.card_paid);
+    const active = s.status === "ACTIVE";
+    const photo = opts.photoUrl
+        ? `<img src="${escapeHtml(opts.photoUrl)}" alt="" onerror="this.remove()">`
+        : "";
+    const rows = [
+        ["N° abonnement", s.numero_abonnement || "—"],
+        ["Faculté", facultyShort(s.faculties?.name || s.faculty_name) || "—"],
+        ["Zone", s.zones?.name || "—"]
+    ];
+    return `
+    <div class="vcard" tabindex="0" role="button" aria-label="Carte membre de ${escapeHtml(name)} — touchez pour retourner">
+      <div class="vcard-inner">
+        <div class="vcard-face vcard-front">
+          <div class="vcard-front-bottom">
+            <div class="vcard-holder"><strong>${escapeHtml(name)}</strong><span>N° ${escapeHtml(s.numero_abonnement || "—")}</span></div>
+            <span class="vcard-pill ${paid ? "ok" : "ko"}">${paid ? "✓ Payée" : "Non payée"}</span>
+          </div>
+        </div>
+        <div class="vcard-face vcard-back">
+          <div class="vcard-tribune"></div>
+          <div class="vcard-body">
+            <div class="vcard-photo">${photo}<span>${initial}</span></div>
+            <div class="vcard-info">
+              <strong>${escapeHtml(name)}</strong>
+              <span class="vcard-state"><i class="${active ? "ok" : "ko"}"></i>${active ? "Actif" : "Désactivé"} · ${paid ? "Carte payée" : "Carte non payée"}</span>
+              <dl>${rows.map(([k, v]) => `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join("")}</dl>
+            </div>
+          </div>
+          <p class="vcard-motto">Ensemble, portons haut nos couleurs</p>
+        </div>
+      </div>
+    </div>
+    <p class="vcard-hint">Touchez la carte pour la retourner</p>`;
+}
+
+// One delegated handler for every card on the page (click, Enter, Space).
+document.addEventListener("click", event => {
+    const card = event.target.closest(".vcard");
+    if (card) card.classList.toggle("flipped");
+});
+document.addEventListener("keydown", event => {
+    const card = event.target.closest?.(".vcard");
+    if (card && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); card.classList.toggle("flipped"); }
+});
