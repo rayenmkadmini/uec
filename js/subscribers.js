@@ -509,8 +509,11 @@ async function bulkActivate() {
   const pending = allSubs.filter(s => !s.user_id && s.status === "ACTIVE");
   if (!pending.length) return showAlert("#pageAlert", "Tous les membres actifs ont déjà un compte.", "success");
   const password = await promptDialog(`Activer ${pending.length} compte(s)`, {
-    input: "password",
-    text: "Mot de passe initial commun. Chaque membre devra le changer à sa première connexion.",
+    // Visible text field, never autofilled by the browser (it used to slip the
+    // staff's own saved password in here).
+    input: "text",
+    inputAttributes: { autocomplete: "off", autocapitalize: "off", spellcheck: "false", name: "uec-initial-password" },
+    text: "Tapez le mot de passe initial commun (visible). Chaque membre devra le changer à sa première connexion.",
     placeholder: "8 caractères minimum",
     confirmText: "Activer",
     validator: value => (String(value || "").length >= 8 ? undefined : "8 caractères minimum.")

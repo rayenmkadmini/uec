@@ -153,7 +153,8 @@ async function promptDialog(message, opts = {}) {
         confirmButtonText: opts.confirmText || "Valider",
         cancelButtonText: "Annuler",
         reverseButtons: true,
-        inputValidator: opts.validator
+        inputValidator: opts.validator,
+        inputAttributes: opts.inputAttributes || undefined
     });
 
     return result.isConfirmed ? result.value : null;
