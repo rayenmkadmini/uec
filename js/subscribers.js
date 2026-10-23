@@ -524,7 +524,18 @@ async function bulkActivate() {
     else failed.push(`${s.prenom || ""} ${s.nom || ""}`.trim() + ` : ${call.result.error || "erreur"}`);
   }
   await loadSubs();
-  showAlert("#pageAlert", `${done} compte(s) activé(s).` + (failed.length ? ` Échecs : ${failed.join(" ; ")}` : ""), failed.length ? "error" : "success");
+  const summary = `${done} compte(s) activé(s) sur ${pending.length}.`;
+  showAlert("#pageAlert", summary + (failed.length ? ` Échecs : ${failed.join(" ; ")}` : ""), failed.length ? "error" : "success");
+  if (window.Swal) {
+    await Swal.fire({
+      ...swalBase(),
+      icon: failed.length ? (done ? "warning" : "error") : "success",
+      title: failed.length ? "Activation terminée avec des erreurs" : "Comptes activés",
+      html: `<p>${escapeHtml(summary)}</p><p>Chaque membre devra changer son mot de passe à sa première connexion.</p>`
+        + (failed.length ? `<ul style="text-align:left;max-height:180px;overflow:auto">${failed.map(f => `<li>${escapeHtml(f)}</li>`).join("")}</ul>` : ""),
+      confirmButtonText: "OK"
+    });
+  }
 }
 
 window.resetPassword = async userId => {
