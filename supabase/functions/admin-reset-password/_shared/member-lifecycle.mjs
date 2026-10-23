@@ -41,7 +41,7 @@ const fail = (status, code, message, extra = {}) => ({ status, body: { ok: false
 async function selectIn(db, column, values) {
   const out = [];
   for (let i = 0; i < values.length; i += 100) {
-    const { data, error } = await db.from("subscribers").select("id,user_id,login_name,cin,numero_abonnement").in(column, values.slice(i, i + 100));
+    const { data, error } = await db.from("subscribers").select("id,user_id,login_name,cin,numero_abonnement,nom,prenom").in(column, values.slice(i, i + 100));
     if (error) throw new Error("Vérification des membres existants impossible.");
     out.push(...(data || []));
   }
@@ -76,6 +76,14 @@ export async function importMembers(db, rows) {
   const byCin = groupBy(await selectIn(db, "cin", unique(prepared.map(r => r.cin))), "cin");
   const byNumber = groupBy(await selectIn(db, "numero_abonnement", unique(prepared.map(r => r.numero_abonnement))), "numero_abonnement");
   const byLogin = groupBy(await selectIn(db, "login_name", unique(prepared.map(r => r.login || null))), "login_name");
+  // Same person already recorded (names are stored in capitals): a re-import must not duplicate it.
+  const nameKey = (nom, prenom) => `${String(nom || "").trim().toUpperCase()}|${String(prenom || "").trim().toUpperCase()}`;
+  const byName = new Map();
+  for (const m of await selectIn(db, "nom", unique(prepared.map(r => String(r.nom || "").trim().toUpperCase() || null)))) {
+    const key = nameKey(m.nom, m.prenom);
+    byName.set(key, [...(byName.get(key) || []), m]);
+  }
+  const seenNames = new Map();
 
   const conflicts = [];
   const conflict = (line, field, code, message) => conflicts.push({ line, field, code, message: `Ligne ${line} — ${message}` });
@@ -88,7 +96,16 @@ export async function importMembers(db, rows) {
     const b = numberMatches[0] || null;
     if (a && b && a.id !== b.id) conflict(row.line, "numero_abonnement", "conflict", "le CIN et le N° d’abonnement correspondent à deux membres différents.");
     if (!a && b && b.cin && b.cin !== row.cin) conflict(row.line, "numero_abonnement", "conflict", "ce N° d’abonnement appartient à un membre dont le CIN est différent.");
-    const existing = a || b;
+    let existing = a || b;
+    const key = nameKey(row.nom, row.prenom);
+    if (seenNames.has(key)) conflict(row.line, "nom", "duplicate_in_file", `même nom et prénom que la ligne ${seenNames.get(key)}.`);
+    else seenNames.set(key, row.line);
+    if (!existing) {
+      const named = byName.get(key) || [];
+      if (named.length > 1) conflict(row.line, "nom", "duplicate_in_database", "plusieurs membres ont déjà ce nom et prénom. Vérification manuelle nécessaire.");
+      else if (named.length === 1 && named[0].cin && named[0].cin !== row.cin) conflict(row.line, "nom", "conflict", "un membre avec ce nom et prénom existe déjà avec un autre CIN.");
+      else if (named.length === 1) existing = named[0];
+    }
     if (!existing && row.login && byLogin.has(row.login)) conflict(row.line, "login", "taken", "ce login est déjà utilisé par un autre membre.");
     return { row, existing };
   });

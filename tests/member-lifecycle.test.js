@@ -356,3 +356,22 @@ test("activation with a staff-chosen initial password: length checked, password 
   assert.equal(ok.status, 200);
   assert.equal(ok.body.temporary_password, undefined);
 });
+
+test("re-import: a member with the same nom + prenom is updated, never duplicated", async () => {
+  const { importMembers } = await lifecycle;
+  const fake = createFake({ tables: { ...REFS, subscribers: [
+    { id: "s1", user_id: null, nom: "TEST", prenom: "SYNTHETIC_MEMBER_001", login_name: "SYNTH1", cin: null, status: "ACTIVE" }
+  ] } });
+  const { body } = await importMembers(fake.db, [row(1)]);
+  assert.equal(body.created, 0);
+  assert.equal(body.updated, 1);
+  assert.equal(fake.tables.subscribers.length, 1);
+});
+
+test("import refuses the same nom + prenom twice in one file", async () => {
+  const { importMembers } = await lifecycle;
+  const fake = createFake({ tables: { ...REFS, subscribers: [] } });
+  const result = await importMembers(fake.db, [row(1), row(2, { prenom: "SYNTHETIC_MEMBER_001" })]);
+  assert.equal(result.body.code, "conflicts");
+  assert.equal(fake.tables.subscribers.length, 0);
+});
