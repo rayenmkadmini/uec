@@ -543,8 +543,18 @@ async function bulkActivate() {
 
 window.resetPassword = async userId => {
   if (!canResetAccess || !userId) return;
-  if (!(await confirmDialog("Générer un nouvel accès pour ce membre ? Il devra choisir un nouveau mot de passe.", { confirmText: "Générer", icon: "question" }))) return;
-  await issueAccess("admin-reset-password", { user_id: userId }, "Nouvel accès généré");
+  const password = await promptDialog("Nouveau mot de passe du membre", {
+    input: "text",
+    inputAttributes: { autocomplete: "off", autocapitalize: "off", spellcheck: "false", name: "uec-reset-password" },
+    text: "Tapez le mot de passe (visible). Le membre devra le changer à sa prochaine connexion.",
+    placeholder: "8 caractères minimum",
+    confirmText: "Enregistrer",
+    validator: value => (String(value || "").length >= 8 ? undefined : "8 caractères minimum.")
+  });
+  if (!password) return;
+  const call = await callAdminFunction("admin-reset-password", { user_id: userId, new_password: password });
+  if (!call.ok) return showAlert("#pageAlert", call.result.error || "Opération impossible.", "error");
+  showAlert("#pageAlert", "Mot de passe enregistré. Le membre devra le changer à sa prochaine connexion.", "success");
 };
 
 // SUPERADMIN only (the server checks it too): deletes the member and ALL their

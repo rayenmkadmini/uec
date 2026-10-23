@@ -1,4 +1,4 @@
-import { requireSuperAdmin, json, options, audit, rateLimit, validateStrongPassword, corsHeaders, errorResponse, failureCode, readJson, revokeSessions } from "./_shared/security.ts";
+import { requireSuperAdmin, json, options, audit, rateLimit, corsHeaders, errorResponse, failureCode, readJson, revokeSessions } from "./_shared/security.ts";
 import { activationRedirect, resetAccess } from "./_shared/member-lifecycle.mjs";
 
 // SUPERADMIN-only. Issues new access to an existing account through the Supabase
@@ -8,7 +8,7 @@ import { activationRedirect, resetAccess } from "./_shared/member-lifecycle.mjs"
 // so whoever held it before the reset cannot set a password of their own.
 //   { user_id, method: "link" }                single-use, expiring recovery link
 //   { user_id, generate: true }                random temporary password, returned once
-//   { user_id, new_password }                  SUPERADMIN-chosen password (strong policy)
+//   { user_id, new_password }                  SUPERADMIN-chosen password (8+ chars, change forced)
 // Secrets are returned with Cache-Control: no-store and never logged or audited.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return options(req);
@@ -23,8 +23,8 @@ Deno.serve(async (req) => {
     const method = body.method === "link" ? "link" : body.generate === true ? "temporary_password" : "chosen_password";
 
     if (method === "chosen_password") {
-      const problem = validateStrongPassword(body.new_password);
-      if (problem) return json(req, { error: problem }, 400);
+      // The member must change it at the next login (flag set by resetAccess).
+      if (String(body.new_password || "").length < 8) return json(req, { error: "Mot de passe : 8 caractères minimum." }, 400);
     }
 
     const result = await resetAccess(
