@@ -1653,3 +1653,9 @@ input[type="checkbox"],input[type="radio"]{width:20px!important;height:20px!impo
 
 /* member names are always in capitals */
 #nom,#prenom,#fNom,#fPrenom,#pNom,#pPrenom{text-transform:uppercase}
+
+/* member area: UEC emblem as a transparent watermark behind personal info */
+#profil{position:relative;overflow:hidden;isolation:isolate}
+#profil::after{content:"";position:absolute;right:-40px;bottom:-30px;width:min(340px,70%);aspect-ratio:1;
+  background:url("../assets/uec-emblem.webp") center/contain no-repeat;opacity:.07;transform:rotate(-8deg);pointer-events:none;z-index:-1}
+@media(max-width:640px){#profil::after{width:75%;right:-25%;bottom:auto;top:40px;opacity:.06}}
