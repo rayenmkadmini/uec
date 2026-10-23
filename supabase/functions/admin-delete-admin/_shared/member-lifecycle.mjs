@@ -170,10 +170,8 @@ export async function importMembers(db, rows) {
 // Access issuing (shared by activation and reset)
 // ------------------------------------------------------------------
 // Never touches is_active: issuing access must not reactivate a deactivated account.
-async function setMustChange(db, userId, displayName, activate = false) {
+async function setMustChange(db, userId, displayName) {
   const patch = { must_change_password: true };
-  // A brand-new account must be usable: the profile created on sign-up may default to inactive.
-  if (activate) patch.is_active = true;
   if (displayName) patch.display_name = displayName;
   const { data, error } = await db.from("profiles").update(patch).eq("id", userId).select("id").single();
   return !error && Boolean(data);
@@ -183,6 +181,13 @@ async function recoveryLink(auth, email, redirectTo) {
   const { data, error } = await auth.generateLink({ type: "recovery", email, options: { redirectTo } });
   const link = data?.properties?.action_link;
   return error || !link ? null : link;
+}
+
+// Only for an account created a moment ago by activateMember: the profile made on
+// sign-up may default to inactive. Never used on existing accounts (resets).
+async function enableNewAccount(db, userId) {
+  const { error } = await db.from("profiles").update({ is_active: true }).eq("id", userId);
+  return !error;
 }
 
 // ------------------------------------------------------------------
@@ -238,7 +243,7 @@ export async function activateMember({ db, auth }, { subscriberId, method = "lin
   }
 
   const roleOk = !(await db.from("user_roles").upsert({ user_id: userId, role: "MEMBER" }, { onConflict: "user_id,role" })).error;
-  if (!roleOk || !(await setMustChange(db, userId, displayName, true))) {
+  if (!roleOk || !(await setMustChange(db, userId, displayName)) || !(await enableNewAccount(db, userId))) {
     await undo(true);
     return fail(502, "account_setup_failed", "Le compte n’a pas pu être préparé. Rien n’a été conservé.");
   }
