@@ -219,8 +219,9 @@ test("team logo prefers the match logo, then the club logo, then generated initi
   const clubs = new Map([["club africain", "https://cdn.example.org/ca.png"]]);
   assert.match(context.teamLogoImg("Club Africain", "HOME", "https://cdn.example.org/match.png", clubs), /src="https:\/\/cdn\.example\.org\/match\.png"/);
   assert.match(context.teamLogoImg("  CLUB AFRICAIN ", "HOME", null, clubs), /src="https:\/\/cdn\.example\.org\/ca\.png"/);
-  assert.match(context.teamLogoImg("CS Sfaxien", "AWAY", null, clubs), /src="data:image\/svg\+xml/);
-  assert.match(context.teamLogoImg("CS Sfaxien", "AWAY", null, clubs), /onerror=/);
+  assert.match(context.teamLogoImg("CS Sfaxien", "AWAY", null, clubs), /src="assets\/clubs\/cs-sfaxien\.webp"/);
+  assert.match(context.teamLogoImg("Stade Tunisien", "AWAY", null, clubs), /src="data:image\/svg\+xml/);
+  assert.match(context.teamLogoImg("Stade Tunisien", "AWAY", null, clubs), /onerror=/);
 });
 
 test("unsafe custom team logo URLs fall back to a generated logo", () => {
