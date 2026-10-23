@@ -213,7 +213,17 @@ function facultyShort(name) {
 
 const BUILT_IN_CLUB_LOGOS = {
     "club africain": "assets/ca-crest.webp",
-    "ca": "assets/ca-crest.webp"
+    "ca": "assets/ca-crest.webp",
+    "ca bizertin": "assets/clubs/ca-bizertin.webp",
+    "cs hammam-lif": "assets/clubs/cs-hammam-lif.webp",
+    "cs hammam lif": "assets/clubs/cs-hammam-lif.webp",
+    "cs sfaxien": "assets/clubs/cs-sfaxien.webp",
+    "espérance de tunis": "assets/clubs/esperance-tunis.webp",
+    "esperance de tunis": "assets/clubs/esperance-tunis.webp",
+    "est": "assets/clubs/esperance-tunis.webp",
+    "js omrane": "assets/clubs/js-omrane.webp",
+    "js el omrane": "assets/clubs/js-omrane.webp",
+    "tp mazembe": "assets/clubs/tp-mazembe.webp"
 };
 
 function getTeamLogo(teamName, fallbackLabel, customUrl) {
