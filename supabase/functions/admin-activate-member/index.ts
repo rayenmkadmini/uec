@@ -5,6 +5,7 @@ import { activateMember, activationRedirect } from "./_shared/member-lifecycle.m
 // yet and returns access once (no-store):
 //   { subscriber_id, method: "link" }                single-use, expiring recovery link (default)
 //   { subscriber_id, method: "temporary_password" }  fallback when links are unavailable
+//   { subscriber_id, method: "initial_password", password }  staff-chosen first password (bulk activation)
 // The link / password is never logged or written to audit rows.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return options(req);
@@ -15,12 +16,12 @@ Deno.serve(async (req) => {
     ctx = await requireMemberManager(req);
     await rateLimit(ctx.admin, ctx.caller.id, "ACTIVATE_MEMBER", 200, 60);
     const body = await readJson(req);
-    const method = body.method === "temporary_password" ? "temporary_password" : body.method === undefined || body.method === "link" ? "link" : "invalid";
+    const method = body.method === "temporary_password" || body.method === "initial_password" ? body.method : body.method === undefined || body.method === "link" ? "link" : "invalid";
     const subscriberId = String(body.subscriber_id || "");
     if (!isUuid(subscriberId)) return json(req, { error: "subscriber_id invalide.", code: "invalid_subscriber" }, 400);
     const result = await activateMember(
       { db: ctx.admin, auth: ctx.admin.auth.admin },
-      { subscriberId, method, redirectTo: activationRedirect(Deno.env.get("PUBLIC_SITE_URL")) },
+      { subscriberId, method, initialPassword: body.password ?? null, redirectTo: activationRedirect(Deno.env.get("PUBLIC_SITE_URL")) },
     );
     await audit(ctx.admin, ctx.caller.id, "ACTIVATE_MEMBER", result.body.user_id || null, result.status === 200, {
       subscriber_id: subscriberId, method, code: result.body.code || "ok",

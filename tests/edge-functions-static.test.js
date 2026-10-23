@@ -29,7 +29,8 @@ test("no Edge Function or shared module sets a password derived from member data
       assert.doesNotMatch(match[1], /cin|nom|prenom|login|numero|phone|email/i, `password: ${match[1].trim()}`);
     }
   }
-  assert.match(lifecycle, /const password = generatePassword\(\);/);
+  // Random, unless the staff typed an initial password (bulk activation, change forced at first login).
+  assert.match(lifecycle, /const password = method === "initial_password" \? String\(initialPassword\) : generatePassword\(\);/);
   assert.match(lifecycle, /generatePassword = generateTemporaryPassword/);
 });
 

@@ -502,6 +502,31 @@ window.activateMember = async subscriberId => {
   if (await issueAccess("admin-activate-member", { subscriber_id: subscriberId }, "Compte activé")) await loadSubs();
 };
 
+// Creates the login account of every active member that has none yet, with one
+// initial password typed by the staff; each member must change it at first login.
+async function bulkActivate() {
+  if (!canManageMembers) return;
+  const pending = allSubs.filter(s => !s.user_id && s.status === "ACTIVE");
+  if (!pending.length) return showAlert("#pageAlert", "Tous les membres actifs ont déjà un compte.", "success");
+  const password = await promptDialog(`Activer ${pending.length} compte(s)`, {
+    input: "password",
+    text: "Mot de passe initial commun. Chaque membre devra le changer à sa première connexion.",
+    placeholder: "8 caractères minimum",
+    confirmText: "Activer",
+    validator: value => (String(value || "").length >= 8 ? undefined : "8 caractères minimum.")
+  });
+  if (!password) return;
+  let done = 0;
+  const failed = [];
+  for (const s of pending) {
+    const call = await callAdminFunction("admin-activate-member", { subscriber_id: s.id, method: "initial_password", password });
+    if (call.ok) done++;
+    else failed.push(`${s.prenom || ""} ${s.nom || ""}`.trim() + ` : ${call.result.error || "erreur"}`);
+  }
+  await loadSubs();
+  showAlert("#pageAlert", `${done} compte(s) activé(s).` + (failed.length ? ` Échecs : ${failed.join(" ; ")}` : ""), failed.length ? "error" : "success");
+}
+
 window.resetPassword = async userId => {
   if (!canResetAccess || !userId) return;
   if (!(await confirmDialog("Générer un nouvel accès pour ce membre ? Il devra choisir un nouveau mot de passe.", { confirmText: "Générer", icon: "question" }))) return;
@@ -757,6 +782,8 @@ async function init() {
   $("#addBtn").classList.toggle("hidden", !canManageMembers);
   $("#importCsvBtn").classList.toggle("hidden", !canImportMembers);
   $("#importCsvBtn").onclick = () => $("#csvFile").click();
+  $("#bulkActivateBtn").hidden = !canManageMembers;
+  $("#bulkActivateBtn").onclick = bulkActivate;
   $("#csvFile").addEventListener("change", async e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) await importMembersCsv(file); });
   $("#closeModal").onclick = () => $("#modal").classList.add("hidden");
   $("#cancelModal").onclick = () => $("#modal").classList.add("hidden");

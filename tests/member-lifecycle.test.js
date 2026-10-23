@@ -347,3 +347,12 @@ test("forced deletion keeps a staff account and stops cleanly if the payments ca
   assert.equal(stuck.tables.subscribers.length, 1, "record kept");
   assert.ok(!stuck.calls.some(c => c.auth === "deleteUser"), "account kept");
 });
+
+test("activation with a staff-chosen initial password: length checked, password never returned", async () => {
+  const { activateMember } = await lifecycle;
+  const fake = createFake({ tables: { subscribers: [{ id: "a", user_id: null, nom: "TEST", prenom: "X", login_name: "SYNTHX", gender: "M", status: "ACTIVE" }], profiles: [], user_roles: [] } });
+  assert.equal((await activateMember(fake, { subscriberId: "a", method: "initial_password", initialPassword: "short" })).body.code, "weak_password");
+  const ok = await activateMember(fake, { subscriberId: "a", method: "initial_password", initialPassword: "x".repeat(9) });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.temporary_password, undefined);
+});

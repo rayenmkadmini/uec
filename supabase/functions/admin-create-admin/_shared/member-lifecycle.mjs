@@ -18,7 +18,9 @@
 import { buildLoginBase, generateTemporaryPassword, generateUniqueLogin, validateImportBatch } from "./import-utils.mjs";
 
 export const LOGIN_EMAIL_DOMAIN = "login.ueclubiste.local";
-export const ACCESS_METHODS = ["link", "temporary_password"];
+export const ACCESS_METHODS = ["link", "temporary_password", "initial_password"];
+// Initial password chosen by the staff for a first login; the member must change it.
+export const INITIAL_PASSWORD_MIN = 8;
 const LOGIN_RE = /^[A-Z0-9_-]{3,40}$/;
 
 export const loginEmail = login => `${String(login).toLowerCase()}@${LOGIN_EMAIL_DOMAIN}`;
@@ -167,8 +169,11 @@ async function recoveryLink(auth, email, redirectTo) {
 // ------------------------------------------------------------------
 // Activation of one imported / created member record
 // ------------------------------------------------------------------
-export async function activateMember({ db, auth }, { subscriberId, method = "link", redirectTo = null, generatePassword = generateTemporaryPassword }) {
+export async function activateMember({ db, auth }, { subscriberId, method = "link", redirectTo = null, initialPassword = null, generatePassword = generateTemporaryPassword }) {
   if (!ACCESS_METHODS.includes(method)) return fail(400, "invalid_method", "Méthode d’activation invalide.");
+  if (method === "initial_password" && String(initialPassword || "").length < INITIAL_PASSWORD_MIN) {
+    return fail(400, "weak_password", `Mot de passe initial : ${INITIAL_PASSWORD_MIN} caractères minimum.`);
+  }
   if (!subscriberId) return fail(400, "missing_subscriber", "subscriber_id requis.");
   if (method === "link" && !redirectTo) {
     return fail(503, "link_unavailable", "Les liens d’activation ne sont pas configurés (PUBLIC_SITE_URL). Aucun compte n’a été créé.");
@@ -183,7 +188,7 @@ export async function activateMember({ db, auth }, { subscriberId, method = "lin
   if (!LOGIN_RE.test(String(member.login_name || ""))) return fail(409, "invalid_login", "Login du membre manquant ou invalide.");
 
   const displayName = `${member.prenom} ${member.nom}`.trim();
-  const password = generatePassword();
+  const password = method === "initial_password" ? String(initialPassword) : generatePassword();
   const created = await auth.createUser({
     email: loginEmail(member.login_name), password, email_confirm: true,
     user_metadata: { display_name: displayName, gender: member.gender }
@@ -216,6 +221,7 @@ export async function activateMember({ db, auth }, { subscriberId, method = "lin
   if (method === "temporary_password") {
     return { status: 200, body: { ok: true, user_id: userId, method, temporary_password: password } };
   }
+  if (method === "initial_password") return { status: 200, body: { ok: true, user_id: userId, method } };
   const link = await recoveryLink(auth, loginEmail(member.login_name), redirectTo);
   if (!link) {
     await undo(true);
