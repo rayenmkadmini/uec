@@ -537,6 +537,14 @@ function setupShell(ctx = null) {
         const currentPage = PERMS.pageName(location.pathname);
 
         // Staff get a profile page backed by public.profiles (not the member area).
+        if (nav && adminSidebar && can(ctx, "manageMeetings") && !nav.querySelector('a[href="meetings.html"]')) {
+            const link = document.createElement("a");
+            link.href = "meetings.html";
+            if (location.pathname.endsWith("/meetings.html")) link.className = "active";
+            link.innerHTML = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg> <span>Réunions</span>';
+            const after = nav.querySelector('a[href="payments.html"]') || nav.querySelector('a[href="admin-matchs.html"]');
+            after ? after.insertAdjacentElement("afterend", link) : nav.appendChild(link);
+        }
         if (nav && adminSidebar && can(ctx, "viewStaffProfile") && !nav.querySelector('a[href="profile.html"]')) {
             const profileLink = document.createElement("a");
             profileLink.href = "profile.html";

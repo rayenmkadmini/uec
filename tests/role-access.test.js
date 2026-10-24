@@ -79,7 +79,7 @@ function goTo(context, page) {
 const EXPECTED = {
   SUPERADMIN: Object.keys(PERMS.PERMISSIONS).filter(p => !["useMemberArea", "editOwnProfile", "chooseOwnSeat"].includes(p)),
   // 20261019120000: ADMIN manages members and sees their identity fields.
-  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewMemberIdentity", "manageMembers", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile"],
+  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewMemberIdentity", "manageMembers", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile", "manageMeetings"],
   TREASURER: ["viewMembers", "manageCardPayments", "viewEvents", "manageEventPaymentStatuses", "viewFinancialReports", "viewStaffProfile"],
   MEMBER: ["useMemberArea", "editOwnProfile", "chooseOwnSeat"]
 };
@@ -91,10 +91,10 @@ for (const [role, allowed] of Object.entries(EXPECTED)) {
   });
 }
 
-test("ADMIN writes members only: no import, reset, payments, events, matches, users or settings", () => {
+test("ADMIN writes members and meetings only: no import, reset, payments, events, matches, users or settings", () => {
   const writes = Object.keys(PERMS.PERMISSIONS).filter(p => /^(manage|edit|choose|import|reset)/.test(p));
   for (const permission of writes) {
-    assert.equal(PERMS.can({ roles: ["ADMIN"] }, permission), permission === "manageMembers", permission);
+    assert.equal(PERMS.can({ roles: ["ADMIN"] }, permission), ["manageMembers", "manageMeetings"].includes(permission), permission);
   }
   assert.equal(PERMS.isReadOnlyStaff({ roles: ["ADMIN"] }), false);
 });
@@ -246,7 +246,8 @@ const PAGE_SCRIPTS = {
   "zones.html": "js/reference.js",
   "profile.html": "js/profile.js",
   "subscriber.html": "js/subscriber.js",
-  "matchs.html": "js/matchs.js"
+  "matchs.html": "js/matchs.js",
+  "meetings.html": "js/meetings.js"
 };
 
 test("every protected page loads permissions.js before common.js and guards with its page permission", () => {

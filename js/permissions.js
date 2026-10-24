@@ -48,6 +48,8 @@
         manageSettings: ["SUPERADMIN"],
         viewStaffProfile: ["SUPERADMIN", "ADMIN", "TREASURER"],
         editStaffProfile: ["SUPERADMIN"],
+        // Meetings (réunions): organised by the bureau; any invited account can join.
+        manageMeetings: ["SUPERADMIN", "ADMIN"],
         useMemberArea: ["MEMBER"],
         editOwnProfile: ["MEMBER"],
         chooseOwnSeat: ["MEMBER"]
@@ -62,6 +64,7 @@
         "admin-users.html": "viewUsers",
         "faculties.html": "viewReferences",
         "zones.html": "viewReferences",
+        "meetings.html": "manageMeetings",
         "profile.html": "viewStaffProfile",
         "subscriber.html": "useMemberArea",
         "matchs.html": "chooseOwnSeat"
