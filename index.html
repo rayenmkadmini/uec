@@ -10,16 +10,22 @@
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#c8102e"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="UEC21"><script src="js/install.js" defer></script>
 </head>
 <body class="auth-page">
-  <section class="welcome-screen" id="welcomeScreen" aria-labelledby="welcomeTitle">
+  <section class="welcome-screen ws2" id="welcomeScreen" aria-labelledby="welcomeTitle">
+    <div class="ws-bg" aria-hidden="true"><span class="ws-aurora"></span><span class="ws-grid"></span><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <header class="ws-bar">
+      <span class="ws-brand"><img src="assets/uec-logo-96.webp" alt="" width="28" height="28"><b>UEC21</b></span>
+      <span class="ws-season" id="wsSeason">Saison 2026-2027</span>
+    </header>
     <div class="welcome-top">
-      <div class="welcome-mascot" aria-hidden="true"><span class="wm-glow"></span><img class="welcome-logo wm-img" src="assets/uec-mascot.webp" alt="UEC" width="320" height="320"></div>
+      <div class="welcome-mascot" id="wsMascot" aria-hidden="true"><span class="wm-ring"></span><span class="wm-glow"></span><img class="welcome-logo wm-img" src="assets/uec-mascot.webp" alt="" width="320" height="320"></div>
       <span class="welcome-kicker">UNION DES ÉTUDIANTS CLUBISTES · DEPUIS 2021</span>
-      <h1 id="welcomeTitle">Bienvenue sur<br><strong>UEC21 Members</strong></h1>
+      <h1 id="welcomeTitle"><span>Bienvenue sur</span><strong>UEC21 Members</strong></h1>
       <p class="welcome-motto" lang="ar" dir="rtl">أصحاب الفكرة و العقول</p>
     </div>
     <div class="welcome-cta">
-      <button type="button" class="btn primary full" id="welcomeStart">Se connecter <span>→</span></button>
-      <small>Accès réservé aux membres et au bureau</small>
+      <button type="button" class="btn primary full ws-go" id="welcomeStart"><span>Se connecter</span><span class="ws-arrow" aria-hidden="true">→</span></button>
+      <button type="button" class="ws-install" id="wsInstall" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg> Installer l’application</button>
+      <small class="ws-trust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg> Accès sécurisé · réservé aux membres et au bureau</small>
     </div>
   </section>
   <main class="auth-shell">

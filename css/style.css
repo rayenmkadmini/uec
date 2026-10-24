@@ -1717,3 +1717,70 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 @keyframes wmFloat{0%,100%{transform:rotateY(-12deg) rotateX(4deg) translateY(0)}50%{transform:rotateY(12deg) rotateX(-3deg) translateY(-8px)}}
 @keyframes wmPulse{0%,100%{opacity:.75;transform:scale(.92)}50%{opacity:1;transform:scale(1.06)}}
 @media(prefers-reduced-motion:reduce){.wm-img,.wm-glow{animation:none}}
+
+/* ============================================================
+   WELCOME SCREEN v2 (phone) — aurora, embers, interactive 3D mascot
+============================================================ */
+@media(max-width:900px){
+  .welcome-screen.ws2:not([hidden]){min-height:100svh;padding:calc(14px + env(safe-area-inset-top,0px)) 20px calc(22px + env(safe-area-inset-bottom,0px));
+    background:#07070a;overflow:hidden;justify-content:space-between;gap:10px}
+  .ws2 > *:not(.ws-bg){position:relative;z-index:1}
+  .ws-bg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .ws-aurora{position:absolute;inset:-30% -40% auto;height:95%;background:
+      radial-gradient(40% 45% at 30% 40%,rgba(229,28,63,.55),transparent 70%),
+      radial-gradient(35% 40% at 75% 30%,rgba(255,80,40,.28),transparent 70%),
+      radial-gradient(45% 40% at 55% 75%,rgba(160,8,30,.45),transparent 70%);
+    filter:blur(30px);animation:wsAurora 14s ease-in-out infinite alternate}
+  @keyframes wsAurora{to{transform:translate3d(6%,4%,0) rotate(8deg) scale(1.08)}}
+  .ws-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+    background-size:28px 28px;mask-image:radial-gradient(70% 55% at 50% 38%,#000,transparent);-webkit-mask-image:radial-gradient(70% 55% at 50% 38%,#000,transparent)}
+  .ws-bg i{position:absolute;bottom:-10px;width:4px;height:4px;border-radius:50%;background:#ff3b55;box-shadow:0 0 10px 2px rgba(255,40,70,.8);opacity:0;animation:wsEmber 7s linear infinite}
+  .ws-bg i:nth-of-type(1){left:12%;animation-delay:0s}.ws-bg i:nth-of-type(2){left:26%;animation-delay:1.6s;width:3px;height:3px}
+  .ws-bg i:nth-of-type(3){left:41%;animation-delay:3.1s}.ws-bg i:nth-of-type(4){left:55%;animation-delay:.8s;width:2px;height:2px}
+  .ws-bg i:nth-of-type(5){left:68%;animation-delay:2.4s}.ws-bg i:nth-of-type(6){left:80%;animation-delay:4.2s;width:3px;height:3px}
+  .ws-bg i:nth-of-type(7){left:90%;animation-delay:5.3s}.ws-bg i:nth-of-type(8){left:34%;animation-delay:6s;width:2px;height:2px}
+  @keyframes wsEmber{0%{transform:translate3d(0,0,0);opacity:0}10%{opacity:.9}100%{transform:translate3d(30px,-105svh,0);opacity:0}}
+
+  .ws-bar{display:flex;align-items:center;justify-content:space-between;padding-right:56px}
+  .ws-brand{display:inline-flex;align-items:center;gap:8px;color:#fff;font-weight:900;letter-spacing:.08em;font-size:14px}
+  .ws-brand img{border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.12)}
+  .ws-season{padding:6px 11px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.04em;color:#ffd6dc;
+    background:rgba(229,28,63,.14);border:1px solid rgba(229,28,63,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+
+  .ws2 .welcome-top{gap:10px}
+  .ws2 .welcome-mascot{width:min(74vw,290px);--rx:0deg;--ry:0deg;animation:wsRise .9s cubic-bezier(.2,.9,.3,1) both}
+  .ws2 .welcome-mascot.tilting .wm-img{animation:none;transform:rotateX(var(--rx)) rotateY(var(--ry)) translateZ(20px);transition:transform .12s ease-out}
+  .wm-ring{position:absolute;inset:6%;border-radius:50%;border:1px solid rgba(255,60,85,.35);box-shadow:inset 0 0 40px rgba(229,28,63,.25);
+    animation:wsSpin 18s linear infinite;background:conic-gradient(from 0deg,transparent 0 70%,rgba(255,60,85,.55) 85%,transparent 100%);
+    mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 0);-webkit-mask:radial-gradient(farthest-side,transparent calc(100% - 2px),#000 0)}
+  @keyframes wsSpin{to{transform:rotate(360deg)}}
+  @keyframes wsRise{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
+
+  .ws2 .welcome-kicker{font-size:10px;letter-spacing:.2em;color:#ff7a8e;animation:wsRise .7s .15s both}
+  .ws2 h1{display:flex;flex-direction:column;gap:2px;animation:wsRise .7s .22s both}
+  .ws2 h1 span{font-size:17px;font-weight:600;color:#c9ccd4;letter-spacing:.01em}
+  .ws2 h1 strong{font-size:clamp(34px,10vw,42px);font-weight:900;letter-spacing:-.02em;line-height:1.02;
+    background:linear-gradient(100deg,#fff 0%,#ffd1d8 30%,#ff2d4b 55%,#fff 80%);background-size:220% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:wsShine 5s ease-in-out infinite}
+  @keyframes wsShine{0%,100%{background-position:100% 0}50%{background-position:0 0}}
+  .ws2 .welcome-motto{font-size:17px;color:#e6e7eb;opacity:.9;animation:wsRise .7s .3s both}
+
+  .ws2 .welcome-cta{gap:10px;padding:14px;border-radius:22px;background:rgba(20,20,26,.55);border:1px solid rgba(255,255,255,.08);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 20px 40px -20px rgba(0,0,0,.7);animation:wsRise .7s .38s both}
+  .ws-go{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;gap:10px}
+  .ws-go::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+    transform:translateX(-120%);animation:wsSweep 3.4s ease-in-out 1.2s infinite}
+  @keyframes wsSweep{0%,60%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+  .ws-arrow{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.18);transition:transform .2s}
+  .ws-go:active .ws-arrow{transform:translateX(4px)}
+  .ws-install{display:flex;align-items:center;justify-content:center;gap:8px;min-height:46px;border-radius:14px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.05);color:#fff;font:700 14.5px/1 Inter,system-ui,sans-serif;cursor:pointer}
+  .ws-install[hidden]{display:none}
+  .ws-install svg{width:17px;height:17px}
+  .ws-trust{display:flex;align-items:center;justify-content:center;gap:6px;color:#8d919b;font-size:11.5px}
+  .ws-trust svg{width:13px;height:13px;color:#4ade80}
+  body:has(.ws2:not([hidden])) .install-app-btn{display:none}
+}
+@media(max-width:900px) and (prefers-reduced-motion:reduce){
+  .ws-aurora,.ws-bg i,.wm-ring,.ws2 h1 strong,.ws-go::after,.ws2 .welcome-mascot,.ws2 *{animation:none!important}
+}
