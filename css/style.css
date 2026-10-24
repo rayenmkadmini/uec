@@ -1672,3 +1672,37 @@ input[type="checkbox"],input[type="radio"]{width:20px!important;height:20px!impo
 #profil::after{right:-40px;bottom:-30px;width:min(340px,70%);background-image:url("../assets/uec-emblem.webp");opacity:.07;filter:none}
 @media(max-width:640px){.panel::after{width:min(110px,30%)}#profil::after{width:75%;right:-25%;bottom:auto;top:40px;opacity:.06}}
 @media print{.panel::after{display:none}}
+
+/* ============================================================
+   INSTALL THE APP (PWA)
+============================================================ */
+.install-app-btn{position:fixed;right:16px;bottom:18px;z-index:40;display:inline-flex;align-items:center;gap:8px;padding:11px 16px;border:0;border-radius:999px;
+  background:linear-gradient(135deg,#e3172f,#a50b1e);color:#fff;font:800 13.5px/1 Inter,system-ui,sans-serif;letter-spacing:.01em;cursor:pointer;
+  box-shadow:0 12px 28px -10px rgba(200,16,46,.75),0 2px 6px rgba(0,0,0,.25);animation:iaPop .5s cubic-bezier(.2,.8,.2,1) both}
+.install-app-btn svg{width:17px;height:17px}
+.install-app-btn:active{transform:scale(.97)}
+@keyframes iaPop{from{opacity:0;transform:translateY(14px) scale(.95)}to{opacity:1;transform:none}}
+@media(max-width:900px){.install-app-btn{bottom:calc(76px + env(safe-area-inset-bottom,0px))}}
+body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install-app-btn{bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+.ia-backdrop{position:fixed;inset:0;z-index:1000;display:flex;align-items:flex-end;justify-content:center;padding:16px;background:rgba(5,5,8,.62);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:iaFade .2s ease both}
+@media(min-width:700px){.ia-backdrop{align-items:center}}
+@keyframes iaFade{from{opacity:0}to{opacity:1}}
+.ia-sheet{position:relative;width:min(100%,440px);padding:20px 20px 18px;border-radius:22px;background:var(--card,#16161b);color:var(--text,#f4f4f6);
+  border:1px solid rgba(255,255,255,.08);box-shadow:0 30px 60px -20px rgba(0,0,0,.6);animation:iaPop .35s cubic-bezier(.2,.8,.2,1) both}
+.ia-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.ia-head img{width:52px;height:52px;border-radius:14px;background:#111114;padding:4px}
+.ia-head small{display:block;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#e3172f;font-weight:800}
+.ia-head h2{margin:2px 0 0;font-size:18px;font-weight:900}
+.ia-close{margin-left:auto;align-self:flex-start;border:0;background:transparent;color:inherit;font-size:18px;opacity:.6;cursor:pointer;padding:4px 6px}
+.ia-steps{margin:0;padding:0;list-style:none;counter-reset:ia;display:grid;gap:10px}
+.ia-steps li{counter-increment:ia;display:flex;gap:12px;align-items:flex-start;font-size:14.5px;line-height:1.45}
+.ia-steps li::before{content:counter(ia);flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  background:#c8102e;color:#fff;font-weight:900;font-size:13px}
+.ia-inline{display:inline-grid;place-items:center;width:22px;height:22px;vertical-align:-5px;border-radius:6px;background:rgba(10,132,255,.15);color:#0a84ff}
+.ia-inline svg{width:15px;height:15px}
+.ia-note{margin:14px 0 0;font-size:12.5px;opacity:.7}
+.ia-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+.ia-arrow{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font-size:22px;color:#fff;animation:iaBounce 1.2s ease-in-out infinite}
+@keyframes iaBounce{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,6px)}}
+@media print{.install-app-btn,.ia-backdrop{display:none!important}}

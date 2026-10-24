@@ -8,13 +8,15 @@ import { extname, join, relative } from "node:path";
 const root = process.cwd();
 const out = join(root, "public");
 const FOLDERS = ["css", "js", "assets", "img"];
-const ALLOWED = new Set([".html", ".css", ".js", ".mjs", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".otf"]);
+const ALLOWED = new Set([".webmanifest", ".html", ".css", ".js", ".mjs", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico", ".woff", ".woff2", ".ttf", ".otf"]);
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out);
 for (const name of readdirSync(root)) {
   if (name.endsWith(".html") && statSync(join(root, name)).isFile()) cpSync(join(root, name), join(out, name));
 }
+// Installable app (PWA): the manifest and the service worker must sit at the site root.
+for (const name of ["manifest.webmanifest", "sw.js"]) cpSync(join(root, name), join(out, name));
 for (const folder of FOLDERS) {
   if (existsSync(join(root, folder))) cpSync(join(root, folder), join(out, folder), { recursive: true });
 }
