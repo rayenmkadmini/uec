@@ -1868,3 +1868,54 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .ev-code-screen p{max-width:460px;color:#c9ccd4;font-size:15px}
 .ev-code-close{position:absolute;top:18px;right:18px;border:0;background:rgba(255,255,255,.1);color:#fff;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer}
 @media(max-width:760px){.ev-rsvp{width:100%}.ev-rsvp button{flex:1}}
+
+/* ============================================================
+   MEMBER AREA v2 — views + home dashboard
+============================================================ */
+.member-views [data-view][hidden]{display:none!important}
+.member-views.mv-enter > [data-view]:not([hidden]){animation:mvIn .38s cubic-bezier(.2,.8,.2,1) both}
+.member-views.mv-enter > [data-view]:not([hidden]):nth-of-type(3){animation-delay:.05s}
+.member-views.mv-enter > [data-view]:not([hidden]):nth-of-type(4){animation-delay:.1s}
+@keyframes mvIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+.mh-hero{position:relative;overflow:hidden;isolation:isolate;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-wrap:wrap;
+  padding:26px 24px;border-radius:24px;color:#fff;margin-bottom:16px;
+  background:linear-gradient(135deg,#a50b1e 0%,#d7142f 45%,#7d0716 100%);box-shadow:0 24px 50px -24px rgba(200,16,46,.7)}
+.mh-hero-bg{position:absolute;inset:0;z-index:-1;opacity:.9;
+  background:radial-gradient(40% 70% at 95% 10%,rgba(255,255,255,.22),transparent 70%),
+    url("../assets/uec-mascot.webp") right -30px center/auto 140% no-repeat;mix-blend-mode:normal}
+.mh-hero-bg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(125,7,22,.95) 30%,rgba(125,7,22,.55) 65%,rgba(125,7,22,.15))}
+.mh-id{display:flex;align-items:center;gap:16px;min-width:0}
+.mh-avatar{flex:none;width:64px;height:64px;border-radius:20px;display:grid;place-items:center;font-size:28px;font-weight:900;
+  background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.mh-greet{font-size:13px;font-weight:700;opacity:.85;letter-spacing:.02em}
+.mh-hero h2{margin:2px 0 8px;font-size:clamp(22px,4vw,30px);font-weight:900;letter-spacing:-.01em;line-height:1.1;color:#fff}
+.mh-chips{display:flex;gap:6px;flex-wrap:wrap}
+.mh-chips .badge{background:rgba(255,255,255,.95)!important;color:#0f7a3a!important;border:0}
+.mh-chips .badge.inactive{color:#b91c1c!important}
+.mh-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:800;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.25)}
+.mh-actions .btn.secondary{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.35);color:#fff;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+
+.mh-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.mh-tile{position:relative;display:flex;flex-direction:column;gap:4px;padding:16px;border-radius:20px;text-decoration:none;color:inherit;min-width:0;
+  background:var(--card,#16161b);border:1px solid var(--border,rgba(255,255,255,.08));transition:transform .2s,box-shadow .2s,border-color .2s}
+.mh-tile:hover{transform:translateY(-3px);border-color:rgba(229,28,63,.45);box-shadow:0 16px 30px -18px rgba(229,28,63,.6)}
+.mh-tile-icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:rgba(229,28,63,.12);color:#e51c3f;margin-bottom:6px}
+.mh-tile-icon svg{width:20px;height:20px}
+.mh-tile small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted,#9aa0aa)}
+.mh-tile b{font-size:15.5px;font-weight:800;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh-tile em{font-style:normal;font-size:12.5px;color:var(--muted,#9aa0aa)}
+.mh-tile-rate{align-items:flex-start}
+.mh-ring{--p:0%;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;margin-bottom:4px;
+  background:radial-gradient(closest-side,var(--card,#16161b) 74%,transparent 76% 100%),conic-gradient(#e51c3f var(--p),rgba(127,127,127,.2) 0)}
+.mh-ring b{font-size:14px}
+.mh-card-panel .member-card-shell{display:flex;justify-content:center}
+
+@media(max-width:900px){
+  .mh-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mh-hero{padding:20px 18px;border-radius:22px}
+  .mh-hero-bg{background-position:right -60px center;background-size:auto 120%}
+  .mh-actions{width:100%}
+  .mh-actions .btn{width:100%}
+}
+@media(prefers-reduced-motion:reduce){.member-views.mv-enter > [data-view]{animation:none!important}}

@@ -10,22 +10,48 @@
 <div class="app">
   <aside class="sidebar">
     <div class="side-brand"><img src="assets/uec-logo-192.webp"><div><b>UE Clubiste</b><small>Espace Abonné</small></div></div>
-    <nav aria-label="Navigation espace membre"><a class="active" href="subscriber.html"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg> <span>Mon profil</span></a><a href="matchs.html"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/><path d="M12 8.2V4.6M15.4 10.7l3.3-1.4M13.1 14.7l1.9 3.1M8.9 14.7L7 17.8M8.6 10.7L5.3 9.3"/></svg> <span>Matchs</span></a><a href="#evenements"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg> <span>Événements</span></a><a href="#reunions"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg> <span>Réunions</span></a><a href="#security"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 018 0v3"/></svg> <span>Sécurité</span></a></nav>
+    <nav aria-label="Navigation espace membre"><a class="active" href="subscriber.html#accueil" data-view-link="accueil"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg> <span>Accueil</span></a><a href="subscriber.html#profil" data-view-link="profil"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.2"/><path d="M5 20c0-3.5 2.8-5.8 7-5.8s7 2.3 7 5.8"/></svg> <span>Mon profil</span></a><a href="matchs.html" data-view-link="matchs"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/><path d="M12 8.2V4.6M15.4 10.7l3.3-1.4M13.1 14.7l1.9 3.1M8.9 14.7L7 17.8M8.6 10.7L5.3 9.3"/></svg> <span>Matchs</span></a><a href="subscriber.html#evenements" data-view-link="evenements"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg> <span>Événements</span></a><a href="subscriber.html#reunions" data-view-link="reunions"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg> <span>Réunions</span></a></nav>
     <button id="logoutBtn" class="side-logout">↪ Déconnexion</button>
   </aside>
   <div class="main">
     <header class="topbar"><button class="menu-btn" id="menuBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button><div><span class="top-kicker">ESPACE ABONNÉ</span><h1>Mon espace</h1></div><div class="top-user"><div class="avatar" id="avatar">U</div><span id="userName">Utilisateur</span></div></header>
-    <main class="content">
+    <main class="content member-views">
       <div id="pageAlert"></div>
-      <section class="hero-card">
-        <div><span class="mini-label">MON ABONNEMENT</span><h2 id="welcomeName">Bienvenue</h2><p>Retrouvez ici vos informations personnelles et l’état de votre abonnement.</p></div>
-        <div class="hero-actions">
-          <span id="statusBadge" class="badge">Chargement du statut…</span>
+      <section class="mh-hero" data-view="accueil">
+        <div class="mh-hero-bg" aria-hidden="true"></div>
+        <div class="mh-id">
+          <div class="mh-avatar" id="mhAvatar" aria-hidden="true">U</div>
+          <div>
+            <span class="mh-greet" id="mhGreet">Bonjour</span>
+            <h2 id="welcomeName">Bienvenue</h2>
+            <div class="mh-chips"><span id="statusBadge" class="badge">Chargement du statut…</span><span class="mh-chip" id="mhNumber">N° —</span><span class="mh-chip" id="mhSeason">Saison</span></div>
+          </div>
+        </div>
+        <div class="hero-actions mh-actions">
           <a class="btn secondary" href="https://staduim.ueclubistes.tn" target="_blank" rel="noopener noreferrer">Live du stade</a>
         </div>
       </section>
-
-      <section id="profil" class="panel">
+      <section class="mh-tiles" data-view="accueil" aria-label="En bref">
+        <a class="mh-tile" href="matchs.html"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/><path d="M12 8.2V4.6M15.4 10.7l3.3-1.4M13.1 14.7l1.9 3.1M8.9 14.7L7 17.8M8.6 10.7L5.3 9.3"/></svg></span><small>Prochain match</small><b id="mhMatch">—</b><em id="mhMatchSub"></em></a>
+        <a class="mh-tile" href="subscriber.html#evenements"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg></span><small>Prochain événement</small><b id="mhEvent">—</b><em id="mhEventSub"></em></a>
+        <a class="mh-tile" href="subscriber.html#reunions"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg></span><small>Prochaine réunion</small><b id="mhMeeting">—</b><em id="mhMeetingSub"></em></a>
+        <a class="mh-tile mh-tile-rate" href="subscriber.html#evenements"><span class="mh-ring" id="mhRing" style="--p:0%"><b id="mhRate">—</b></span><small>Assiduité</small><em>réunions et événements</em></a>
+      </section>
+      <section class="panel mh-card-panel" data-view="accueil">
+        <div class="panel-head">
+          <div><span class="mini-label">CARTE MEMBRE</span><h2>Carte d’abonné</h2></div>
+          <button id="printMemberCardBtn" class="btn secondary" type="button">Imprimer la carte</button>
+        </div>
+        <div id="subscriberMemberCard" class="member-card-shell"><div class="loading-state">Chargement de votre carte membre…</div></div>
+      </section>
+      <section class="panel" data-view="accueil">
+        <div class="panel-head">
+          <div><span class="mini-label">PROCHAINS MATCHS</span><h2>Agenda de la semaine</h2></div>
+          <a class="btn secondary" href="matchs.html">Voir tous les matchs</a>
+        </div>
+        <div id="upcomingMatches" class="matches-grid"><div class="loading-state">Chargement des matchs…</div></div>
+      </section>
+      <section id="profil" class="panel" data-view="profil">
         <div class="panel-head"><div><span class="mini-label">PROFIL</span><h2>Informations personnelles</h2></div><button id="editBtn" class="btn secondary">Modifier</button></div>
         <form id="profileForm" class="grid-form">
           <label>Nom<input id="nom" autocomplete="family-name" maxlength="100" disabled></label><label>Prénom<input id="prenom" autocomplete="given-name" maxlength="100" disabled></label>
@@ -37,32 +63,7 @@
           <div id="saveRow" class="form-actions hidden"><button type="button" id="cancelBtn" class="btn secondary">Annuler</button><button class="btn primary" type="submit">Enregistrer</button></div>
         </form>
       </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div><span class="mini-label">CARTE MEMBRE</span><h2>Carte d’abonné</h2></div>
-          <button id="printMemberCardBtn" class="btn secondary" type="button">Imprimer la carte</button>
-        </div>
-        <div id="subscriberMemberCard" class="member-card-shell"><div class="loading-state">Chargement de votre carte membre…</div></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div><span class="mini-label">PROCHAINS MATCHS</span><h2>Agenda de la semaine</h2></div>
-          <a class="btn secondary" href="matchs.html">Voir tous les matchs</a>
-        </div>
-        <div id="upcomingMatches" class="matches-grid"><div class="loading-state">Chargement des matchs…</div></div>
-      </section>
-
-      <section id="evenements" class="panel">
-        <div class="panel-head"><div><span class="mini-label">ÉVÉNEMENTS</span><h2>Mes événements</h2></div></div>
-        <div id="myEvents" class="mt-mine-list"><div class="loading-state">Chargement…</div></div>
-      </section>
-      <section id="reunions" class="panel">
-        <div class="panel-head"><div><span class="mini-label">RÉUNIONS</span><h2>Mes réunions</h2></div></div>
-        <div id="myMeetings" class="mt-mine-list"><div class="loading-state">Chargement…</div></div>
-      </section>
-      <section id="security" class="panel">
+      <section id="security" class="panel" data-view="profil">
         <div class="panel-head"><div><span class="mini-label">SÉCURITÉ</span><h2>Changer le mot de passe</h2></div></div>
         <form id="passwordForm" class="grid-form security-form">
           <label>Nouveau mot de passe<input id="newPassword" type="password" minlength="12" autocomplete="new-password" required placeholder="12 caractères minimum"></label>
@@ -71,9 +72,17 @@
         </form>
         <div id="passwordAlert"></div>
       </section>
+      <section id="evenements" class="panel" data-view="evenements">
+        <div class="panel-head"><div><span class="mini-label">ÉVÉNEMENTS</span><h2>Mes événements</h2></div></div>
+        <div id="myEvents" class="mt-mine-list"><div class="loading-state">Chargement…</div></div>
+      </section>
+      <section id="reunions" class="panel" data-view="reunions">
+        <div class="panel-head"><div><span class="mini-label">RÉUNIONS</span><h2>Mes réunions</h2></div></div>
+        <div id="myMeetings" class="mt-mine-list"><div class="loading-state">Chargement…</div></div>
+      </section>
     </main>
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js" integrity="sha384-nLoOnA/BDh8A/jxqtckg4DumuCGOBYUnNJLZdQz/zfYNp3wcjGSoWTAzgko06G/2" crossorigin="anonymous"></script>
-<script src="js/config.js"></script><script src="js/permissions.js"></script><script src="js/common.js"></script><script src="js/subscriber.js"></script><script src="js/my-meetings.js"></script><script src="js/my-events.js"></script>
+<script src="js/config.js"></script><script src="js/permissions.js"></script><script src="js/common.js"></script><script src="js/subscriber.js"></script><script src="js/my-meetings.js"></script><script src="js/my-events.js"></script><script src="js/member-views.js"></script>
 </body></html>

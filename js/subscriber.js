@@ -145,7 +145,7 @@ async function withOwnPrivateFields(subscriber) {
     return;
   }
   original = s;
-  $("#welcomeName").textContent = `Bienvenue ${s.prenom || ""} ${s.nom || ""}`.trim();
+  $("#welcomeName").textContent = `${s.prenom || ""} ${s.nom || ""}`.trim() || "Membre";
   $("#userName").textContent = `${s.prenom || ""} ${s.nom || ""}`.trim();
   $("#avatar").textContent = (s.prenom || s.nom || "U").charAt(0).toUpperCase();
   $("#statusBadge").outerHTML = `<span id="statusBadge" class="badge ${s.status === "ACTIVE" ? "active" : "inactive"}">${s.status === "ACTIVE" ? "Abonnement actif" : "Abonnement désactivé"}</span>`;
@@ -213,7 +213,7 @@ async function saveMemberProfile() {
   if ($("#photoFile")) $("#photoFile").value = "";
   setProfileEditable(false);
   fillProfileForm(original);
-  $("#welcomeName").textContent = `Bienvenue ${original.prenom || ""} ${original.nom || ""}`.trim();
+  $("#welcomeName").textContent = `${original.prenom || ""} ${original.nom || ""}`.trim() || "Membre";
   await renderMemberCard(original);
   showAlert("#pageAlert","Informations et photo mises à jour."); $("#saveRow").classList.add("hidden"); $("#editBtn").classList.remove("hidden");
 }
