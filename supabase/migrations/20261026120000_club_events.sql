@@ -80,6 +80,7 @@ revoke all on public.club_events, public.club_event_participants from anon;
 revoke insert, update, delete on public.club_events, public.club_event_participants from authenticated;
 grant select on public.club_events, public.club_event_participants to authenticated;
 revoke all on private.club_event_codes from public, anon, authenticated;
+alter table private.club_event_codes enable row level security; -- no policy: only the definer functions read it
 
 create or replace function private.new_event_code()
 returns text
