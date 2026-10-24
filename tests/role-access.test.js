@@ -426,3 +426,12 @@ test("expired-link details survive supabase-js URL handling and stay visible", (
   assert.ok(page.indexOf('id="linkError"') >= 0 && page.indexOf('id="linkError"') < page.indexOf('<form id="changeForm"'), "outside the hidden form");
   assert.match(read("js/change-password.js"), /box\.textContent=linkError;box\.classList\.remove\("hidden"\)/);
 });
+
+test("every page that talks to the database loads supabase-js before config.js", () => {
+  for (const page of fs.readdirSync(root).filter(f => f.endsWith(".html"))) {
+    const html = read(page);
+    if (!html.includes("js/config.js")) continue;
+    const lib = html.indexOf("@supabase/supabase-js");
+    assert.ok(lib > -1 && lib < html.indexOf("js/config.js"), `${page} loads supabase-js before config.js`);
+  }
+});
