@@ -247,7 +247,8 @@ const PAGE_SCRIPTS = {
   "profile.html": "js/profile.js",
   "subscriber.html": "js/subscriber.js",
   "matchs.html": "js/matchs.js",
-  "meetings.html": "js/meetings.js"
+  "meetings.html": "js/meetings.js",
+  "events.html": "js/events.js"
 };
 
 test("every protected page loads permissions.js before common.js and guards with its page permission", () => {

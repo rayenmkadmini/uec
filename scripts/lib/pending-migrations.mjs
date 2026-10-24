@@ -25,7 +25,7 @@ export const RELEASED = [
 // 20261018120000 was applied by hand in the SQL editor on 2026-10-18 (not recorded in the
 // migration history): record it first with `supabase migration repair --status applied
 // 20261018120000` and move it to RELEASED before running scripts/apply-migration.mjs.
-export const PENDING = ["20261018120000_smart_collections", "20261019120000_admin_member_management", "20261021120000_staff_member_records", "20261022120000_member_self_edit", "20261023120000_uppercase_member_names", "20261024120000_sync_member_account_status", "20261025120000_meetings"];
+export const PENDING = ["20261018120000_smart_collections", "20261019120000_admin_member_management", "20261021120000_staff_member_records", "20261022120000_member_self_edit", "20261023120000_uppercase_member_names", "20261024120000_sync_member_account_status", "20261025120000_meetings", "20261026120000_club_events"];
 
 export const versionOf = name => name.split("_")[0];
 export const APPLIED_VERSIONS = [...BASE_APPLIED, ...RELEASED.map(versionOf)];

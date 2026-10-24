@@ -65,6 +65,7 @@
         "faculties.html": "viewReferences",
         "zones.html": "viewReferences",
         "meetings.html": "manageMeetings",
+        "events.html": "manageMeetings",
         "profile.html": "viewStaffProfile",
         "subscriber.html": "useMemberArea",
         "matchs.html": "chooseOwnSeat"

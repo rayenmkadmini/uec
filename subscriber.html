@@ -10,7 +10,7 @@
 <div class="app">
   <aside class="sidebar">
     <div class="side-brand"><img src="assets/uec-logo-192.webp"><div><b>UE Clubiste</b><small>Espace Abonné</small></div></div>
-    <nav aria-label="Navigation espace membre"><a class="active" href="subscriber.html"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg> <span>Mon profil</span></a><a href="matchs.html"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/><path d="M12 8.2V4.6M15.4 10.7l3.3-1.4M13.1 14.7l1.9 3.1M8.9 14.7L7 17.8M8.6 10.7L5.3 9.3"/></svg> <span>Matchs</span></a><a href="#reunions"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg> <span>Réunions</span></a><a href="#security"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 018 0v3"/></svg> <span>Sécurité</span></a></nav>
+    <nav aria-label="Navigation espace membre"><a class="active" href="subscriber.html"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/></svg> <span>Mon profil</span></a><a href="matchs.html"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/><path d="M12 8.2V4.6M15.4 10.7l3.3-1.4M13.1 14.7l1.9 3.1M8.9 14.7L7 17.8M8.6 10.7L5.3 9.3"/></svg> <span>Matchs</span></a><a href="#evenements"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg> <span>Événements</span></a><a href="#reunions"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg> <span>Réunions</span></a><a href="#security"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 018 0v3"/></svg> <span>Sécurité</span></a></nav>
     <button id="logoutBtn" class="side-logout">↪ Déconnexion</button>
   </aside>
   <div class="main">
@@ -54,6 +54,10 @@
         <div id="upcomingMatches" class="matches-grid"><div class="loading-state">Chargement des matchs…</div></div>
       </section>
 
+      <section id="evenements" class="panel">
+        <div class="panel-head"><div><span class="mini-label">ÉVÉNEMENTS</span><h2>Mes événements</h2></div></div>
+        <div id="myEvents" class="mt-mine-list"><div class="loading-state">Chargement…</div></div>
+      </section>
       <section id="reunions" class="panel">
         <div class="panel-head"><div><span class="mini-label">RÉUNIONS</span><h2>Mes réunions</h2></div></div>
         <div id="myMeetings" class="mt-mine-list"><div class="loading-state">Chargement…</div></div>
@@ -71,5 +75,5 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js" integrity="sha384-WgXwGL6fUsYJWNaKJgVbrJKGRQwc1vieh2oy4kw9nXqpNDz3tdSsqEYUgeHD/NuF" crossorigin="anonymous"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js" integrity="sha384-nLoOnA/BDh8A/jxqtckg4DumuCGOBYUnNJLZdQz/zfYNp3wcjGSoWTAzgko06G/2" crossorigin="anonymous"></script>
-<script src="js/config.js"></script><script src="js/permissions.js"></script><script src="js/common.js"></script><script src="js/subscriber.js"></script><script src="js/my-meetings.js"></script>
+<script src="js/config.js"></script><script src="js/permissions.js"></script><script src="js/common.js"></script><script src="js/subscriber.js"></script><script src="js/my-meetings.js"></script><script src="js/my-events.js"></script>
 </body></html>

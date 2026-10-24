@@ -544,6 +544,11 @@ function setupShell(ctx = null) {
             link.innerHTML = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg> <span>Réunions</span>';
             const after = nav.querySelector('a[href="payments.html"]') || nav.querySelector('a[href="admin-matchs.html"]');
             after ? after.insertAdjacentElement("afterend", link) : nav.appendChild(link);
+            const events = document.createElement("a");
+            events.href = "events.html";
+            if (location.pathname.endsWith("/events.html")) events.className = "active";
+            events.innerHTML = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg> <span>Événements</span>';
+            link.insertAdjacentElement("afterend", events);
         }
         if (nav && adminSidebar && can(ctx, "viewStaffProfile") && !nav.querySelector('a[href="profile.html"]')) {
             const profileLink = document.createElement("a");

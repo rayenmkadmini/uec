@@ -1849,3 +1849,22 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
   .mt-mine{flex-direction:column;align-items:stretch}
   .mt-mine-side{flex-direction:row;justify-content:space-between;align-items:center}
 }
+
+/* ============================================================
+   ÉVÉNEMENTS (events): category badge, RSVP, full-screen check-in code
+============================================================ */
+.mt-badge.ev-cat{background:rgba(229,28,63,.12);color:#ff5a72}
+.ev-rsvp{display:inline-flex;gap:6px}
+.ev-rsvp button{border:1px solid var(--border,rgba(255,255,255,.12));background:transparent;color:inherit;font:700 13px/1 Inter,system-ui,sans-serif;padding:10px 12px;border-radius:12px;cursor:pointer}
+.ev-rsvp button.on.ok{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.5);color:#22c55e}
+.ev-rsvp button.on.ko{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.45);color:#ef4444}
+.ev-detail-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.ev-code-screen{position:fixed;inset:0;z-index:1200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;text-align:center;
+  background:radial-gradient(60% 50% at 50% 40%,rgba(229,28,63,.35),transparent 70%),#07070a;color:#fff}
+.ev-code-screen.hidden{display:none}
+.ev-code-screen small{font-size:14px;color:#ff7a8e;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+.ev-code-screen span{font-size:16px;color:#c9ccd4}
+.ev-code-screen b{font-size:clamp(56px,16vw,150px);font-weight:900;letter-spacing:.08em;font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(229,28,63,.6)}
+.ev-code-screen p{max-width:460px;color:#c9ccd4;font-size:15px}
+.ev-code-close{position:absolute;top:18px;right:18px;border:0;background:rgba(255,255,255,.1);color:#fff;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer}
+@media(max-width:760px){.ev-rsvp{width:100%}.ev-rsvp button{flex:1}}
