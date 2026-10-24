@@ -1784,3 +1784,4 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 @media(max-width:900px) and (prefers-reduced-motion:reduce){
   .ws-aurora,.ws-bg i,.wm-ring,.ws2 h1 strong,.ws-go::after,.ws2 .welcome-mascot,.ws2 *{animation:none!important}
 }
+.welcome-kicker em{display:block;margin-top:4px;font-style:normal;font-size:.92em;letter-spacing:.3em;color:#c9ccd4;opacity:.85}
