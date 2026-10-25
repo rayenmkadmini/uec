@@ -635,6 +635,7 @@ function setupShell(ctx = null) {
         };
 
         const openDrawer = () => {
+            if (navigator.vibrate) try { navigator.vibrate(8); } catch (_) {}
             sidebar.classList.add("open");
             backdrop.classList.add("visible");
             document.body.classList.add("nav-open");
@@ -667,6 +668,7 @@ function setupShell(ctx = null) {
             const logout = sidebar.querySelector(".side-logout");
             if (logout) { logout.insertAdjacentElement("beforebegin", quick); quick.appendChild(logout); }
             else sidebar.appendChild(quick);
+            enhanceDrawer(sidebar, ctx, profile, quick, closeDrawer);
         }
 
         // Swipe: from the left screen edge to open, to the left on the drawer to close.
@@ -701,6 +703,78 @@ function setupShell(ctx = null) {
     setupMobileTabbar(sidebar, menuButton);
     setupResponsiveTables();
     setupAccessibleDialogs();
+}
+
+/* ============================================================
+   PHONE DRAWER v2 — season + role in the header, page search, live
+   counters (upcoming meetings / events), shortcuts (install the app,
+   Discord), staggered entrance.
+============================================================ */
+function enhanceDrawer(sidebar, ctx, profile, quick, closeDrawer) {
+    const now = new Date();
+    const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const meta = document.createElement("div");
+    meta.className = "drawer-meta";
+    meta.innerHTML = `<span>Saison ${y}-${y + 1}</span><span class="drawer-dot" aria-hidden="true"></span><span>UEC21 Members</span>`;
+    profile.insertAdjacentElement("afterend", meta);
+
+    const nav = sidebar.querySelector("nav");
+    if (nav) {
+        const search = document.createElement("label");
+        search.className = "drawer-search";
+        search.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input type="search" placeholder="Rechercher une page…" aria-label="Rechercher une page" autocomplete="off">';
+        nav.insertAdjacentElement("beforebegin", search);
+        const input = search.querySelector("input");
+        const norm = v => String(v || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+        input.addEventListener("input", () => {
+            const q = norm(input.value.trim());
+            nav.querySelectorAll("a").forEach(link => { link.classList.toggle("drawer-filtered", Boolean(q) && !norm(link.textContent).includes(q)); });
+        });
+        input.addEventListener("keydown", event => {
+            if (event.key !== "Enter") return;
+            const first = nav.querySelector("a:not(.drawer-filtered):not(.hidden)");
+            if (first) { event.preventDefault(); closeDrawer(false); location.href = first.getAttribute("href"); }
+        });
+        nav.querySelectorAll("a").forEach((link, i) => link.style.setProperty("--i", i));
+    }
+
+    const shortcuts = document.createElement("div");
+    shortcuts.className = "drawer-shortcuts";
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    shortcuts.innerHTML = `
+        ${standalone ? "" : '<button type="button" class="drawer-sc" data-sc="install"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span>Installer l’app</span></button>'}
+        <a class="drawer-sc drawer-sc-discord" href="${UEC_DISCORD_URL}" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.3 4.4A19.6 19.6 0 0015.4 3l-.6 1.3a18.2 18.2 0 00-5.5 0L8.7 3a19.5 19.5 0 00-4.9 1.4C.7 9 0 13.6.3 18.1a19.7 19.7 0 006 3l1.3-2a12.7 12.7 0 01-2-1l.5-.4a14 14 0 0012 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.6 19.6 0 006-3c.4-5.2-.7-9.7-3.3-13.7zM8.7 15.3c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4zm6.6 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4z"/></svg><span>Discord UEC</span></a>`;
+    shortcuts.querySelector('[data-sc="install"]')?.addEventListener("click", () => { closeDrawer(false); window.uecInstallApp?.(); });
+    quick.insertAdjacentElement("beforebegin", shortcuts);
+    const foot = document.createElement("small");
+    foot.className = "drawer-foot";
+    foot.textContent = "UEC21 · Ensemble, portons haut nos couleurs";
+    quick.insertAdjacentElement("afterend", foot);
+
+    // Live counters: upcoming meetings and events this account can see.
+    (async () => {
+        try {
+            const since = new Date(Date.now() - 6 * 3600000).toISOString();
+            const count = async table => {
+                const { count: n, error } = await sb.from(table).select("id", { count: "exact", head: true }).gte("starts_at", since).neq("status", "CANCELLED");
+                return error ? 0 : n || 0;
+            };
+            const [meetings, events] = await Promise.all([count("meetings"), count("club_events")]);
+            const badge = (selector, n) => {
+                if (!n) return;
+                sidebar.querySelectorAll(selector).forEach(link => {
+                    if (link.querySelector(".drawer-badge")) return;
+                    const b = document.createElement("span");
+                    b.className = "drawer-badge";
+                    b.textContent = n > 9 ? "9+" : String(n);
+                    b.setAttribute("aria-label", `${n} à venir`);
+                    link.appendChild(b);
+                });
+            };
+            badge('nav a[href*="reunions"], nav a[href="meetings.html"]', meetings);
+            badge('nav a[href*="evenements"], nav a[href="events.html"]', events);
+        } catch (_) { /* counters are optional */ }
+    })();
 }
 
 /* ============================================================
