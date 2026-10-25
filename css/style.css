@@ -1972,3 +1972,58 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
   .drawer-foot{display:block;margin:14px 0 4px;text-align:center;font-size:11px;color:#6f7480;letter-spacing:.03em}
 }
 @media(max-width:900px) and (prefers-reduced-motion:reduce){.sidebar.open nav a{animation:none}}
+
+/* ============================================================
+   PHONE DRAWER v3 — sober, list-based (overrides v1/v2 tiles)
+============================================================ */
+@media(max-width:900px){
+  .sidebar{width:min(320px,86vw);padding:0 0 calc(12px + env(safe-area-inset-bottom));border-radius:0 20px 20px 0;
+    background:#101014;box-shadow:16px 0 40px rgba(0,0,0,.5);border-right:1px solid rgba(255,255,255,.06)}
+  .sidebar::before{display:none}
+
+  /* Header: plain, aligned, no gradient */
+  .drawer-profile{margin:0;padding:calc(18px + env(safe-area-inset-top)) 18px 16px;border-radius:0;background:transparent;box-shadow:none;
+    border-bottom:1px solid rgba(255,255,255,.07)}
+  .drawer-profile::before{display:none}
+  .drawer-avatar{width:44px;height:44px;border-radius:50%;font-size:17px;background:#c8102e;box-shadow:none}
+  .drawer-who strong{font-size:15.5px;font-weight:700}
+  .drawer-who small{color:#8b909b;font-weight:500;letter-spacing:0;text-transform:none;font-size:12.5px}
+  .drawer-close{width:36px;height:36px;border-radius:10px;background:transparent;border:0;color:#8b909b}
+  .drawer-meta{display:none}
+
+  .drawer-search{margin:12px 14px 4px;min-height:40px;border-radius:10px;background:#1a1a20;border:0}
+  .drawer-search input{font-weight:500;font-size:14px}
+
+  /* Navigation: one column, rows with icon + label + chevron */
+  .sidebar nav{display:flex;flex-direction:column;gap:2px;padding:8px 10px 0}
+  .sidebar nav::before{content:"MENU";padding:10px 10px 6px;font-size:11px;font-weight:700;letter-spacing:.12em;color:#5f6470}
+  .sidebar nav a{flex-direction:row;align-items:center;justify-content:flex-start;gap:14px;min-height:48px;padding:0 12px;border-radius:10px;
+    background:transparent;border:0;color:#d4d6dc;font-size:14.5px;font-weight:500;box-shadow:none}
+  .sidebar nav a .nav-icon{width:20px;height:20px;padding:0;border-radius:0;background:none;color:#8b909b}
+  .sidebar nav a::after{content:"";margin-left:auto;width:7px;height:7px;border-right:1.6px solid #4b4f59;border-top:1.6px solid #4b4f59;transform:rotate(45deg)}
+  .sidebar nav a:active{transform:none;background:#1a1a20}
+  .sidebar nav a.active{background:rgba(200,16,46,.12);color:#fff;box-shadow:none;font-weight:600}
+  .sidebar nav a.active .nav-icon{background:none;color:#e51c3f}
+  .sidebar nav a.active::after{border-color:#e51c3f}
+  .sidebar nav a.nav-switch{min-height:48px;margin:8px 0 0;padding:0 12px;border-top:0;border-radius:10px;background:transparent;position:relative}
+  .sidebar nav a.nav-switch::before{content:"";position:absolute;left:12px;right:12px;top:-5px;height:1px;background:rgba(255,255,255,.07)}
+  .sidebar.open nav a{animation:none}
+
+  .drawer-badge{position:static;margin-left:auto;min-width:22px;height:20px;border-radius:10px;font-size:11.5px;font-weight:700;box-shadow:none;background:#c8102e}
+  .sidebar nav a:has(.drawer-badge)::after{margin-left:8px}
+  .sidebar nav a.active .drawer-badge{background:#c8102e;color:#fff}
+
+  /* Footer: account actions as plain rows */
+  .drawer-shortcuts{display:flex;flex-direction:column;gap:2px;margin:12px 10px 0;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)}
+  .drawer-sc{justify-content:flex-start;gap:14px;min-height:46px;padding:0 12px;border-radius:10px;border:0;background:transparent;color:#d4d6dc;font-weight:500;font-size:14.5px}
+  .drawer-sc svg{width:20px;height:20px;color:#8b909b}
+  .drawer-sc-discord{background:transparent;color:#d4d6dc}
+  .drawer-sc-discord svg{color:#5865F2}
+  .drawer-quick{display:flex;flex-direction:column;gap:2px;margin:0 10px;padding:0}
+  .drawer-quick .drawer-theme,.drawer-quick .side-logout{justify-content:flex-start;gap:14px;min-height:46px;padding:0 12px;border-radius:10px;border:0;
+    background:transparent;font-weight:500;font-size:14.5px}
+  .drawer-quick .drawer-theme{color:#d4d6dc}
+  .drawer-quick .drawer-theme-icon{color:#8b909b}
+  .drawer-quick .side-logout{color:#ff6b7f}
+  .drawer-foot{margin:10px 22px 0;text-align:left;color:#4b4f59}
+}
