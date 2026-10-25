@@ -58,7 +58,7 @@ function renderQuickActions(ctx){
   const items=[
     can(ctx,"manageMembers")&&{href:"subscribers.html",label:"Ajouter un abonné",icon:icon('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.6-5.6 5.5-5.6s5.5 2.3 5.5 5.6"/><path d="M18 8v6M15 11h6"/>')},
     can(ctx,"viewMembers")&&{href:"subscribers.html",label:"Abonnés",icon:icon('<circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c0-3.3 2.6-5.6 5.5-5.6s5.5 2.3 5.5 5.6"/><circle cx="17" cy="8.5" r="2.4"/><path d="M15.8 14.7c2.5.3 4.3 2.3 4.3 5.3"/>')},
-    can(ctx,"viewEvents")&&{href:"payments.html",label:"Collectes",icon:icon('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>')},
+    can(ctx,"viewEvents")&&{href:"payments.html",label:"Cotisations",icon:icon('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/>')},
     can(ctx,"viewMatches")&&{href:"admin-matchs.html",label:"Matchs",icon:icon('<circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/>')},
     can(ctx,"viewUsers")&&{href:"admin-users.html",label:"Comptes",icon:icon('<path d="M12 3.5l7 2.6v5.4c0 4.6-2.9 7.8-7 9-4.1-1.2-7-4.4-7-9V6.1l7-2.6z"/><path d="M9 12.2l2 2 4-4.2"/>')},
     can(ctx,"useMemberArea")&&{href:"subscriber.html",label:"Mon espace",icon:icon('<path d="M3.5 11L12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5h4v5"/>')}

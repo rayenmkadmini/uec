@@ -216,7 +216,7 @@ async function render() {
           ? (canResetAccess ? `<button class="icon-btn" aria-label="Nouvel accès pour ${escapeHtml(s.nom || "le membre")}" title="Nouvel accès (lien ou mot de passe temporaire)" onclick="resetPassword('${s.user_id}')">${ICONS.refresh}</button>` : "")
           : `<button class="icon-btn" aria-label="Activer le compte de ${escapeHtml(s.nom || "le membre")}" title="Activer le compte" onclick="activateMember('${s.id}')">${ICONS.play}</button>`}
         <button class="icon-btn danger" aria-label="Supprimer ${escapeHtml(s.nom || "le membre")}" title="Supprimer" onclick="deleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
-        ${canForceDelete ? `<button class="icon-btn force-delete-btn" aria-label="Suppression forcée de ${escapeHtml(s.nom || "le membre")} (paiements inclus)" title="Suppression forcée : membre + paiements des collectes" onclick="forceDeleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
+        ${canForceDelete ? `<button class="icon-btn force-delete-btn" aria-label="Suppression forcée de ${escapeHtml(s.nom || "le membre")} (paiements inclus)" title="Suppression forcée : membre + paiements des cotisations" onclick="forceDeleteSub('${s.id}')">${ICONS.trash}</button>` : ""}
       </td>
       ${mobileMemberCell(s, photoUrls.get(s.id))}
     </tr>
@@ -567,7 +567,7 @@ window.forceDeleteSub = async (id, reason = "") => {
     placeholder: "Tapez SUPPRIMER pour confirmer",
     confirmText: "Supprimer définitivement",
     validator: value => (String(value || "").trim().toUpperCase() === "SUPPRIMER" ? undefined : "Tapez SUPPRIMER pour confirmer."),
-    text: `${reason ? reason + " " : ""}Le membre, son compte de connexion et TOUS ses paiements dans les collectes seront supprimés définitivement (action enregistrée dans le journal).`
+    text: `${reason ? reason + " " : ""}Le membre, son compte de connexion et TOUS ses paiements dans les cotisations seront supprimés définitivement (action enregistrée dans le journal).`
   });
   if (typed === null) return;
   const call = await callAdminFunction("admin-delete-user", { subscriber_id: id, force: true });

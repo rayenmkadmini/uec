@@ -353,17 +353,17 @@
 
                 <div class="page-head">
                     <div>
-                        <span class="mini-label">GESTION DES COLLECTES</span>
-                        <h2 class="page-title">Collectes</h2>
+                        <span class="mini-label">GESTION DES COTISATIONS</span>
+                        <h2 class="page-title">Cotisations</h2>
                         <p class="page-sub">Objectifs globaux et contributions individuelles réelles de chaque adhérent.</p>
                     </div>
-                    <button type="button" id="addEventBtn" class="btn primary needs-configure">+ Nouvelle collecte</button>
+                    <button type="button" id="addEventBtn" class="btn primary needs-configure">+ Nouvelle cotisation</button>
                 </div>
 
                 <div class="kpi-grid" id="globalKpis"></div>
 
                 <div class="toolbar">
-                    <input id="collectionSearch" class="search" type="search" placeholder="Rechercher une collecte…" aria-label="Rechercher une collecte">
+                    <input id="collectionSearch" class="search" type="search" placeholder="Rechercher une cotisation…" aria-label="Rechercher une cotisation">
                     <select id="collectionStatusFilter" aria-label="Filtrer par statut">
                         <option value="">Tous les statuts</option>
                         <option value="DRAFT">Brouillon</option>
@@ -385,9 +385,9 @@
 
                 <div class="page-head">
                     <div>
-                        <button type="button" class="link-btn back-link" id="backToList">← Toutes les collectes</button>
+                        <button type="button" class="link-btn back-link" id="backToList">← Toutes les cotisations</button>
                         <div class="title-row">
-                            <h2 class="page-title" id="detailTitle">Collecte</h2>
+                            <h2 class="page-title" id="detailTitle">Cotisation</h2>
                             <span id="detailStatus"></span>
                         </div>
                         <p class="page-sub" id="detailMeta"></p>
@@ -514,8 +514,8 @@
     <div class="modal-box">
         <div class="modal-head">
             <div>
-                <span class="mini-label">COLLECTE</span>
-                <h2 id="eventFormTitle">Nouvelle collecte</h2>
+                <span class="mini-label">COTISATION</span>
+                <h2 id="eventFormTitle">Nouvelle cotisation</h2>
             </div>
             <button type="button" class="close" data-close aria-label="Fermer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -525,13 +525,13 @@
         <form id="eventForm" class="grid-form" novalidate>
             <input type="hidden" id="eventId">
 
-            <label class="span-2">Nom de la collecte *
+            <label class="span-2">Nom de la cotisation *
                 <input id="eventName" type="text" required maxlength="150" placeholder="Ex : Déplacement Coupe d'Afrique">
                 <small class="field-error" data-for="eventName"></small>
             </label>
 
             <label class="span-2">Description
-                <textarea id="eventDescription" rows="2" maxlength="1000" placeholder="Objet de la collecte, utilisation des fonds…"></textarea>
+                <textarea id="eventDescription" rows="2" maxlength="1000" placeholder="Objet de la cotisation, utilisation des fonds…"></textarea>
             </label>
 
             <label>Objectif global (DT) *

@@ -1,5 +1,5 @@
 /* ============================================================
-   GESTION DES COLLECTES — individual contributions
+   GESTION DES COTISATIONS — individual contributions
    Financial maths lives in collections-core.js (integer millimes).
    ============================================================ */
 const CC = window.CollectionsCore;
@@ -110,7 +110,7 @@ function errorMessage(error) {
     if (error?.code === "22023") return "Données invalides : vérifiez le montant, la date et le motif.";
     if (error?.code === "P0002") return "Élément introuvable : rechargez la page.";
     if (error?.code === "23503" || /violates foreign key/i.test(msg)) {
-        return "Cette collecte contient des paiements : elle ne peut pas être supprimée. Passez-la en « Annulée ».";
+        return "Cette cotisation contient des paiements : elle ne peut pas être supprimée. Passez-la en « Annulée ».";
     }
     if (error?.code === "42P01" || error?.code === "PGRST205" || /does not exist|schema cache/i.test(msg)) {
         return "La migration supabase/collections.sql n'a pas encore été appliquée.";
@@ -214,9 +214,9 @@ function renderGlobalKpis() {
     const reached = state.events.filter(e => eventSummary(e).reached).length;
 
     $("#globalKpis").innerHTML = `
-        ${kpi("Collectes actives", active.length, `${state.events.length} au total`)}
+        ${kpi("Cotisations actives", active.length, `${state.events.length} au total`)}
         ${kpi("Collecté (actives)", fmt(collected), target ? `sur ${fmt(target)} d'objectif` : "Aucun objectif défini", "money")}
-        ${kpi("Objectifs atteints", reached, "collectes")}
+        ${kpi("Objectifs atteints", reached, "cotisations")}
         ${kpi("En retard", overdue, "date limite dépassée", overdue ? "alert" : "")}
     `;
 }
@@ -246,14 +246,14 @@ function renderEvents() {
     if (!state.events.length) {
         container.innerHTML = `
             <div class="empty-card big">
-                <strong>Aucune collecte pour le moment</strong>
-                <p>Créez une collecte avec un objectif global, puis enregistrez les montants réellement versés par chaque membre.</p>
-                <button type="button" class="btn primary needs-configure" data-action="create">+ Nouvelle collecte</button>
+                <strong>Aucune cotisation pour le moment</strong>
+                <p>Créez une cotisation avec un objectif global, puis enregistrez les montants réellement versés par chaque membre.</p>
+                <button type="button" class="btn primary needs-configure" data-action="create">+ Nouvelle cotisation</button>
             </div>`;
         return;
     }
     if (!list.length) {
-        container.innerHTML = `<div class="empty-card">Aucune collecte ne correspond à ces filtres.</div>`;
+        container.innerHTML = `<div class="empty-card">Aucune cotisation ne correspond à ces filtres.</div>`;
         return;
     }
 
@@ -317,7 +317,7 @@ function openEventForm(event = null) {
     const form = $("#eventForm");
     form.reset();
     clearErrors(form);
-    $("#eventFormTitle").textContent = event ? "Modifier la collecte" : "Nouvelle collecte";
+    $("#eventFormTitle").textContent = event ? "Modifier la cotisation" : "Nouvelle cotisation";
     $("#eventId").value = event?.id || "";
     $("#eventName").value = event?.title || "";
     $("#eventDescription").value = event?.description || "";
@@ -380,7 +380,7 @@ async function saveEvent(submitEvent) {
     }
 
     closeModal(form);
-    showAlert("#pageAlert", id ? "Collecte mise à jour." : "Collecte créée.", "success");
+    showAlert("#pageAlert", id ? "Cotisation mise à jour." : "Cotisation créée.", "success");
     await loadEvents();
     if (state.current && state.current.id === id) {
         state.current = state.events.find(e => e.id === id) || state.current;
@@ -399,12 +399,12 @@ async function deleteEvent(id) {
         );
         return;
     }
-    if (!(await confirmDialog(`Supprimer définitivement la collecte « ${event.title} » ?`, { title: "Supprimer la collecte", confirmText: "Supprimer" }))) return;
+    if (!(await confirmDialog(`Supprimer définitivement la cotisation « ${event.title} » ?`, { title: "Supprimer la cotisation", confirmText: "Supprimer" }))) return;
 
     const result = await sb.from("events").delete().eq("id", id).select("id");
     const failure = result.error ? errorMessage(result.error) : writeError(result);
     if (failure) return showAlert("#pageAlert", failure, "error");
-    showAlert("#pageAlert", "Collecte supprimée.", "success");
+    showAlert("#pageAlert", "Cotisation supprimée.", "success");
     await loadEvents();
 }
 
@@ -461,7 +461,7 @@ function renderDetail() {
     const e = state.current;
     const s = currentSummary();
 
-    $("#detailTitle").textContent = e.title || "Collecte";
+    $("#detailTitle").textContent = e.title || "Cotisation";
     $("#detailStatus").innerHTML = statusBadgeFor(e.collection_status);
     $("#detailMeta").textContent = [
         e.category,
@@ -474,10 +474,10 @@ function renderDetail() {
     const alerts = [];
     if (s.reached) alerts.push(`<div class="notice success"><b>Objectif atteint 🎉</b> ${fmt(s.collected)} collectés sur ${fmt(s.target)}${s.surplus ? ` — excédent de <b>${fmt(s.surplus)}</b>` : ""}.</div>`);
     const d = CC.deadlineState(e);
-    if (d === "OVERDUE" && !s.reached) alerts.push(`<div class="notice danger"><b>Collecte en retard.</b> La date limite (${fmtDate(e.deadline)}) est dépassée et il manque ${fmt(s.remaining)}.</div>`);
+    if (d === "OVERDUE" && !s.reached) alerts.push(`<div class="notice danger"><b>Cotisation en retard.</b> La date limite (${fmtDate(e.deadline)}) est dépassée et il manque ${fmt(s.remaining)}.</div>`);
     if (d === "SOON" && !s.reached) alerts.push(`<div class="notice warning"><b>Échéance proche :</b> ${fmtDate(e.deadline)} — reste ${fmt(s.remaining)} à collecter.</div>`);
-    if (e.collection_status === "CANCELLED") alerts.push(`<div class="notice">Cette collecte est annulée. Les paiements existants restent consultables.</div>`);
-    if (!s.target) alerts.push(`<div class="notice">Aucun objectif global n'est défini pour cette collecte.</div>`);
+    if (e.collection_status === "CANCELLED") alerts.push(`<div class="notice">Cette cotisation est annulée. Les paiements existants restent consultables.</div>`);
+    if (!s.target) alerts.push(`<div class="notice">Aucun objectif global n'est défini pour cette cotisation.</div>`);
     $("#detailAlerts").innerHTML = alerts.join("");
 
     $("#finHero").innerHTML = `
@@ -667,7 +667,7 @@ function renderLedger() {
     state.ledgerPage = Math.min(state.ledgerPage, pages);
     const slice = rows.slice((state.ledgerPage - 1) * PAGE_SIZE, state.ledgerPage * PAGE_SIZE);
 
-    $("#ledgerRows").innerHTML = slice.length ? slice.map(p => ledgerRow(p, true)).join("") : rowsMessage(8, state.payments.length ? "Aucun paiement ne correspond à ces filtres." : "Aucun paiement enregistré pour cette collecte.");
+    $("#ledgerRows").innerHTML = slice.length ? slice.map(p => ledgerRow(p, true)).join("") : rowsMessage(8, state.payments.length ? "Aucun paiement ne correspond à ces filtres." : "Aucun paiement enregistré pour cette cotisation.");
     renderPager($("#ledgerPager"), state.ledgerPage, rows.length, n => { state.ledgerPage = n; renderLedger(); });
 }
 
@@ -751,7 +751,7 @@ function renderDrawer() {
         <div class="table-wrap"><table class="data-table compact">
             <thead><tr><th>Date</th><th class="num">Montant</th><th>Mode</th><th>Réf.</th><th>Note</th><th>Statut</th><th></th></tr></thead>
             <tbody>${history.map(p => ledgerRow(p, false)).join("")}</tbody>
-        </table></div>` : `<div class="empty-card">Ce membre n'a encore rien versé pour cette collecte.</div>`}
+        </table></div>` : `<div class="empty-card">Ce membre n'a encore rien versé pour cette cotisation.</div>`}
     `;
 }
 
@@ -970,7 +970,7 @@ function exportCsv() {
     const s = currentSummary();
     const num = m => CC.fromMillimes(m).toLocaleString("fr-FR", { minimumFractionDigits: 3 });
     const rows = [
-        ["Collecte", e.title],
+        ["Cotisation", e.title],
         ["Objectif (DT)", num(s.target)],
         ["Total collecté (DT)", num(s.collected)],
         ["Reste (DT)", num(s.remaining)],
@@ -995,7 +995,7 @@ function exportCsv() {
                 p.status === "VALID" ? "Valide" : "Annulé", p.cancel_reason || "", (p.created_at || "").slice(0, 19).replace("T", " ")];
         })
     ];
-    const slug = (e.title || "collecte").normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+    const slug = (e.title || "cotisation").normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase();
     download(`collecte-${slug}-${todayIso()}.csv`, CC.toCsv(rows), "text/csv;charset=utf-8");
 }
 
