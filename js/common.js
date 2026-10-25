@@ -680,7 +680,7 @@ function setupShell(ctx = null) {
             if (!mobile() || event.touches.length !== 1) return;
             const t = event.touches[0];
             const open = sidebar.classList.contains("open");
-            fromEdge = !open && t.clientX < 24;
+            fromEdge = false; // the phone menu is a bottom sheet now (opened from the tab bar)
             if (open || fromEdge) { startX = t.clientX; startY = t.clientY; } else startX = null;
         }, { passive: true });
         document.addEventListener("touchend", event => {
@@ -715,6 +715,32 @@ function setupShell(ctx = null) {
 function enhanceDrawer(sidebar, ctx, profile, quick, closeDrawer) {
     const now = new Date();
     const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const handle = document.createElement("span");
+    handle.className = "sheet-handle";
+    handle.setAttribute("aria-hidden", "true");
+    sidebar.insertAdjacentElement("afterbegin", handle);
+
+    // Bottom sheet on phones: drag down from the top area to close.
+    let dragY = null;
+    sidebar.addEventListener("touchstart", event => {
+        if (event.touches.length === 1 && sidebar.scrollTop <= 0 && event.touches[0].clientY - sidebar.getBoundingClientRect().top < 90) dragY = event.touches[0].clientY;
+        else dragY = null;
+    }, { passive: true });
+    sidebar.addEventListener("touchmove", event => {
+        if (dragY === null) return;
+        const dy = Math.max(0, event.touches[0].clientY - dragY);
+        sidebar.style.transition = "none";
+        sidebar.style.setProperty("transform", `translateY(${dy}px)`, "important");
+    }, { passive: true });
+    sidebar.addEventListener("touchend", event => {
+        if (dragY === null) return;
+        const dy = event.changedTouches[0].clientY - dragY;
+        sidebar.style.transition = "";
+        sidebar.style.removeProperty("transform");
+        dragY = null;
+        if (dy > 90) closeDrawer(false);
+    }, { passive: true });
+
     const meta = document.createElement("div");
     meta.className = "drawer-meta";
     meta.innerHTML = `<span>Saison ${y}-${y + 1}</span><span class="drawer-dot" aria-hidden="true"></span><span>UEC21 Members</span>`;

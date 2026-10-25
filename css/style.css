@@ -2032,3 +2032,47 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
   .sidebar::-webkit-scrollbar{display:none}
   .drawer-profile{position:sticky;top:0;z-index:2;background:#101014}
 }
+
+/* ============================================================
+   PHONE MENU v4 — bottom sheet with an app-launcher grid
+   (replaces the side drawer on phones)
+============================================================ */
+@media(max-width:900px){
+  .sidebar,html[dir="rtl"] .sidebar{position:fixed;inset:auto 0 0 0!important;top:auto!important;width:100%!important;height:auto!important;max-height:88dvh;
+    transform:translateY(105%)!important;border-radius:26px 26px 0 0!important;border:0;border-top:1px solid rgba(255,255,255,.08);
+    padding:0 0 calc(14px + env(safe-area-inset-bottom))!important;background:#121217!important;box-shadow:0 -20px 60px rgba(0,0,0,.55)!important;
+    transition:transform .34s cubic-bezier(.2,.9,.25,1)!important;overflow-y:auto;z-index:60}
+  .sidebar.open,html[dir="rtl"] .sidebar.open{transform:translateY(0)!important}
+  .sidebar-backdrop.visible{z-index:59;background:rgba(5,6,8,.55)!important;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  .sheet-handle{display:block;width:42px;height:5px;margin:10px auto 2px;border-radius:99px;background:rgba(255,255,255,.22)}
+
+  /* compact identity row */
+  .drawer-profile{position:static;padding:10px 18px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:transparent}
+  .drawer-avatar{width:40px;height:40px;font-size:16px}
+  .drawer-close{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.07);color:#c9ccd4}
+  .drawer-search{display:none}
+
+  /* app-launcher grid */
+  .sidebar nav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 6px;padding:16px 12px 6px!important}
+  .sidebar nav::before{display:none}
+  .sidebar nav a,.sidebar nav a.nav-switch{position:relative;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;gap:7px!important;
+    min-height:0!important;padding:4px 0!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;
+    font-size:11.5px!important;font-weight:600!important;color:#c9ccd4!important;text-align:center;line-height:1.2}
+  .sidebar nav a::after,.sidebar nav a.nav-switch::before{display:none!important}
+  .sidebar nav a .nav-icon{width:24px!important;height:24px!important;padding:15px!important;box-sizing:content-box;border-radius:18px!important;
+    background:#1d1d24!important;color:#e6e7eb!important;transition:transform .15s}
+  .sidebar nav a:active .nav-icon{transform:scale(.92)}
+  .sidebar nav a.active{color:#fff!important;background:transparent!important}
+  .sidebar nav a.active .nav-icon{background:linear-gradient(135deg,#e51c3f,#a30d27)!important;color:#fff!important;box-shadow:0 10px 22px -10px rgba(229,28,63,.8)}
+  .sidebar nav a span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .drawer-badge{position:absolute!important;top:0;right:calc(50% - 32px);margin:0!important;min-width:19px;height:19px;font-size:10.5px;box-shadow:0 0 0 2px #121217!important}
+
+  /* actions: one row of round buttons */
+  .drawer-shortcuts{flex-direction:row!important;gap:8px;margin:10px 16px 0!important;padding-top:14px!important}
+  .drawer-sc{flex:1;justify-content:center!important;gap:8px!important;min-height:44px!important;border-radius:14px!important;background:#1d1d24!important;font-size:13px!important;font-weight:600!important}
+  .drawer-quick{flex-direction:row!important;gap:8px!important;margin:8px 16px 0!important}
+  .drawer-quick .drawer-theme,.drawer-quick .side-logout{flex:1;justify-content:center!important;min-height:44px!important;border-radius:14px!important;background:#1d1d24!important;font-size:13px!important;font-weight:600!important}
+  .drawer-quick .side-logout{background:rgba(229,28,63,.12)!important}
+  .drawer-foot{display:none}
+}
+@media(min-width:901px){.sheet-handle{display:none}}
