@@ -76,7 +76,7 @@
     const today = new Date().toISOString().slice(0, 10);
     const [me, matches, meetings, myMeetings, events, myEvents] = await Promise.all([
       sb.from("subscribers").select("prenom,nom,numero_abonnement,card_paid").eq("user_id", userId).maybeSingle(),
-      sb.from("matches").select("id,home_team,away_team,match_date,match_time,stadium").eq("is_active", true).gte("match_date", today).order("match_date", { ascending: true }).order("match_time", { ascending: true }).limit(3),
+      sb.from("matches").select("id,home_team,away_team,home_logo_url,away_logo_url,match_date,match_time,stadium").eq("is_active", true).gte("match_date", today).order("match_date", { ascending: true }).order("match_time", { ascending: true }).limit(3),
       sb.from("meetings").select("id,title,starts_at,duration_min,status").order("starts_at", { ascending: true }),
       sb.from("meeting_participants").select("meeting_id,status").eq("user_id", userId),
       sb.from("club_events").select("id,title,starts_at,duration_min,status,location").order("starts_at", { ascending: true }),
@@ -111,18 +111,21 @@
 
     // One agenda: matches, events and meetings, soonest first.
     const items = [
-      ...(matches.data || []).map(m => ({ kind: "match", when: `${m.match_date}T${m.match_time || "00:00"}`, title: `${m.home_team} – ${m.away_team}`, sub: m.stadium || "Match", href: "matchs.html", cta: "Ma place" })),
+      ...(matches.data || []).map(m => ({ kind: "match", match: m, when: `${m.match_date}T${m.match_time || "00:00"}`, title: `${m.home_team} – ${m.away_team}`, sub: m.stadium || "Match", href: "matchs.html", cta: "Ma place" })),
       ...ev.filter(x => end(x) >= Date.now()).map(x => ({ kind: "event", when: x.starts_at, title: x.title, sub: x.location || "Événement", href: "subscriber.html#evenements",
         cta: x.me.rsvp === "GOING" ? "Inscrit ✓" : x.me.rsvp === "NOT_GOING" ? "Décliné" : "Répondre", pending: x.me.rsvp === "NONE" })),
       ...mt.filter(x => end(x) >= Date.now()).map(x => ({ kind: "meeting", when: x.starts_at, title: x.title, sub: "Discord UEC", href: "subscriber.html#reunions", cta: "Voir" }))
     ].sort((a, b) => new Date(a.when) - new Date(b.when)).slice(0, 5);
     const LABEL = { match: "Match", event: "Événement", meeting: "Réunion" };
+    const logos = (matches.data || []).length ? await loadClubLogos().catch(() => new Map()) : new Map();
     const box = document.getElementById("mhAgenda");
     if (box) box.innerHTML = items.length ? items.map(it => {
       const d = new Date(it.when);
       return `<a class="mh-item ${it.kind}" href="${it.href}">
-        <span class="mh-item-date"><b>${String(d.getDate()).padStart(2, "0")}</b><small>${d.toLocaleDateString("fr-FR", { month: "short" })}</small></span>
-        <span class="mh-item-main"><small>${LABEL[it.kind]} · ${countdown(it.when)}</small><b>${escapeHtml(it.title)}</b><em>${d.toLocaleDateString("fr-FR", { weekday: "long" })} · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · ${escapeHtml(it.sub)}</em></span>
+        ${it.match
+          ? `<span class="mh-item-logos">${teamLogoImg(it.match.home_team, "HOME", it.match.home_logo_url, logos)}${teamLogoImg(it.match.away_team, "AWAY", it.match.away_logo_url, logos)}</span>`
+          : `<span class="mh-item-date"><b>${String(d.getDate()).padStart(2, "0")}</b><small>${d.toLocaleDateString("fr-FR", { month: "short" })}</small></span>`}
+        <span class="mh-item-main"><small>${LABEL[it.kind]} · ${countdown(it.when)}</small><b>${escapeHtml(it.title)}</b><em>${d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "short" })} · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · ${escapeHtml(it.sub)}</em></span>
         <span class="mh-item-cta${it.pending ? " pending" : ""}">${it.cta}</span>
       </a>`;
     }).join("") : '<div class="mh-empty">Rien de prévu pour le moment. Les prochains matchs, événements et réunions apparaîtront ici.</div>';

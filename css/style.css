@@ -2183,3 +2183,7 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .mh-stat-icon{flex:none;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:24px;background:rgba(34,197,94,.12)}
 .mh-stat.warn .mh-stat-icon{background:rgba(245,158,11,.14)}
 @media(max-width:600px){.mh-stats{grid-template-columns:1fr}}
+.mh-item-logos{position:relative;width:52px;height:44px;flex:none}
+.mh-item-logos .team-logo{position:absolute;width:32px;height:32px;object-fit:contain;padding:3px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.mh-item-logos .team-logo:first-child{left:0;top:0;z-index:2}
+.mh-item-logos .team-logo:last-child{right:0;bottom:0}
