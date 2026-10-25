@@ -4,6 +4,31 @@
    screenshot is easy to spot, the screen kept awake (Wake Lock), tap the
    card to flip it. Closes with ✕, Escape or the back gesture.
 ============================================================ */
+/* Manifesto under the card: read aloud (speech synthesis) and share. */
+(function () {
+  const text = () => `${document.getElementById("manifestoText")?.textContent || ""} ${document.querySelector(".um-motto")?.textContent || ""}`.trim();
+  const listen = document.getElementById("manifestoListen");
+  if (listen && "speechSynthesis" in window) {
+    listen.addEventListener("click", () => {
+      if (speechSynthesis.speaking) { speechSynthesis.cancel(); listen.classList.remove("on"); return; }
+      const say = new SpeechSynthesisUtterance(text());
+      say.lang = "fr-FR";
+      say.rate = 0.95;
+      say.onend = () => listen.classList.remove("on");
+      listen.classList.add("on");
+      speechSynthesis.speak(say);
+    });
+  } else listen?.remove();
+  document.getElementById("manifestoShare")?.addEventListener("click", async () => {
+    const data = { title: "UEC21 — Union des Étudiants Clubistes", text: text() };
+    try {
+      if (navigator.share) await navigator.share(data);
+      else { await navigator.clipboard.writeText(data.text); showAlert("#pageAlert", "Texte copié.", "success"); }
+    } catch (_) { /* cancelled */ }
+  });
+  window.addEventListener("hashchange", () => { if (window.speechSynthesis?.speaking) { speechSynthesis.cancel(); listen?.classList.remove("on"); } });
+})();
+
 (function () {
   const button = document.getElementById("presentCardBtn");
   if (!button) return;
