@@ -83,6 +83,17 @@
       sb.from("club_event_participants").select("event_id,status,rsvp").eq("user_id", userId)
     ]);
 
+    const ann = await sb.from("announcements").select("title,body,pinned,created_at").order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(1);
+    const latest = ann.data?.[0];
+    if (latest) {
+      let seen = 0;
+      try { seen = Number(localStorage.getItem("uec-announcements-seen") || 0); } catch (_) {}
+      set("mhAnnTag", new Date(latest.created_at).getTime() > seen ? "Nouvelle annonce" : latest.pinned ? "Annonce épinglée" : "Dernière annonce");
+      set("mhAnnTitle", latest.title);
+      set("mhAnnBody", latest.body);
+      document.getElementById("mhAnn")?.classList.remove("hidden");
+    }
+
     if (me.data) {
       set("mhNumber", `N° ${me.data.numero_abonnement || "—"}`);
       const avatar = document.getElementById("mhAvatar");

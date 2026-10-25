@@ -79,9 +79,9 @@ function goTo(context, page) {
 const EXPECTED = {
   SUPERADMIN: Object.keys(PERMS.PERMISSIONS).filter(p => !["useMemberArea", "editOwnProfile", "chooseOwnSeat"].includes(p)),
   // 20261019120000: ADMIN manages members and sees their identity fields.
-  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewMemberIdentity", "manageMembers", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile", "manageMeetings"],
-  TREASURER: ["viewMembers", "manageCardPayments", "viewEvents", "manageEventPaymentStatuses", "viewFinancialReports", "viewStaffProfile"],
-  MEMBER: ["useMemberArea", "editOwnProfile", "chooseOwnSeat"]
+  ADMIN: ["viewDashboard", "viewMembers", "viewMemberDetails", "viewMemberIdentity", "manageMembers", "viewEvents", "viewFinancialReports", "viewMatches", "viewUsers", "viewReferences", "viewStaffProfile", "manageMeetings", "useCommunity"],
+  TREASURER: ["viewMembers", "manageCardPayments", "viewEvents", "manageEventPaymentStatuses", "viewFinancialReports", "viewStaffProfile", "useCommunity"],
+  MEMBER: ["useMemberArea", "editOwnProfile", "chooseOwnSeat", "useCommunity"]
 };
 
 for (const [role, allowed] of Object.entries(EXPECTED)) {
@@ -248,7 +248,9 @@ const PAGE_SCRIPTS = {
   "subscriber.html": "js/subscriber.js",
   "matchs.html": "js/matchs.js",
   "meetings.html": "js/meetings.js",
-  "events.html": "js/events.js"
+  "events.html": "js/events.js",
+  "chat.html": "js/chat.js",
+  "annonces.html": "js/announcements.js"
 };
 
 test("every protected page loads permissions.js before common.js and guards with its page permission", () => {

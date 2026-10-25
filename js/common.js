@@ -553,6 +553,17 @@ function setupShell(ctx = null) {
             if (location.pathname.endsWith("/events.html")) events.className = "active";
             events.innerHTML = '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg> <span>Événements</span>';
             link.insertAdjacentElement("afterend", events);
+            const community = [["annonces.html", "Annonces", '<path d="M3 10v4a1 1 0 001 1h2l5 4V5L6 9H4a1 1 0 00-1 1z"/><path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/>'],
+                ["chat.html", "Discussion", '<path d="M20 12a8 8 0 01-11.8 7L4 20l1.1-3.9A8 8 0 1120 12z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/>']];
+            let anchor = events;
+            for (const [href, label, path] of community) {
+                const a = document.createElement("a");
+                a.href = href;
+                if (location.pathname.endsWith("/" + href)) a.className = "active";
+                a.innerHTML = `<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg> <span>${label}</span>`;
+                anchor.insertAdjacentElement("afterend", a);
+                anchor = a;
+            }
         }
         if (nav && adminSidebar && can(ctx, "viewStaffProfile") && !nav.querySelector('a[href="profile.html"]')) {
             const profileLink = document.createElement("a");

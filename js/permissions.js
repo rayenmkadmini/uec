@@ -50,6 +50,8 @@
         editStaffProfile: ["SUPERADMIN"],
         // Meetings (réunions): organised by the bureau; any invited account can join.
         manageMeetings: ["SUPERADMIN", "ADMIN"],
+        // Community: chat and announcements, for every account (writes are checked by the database).
+        useCommunity: ["SUPERADMIN", "ADMIN", "TREASURER", "MEMBER"],
         useMemberArea: ["MEMBER"],
         editOwnProfile: ["MEMBER"],
         chooseOwnSeat: ["MEMBER"]
@@ -66,6 +68,8 @@
         "zones.html": "viewReferences",
         "meetings.html": "manageMeetings",
         "events.html": "manageMeetings",
+        "chat.html": "useCommunity",
+        "annonces.html": "useCommunity",
         "profile.html": "viewStaffProfile",
         "subscriber.html": "useMemberArea",
         "matchs.html": "chooseOwnSeat"
