@@ -2143,3 +2143,7 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .mc-action.primary{background:linear-gradient(135deg,#e51c3f,#a30d27);border-color:transparent;color:#fff;box-shadow:0 14px 26px -14px rgba(229,28,63,.85)}
 .mc-action.primary svg{color:#fff}
 @media print{.mc-head,.mc-actions{display:none!important}.mc-stage{background:none;border:0;padding:0}}
+/* profile photo in avatars */
+.has-photo{overflow:hidden;padding:0!important}
+.avatar-photo{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
+.mh-avatar.has-photo{border:2px solid rgba(255,255,255,.75);box-shadow:0 10px 24px -10px rgba(0,0,0,.6)}

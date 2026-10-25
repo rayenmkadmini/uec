@@ -31,6 +31,7 @@ async function renderMemberCard(subscriber) {
   const photo = photoUrl ? `<img src="${escapeHtml(photoUrl)}" alt="Photo du membre" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` : "";
 
   card.innerHTML = renderVirtualMemberCard(subscriber, { photoUrl });
+  showProfilePhoto(photoUrl);
 }
 
 async function loadUpcomingMatches() {
@@ -120,6 +121,18 @@ async function withOwnPrivateFields(subscriber) {
     },
     error: null
   };
+}
+
+// Profile photo in the home hero, the top bar and the menu (initial as fallback).
+function showProfilePhoto(url) {
+  if (!url) return;
+  document.querySelectorAll("#mhAvatar, .top-user .avatar, .drawer-avatar").forEach(node => {
+    const img = new Image();
+    img.alt = "";
+    img.className = "avatar-photo";
+    img.onload = () => { node.textContent = ""; node.appendChild(img); node.classList.add("has-photo"); };
+    img.src = url;
+  });
 }
 
 (async function init() {
