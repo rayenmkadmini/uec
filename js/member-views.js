@@ -59,45 +59,73 @@
     return `${day} · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`;
   };
 
+  // "dans 2 j", "dans 3 h", "maintenant"
+  const countdown = date => {
+    const ms = new Date(date).getTime() - Date.now();
+    if (ms <= 0) return "en cours";
+    const h = Math.floor(ms / 3600000);
+    if (h < 1) return `dans ${Math.max(1, Math.round(ms / 60000))} min`;
+    if (h < 24) return `dans ${h} h`;
+    return `dans ${Math.round(h / 24)} j`;
+  };
+
   async function summary() {
     const { data: auth } = await sb.auth.getUser();
     const userId = auth?.user?.id;
     if (!userId) return;
     const today = new Date().toISOString().slice(0, 10);
-    const [me, match, meetings, myMeetings, events, myEvents] = await Promise.all([
-      sb.from("subscribers").select("prenom,nom,numero_abonnement").eq("user_id", userId).maybeSingle(),
-      sb.from("matches").select("home_team,away_team,match_date,match_time").eq("is_active", true).gte("match_date", today).order("match_date", { ascending: true }).order("match_time", { ascending: true }).limit(1),
+    const [me, matches, meetings, myMeetings, events, myEvents] = await Promise.all([
+      sb.from("subscribers").select("prenom,nom,numero_abonnement,card_paid").eq("user_id", userId).maybeSingle(),
+      sb.from("matches").select("id,home_team,away_team,match_date,match_time,stadium").eq("is_active", true).gte("match_date", today).order("match_date", { ascending: true }).order("match_time", { ascending: true }).limit(3),
       sb.from("meetings").select("id,title,starts_at,duration_min,status").order("starts_at", { ascending: true }),
       sb.from("meeting_participants").select("meeting_id,status").eq("user_id", userId),
       sb.from("club_events").select("id,title,starts_at,duration_min,status,location").order("starts_at", { ascending: true }),
-      sb.from("club_event_participants").select("event_id,status").eq("user_id", userId)
+      sb.from("club_event_participants").select("event_id,status,rsvp").eq("user_id", userId)
     ]);
 
     if (me.data) {
       set("mhNumber", `N° ${me.data.numero_abonnement || "—"}`);
-      set("mhAvatar", (me.data.prenom || me.data.nom || "U").charAt(0).toUpperCase());
+      const avatar = document.getElementById("mhAvatar");
+      if (avatar && !avatar.classList.contains("has-photo")) avatar.textContent = (me.data.prenom || me.data.nom || "U").charAt(0).toUpperCase();
+      set("mhCardState", me.data.card_paid ? "Carte payée" : "Carte non payée");
+      set("mhCardSub", me.data.card_paid ? "Vous êtes en règle ✓" : "Rapprochez-vous du trésorier");
+      set("mhCardIcon", me.data.card_paid ? "✅" : "⏳");
+      document.querySelector("#mhCardIcon")?.closest(".mh-stat")?.classList.toggle("warn", !me.data.card_paid);
     }
-    const m = match.data?.[0];
-    if (m) { set("mhMatch", `${m.home_team} – ${m.away_team}`); set("mhMatchSub", when(`${m.match_date}T${m.match_time || "00:00"}`)); }
-    else set("mhMatchSub", "Aucun match programmé");
 
     const end = x => new Date(x.starts_at).getTime() + x.duration_min * 60000;
-    const pick = (list, mine, key) => {
-      const status = new Map((mine.data || []).map(p => [p[key], p.status]));
-      const items = (list.data || []).filter(x => status.has(x.id) && x.status !== "CANCELLED");
-      const next = items.find(x => end(x) >= Date.now());
-      const past = items.filter(x => end(x) < Date.now());
-      const attended = past.filter(x => ["PRESENT", "LATE"].includes(status.get(x.id))).length;
-      return { next, past: past.length, attended };
+    const mine = (list, rows, key) => {
+      const status = new Map((rows.data || []).map(p => [p[key], p]));
+      return (list.data || []).filter(x => status.has(x.id) && x.status !== "CANCELLED").map(x => ({ ...x, me: status.get(x.id) }));
     };
-    const ev = pick(events, myEvents, "event_id");
-    const mt = pick(meetings, myMeetings, "meeting_id");
-    if (ev.next) { set("mhEvent", ev.next.title); set("mhEventSub", when(ev.next.starts_at)); } else set("mhEventSub", "Rien de prévu");
-    if (mt.next) { set("mhMeeting", mt.next.title); set("mhMeetingSub", when(mt.next.starts_at)); } else set("mhMeetingSub", "Rien de prévu");
-    const total = ev.past + mt.past;
-    const rate = total ? Math.round(((ev.attended + mt.attended) / total) * 100) : null;
+    const ev = mine(events, myEvents, "event_id");
+    const mt = mine(meetings, myMeetings, "meeting_id");
+
+    // Attendance over finished meetings and events.
+    const done = [...ev, ...mt].filter(x => end(x) < Date.now());
+    const attended = done.filter(x => ["PRESENT", "LATE"].includes(x.me.status)).length;
+    const rate = done.length ? Math.round((attended / done.length) * 100) : null;
     set("mhRate", rate === null ? "—" : `${rate}%`);
+    set("mhRateSub", rate === null ? "pas encore d’historique" : `${attended} présence(s) sur ${done.length}`);
     document.getElementById("mhRing")?.style.setProperty("--p", `${rate || 0}%`);
+
+    // One agenda: matches, events and meetings, soonest first.
+    const items = [
+      ...(matches.data || []).map(m => ({ kind: "match", when: `${m.match_date}T${m.match_time || "00:00"}`, title: `${m.home_team} – ${m.away_team}`, sub: m.stadium || "Match", href: "matchs.html", cta: "Ma place" })),
+      ...ev.filter(x => end(x) >= Date.now()).map(x => ({ kind: "event", when: x.starts_at, title: x.title, sub: x.location || "Événement", href: "subscriber.html#evenements",
+        cta: x.me.rsvp === "GOING" ? "Inscrit ✓" : x.me.rsvp === "NOT_GOING" ? "Décliné" : "Répondre", pending: x.me.rsvp === "NONE" })),
+      ...mt.filter(x => end(x) >= Date.now()).map(x => ({ kind: "meeting", when: x.starts_at, title: x.title, sub: "Discord UEC", href: "subscriber.html#reunions", cta: "Voir" }))
+    ].sort((a, b) => new Date(a.when) - new Date(b.when)).slice(0, 5);
+    const LABEL = { match: "Match", event: "Événement", meeting: "Réunion" };
+    const box = document.getElementById("mhAgenda");
+    if (box) box.innerHTML = items.length ? items.map(it => {
+      const d = new Date(it.when);
+      return `<a class="mh-item ${it.kind}" href="${it.href}">
+        <span class="mh-item-date"><b>${String(d.getDate()).padStart(2, "0")}</b><small>${d.toLocaleDateString("fr-FR", { month: "short" })}</small></span>
+        <span class="mh-item-main"><small>${LABEL[it.kind]} · ${countdown(it.when)}</small><b>${escapeHtml(it.title)}</b><em>${d.toLocaleDateString("fr-FR", { weekday: "long" })} · ${d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · ${escapeHtml(it.sub)}</em></span>
+        <span class="mh-item-cta${it.pending ? " pending" : ""}">${it.cta}</span>
+      </a>`;
+    }).join("") : '<div class="mh-empty">Rien de prévu pour le moment. Les prochains matchs, événements et réunions apparaîtront ici.</div>';
   }
   const start = () => summary().catch(() => {});
   if (document.readyState === "complete") start(); else window.addEventListener("load", start);

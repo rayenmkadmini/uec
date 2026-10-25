@@ -2147,3 +2147,39 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .has-photo{overflow:hidden;padding:0!important}
 .avatar-photo{width:100%;height:100%;object-fit:cover;display:block;border-radius:inherit}
 .mh-avatar.has-photo{border:2px solid rgba(255,255,255,.75);box-shadow:0 10px 24px -10px rgba(0,0,0,.6)}
+
+/* ============================================================
+   MON ESPACE v3 — quick actions, unified agenda, stats
+============================================================ */
+.mh-actions-row{display:grid!important;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.mh-actions-row .btn{width:100%;min-height:46px}
+.mh-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.mh-quick a{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 4px 12px;border-radius:18px;text-decoration:none;color:inherit;
+  background:var(--card,#16161b);border:1px solid var(--border,rgba(255,255,255,.08));font-size:12.5px;font-weight:700;transition:transform .15s,border-color .15s}
+.mh-quick a:active{transform:scale(.96)}
+.mh-quick svg{width:24px;height:24px;color:#e51c3f}
+.mh-quick .mh-q-discord svg{color:#5865F2}
+.mh-next .panel-head{margin-bottom:6px}
+.mh-agenda{display:flex;flex-direction:column}
+.mh-item{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 2px;text-decoration:none;color:inherit;border-top:1px solid var(--border,rgba(255,255,255,.07))}
+.mh-item:first-child{border-top:0}
+.mh-item-date{width:48px;padding:6px 0;border-radius:12px;text-align:center;background:rgba(229,28,63,.1);color:#e51c3f}
+.mh-item.meeting .mh-item-date{background:rgba(88,101,242,.14);color:#8b93ff}
+.mh-item.event .mh-item-date{background:rgba(245,158,11,.14);color:#f59e0b}
+.mh-item-date b{display:block;font-size:19px;font-weight:900;line-height:1.05;color:var(--text,#fff)}
+.mh-item-date small{display:block;font-size:10.5px;font-weight:800;text-transform:uppercase}
+.mh-item-main{min-width:0;display:flex;flex-direction:column;gap:2px}
+.mh-item-main small{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#9aa0aa)}
+.mh-item-main b{font-size:15px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh-item-main em{font-style:normal;font-size:12.5px;color:var(--muted,#9aa0aa);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mh-item-cta{flex:none;padding:7px 11px;border-radius:999px;font-size:12px;font-weight:800;background:rgba(127,127,127,.14)}
+.mh-item-cta.pending{background:#c8102e;color:#fff;animation:mtBlink 2s ease-in-out infinite}
+.mh-empty{padding:14px 2px;color:var(--muted,#9aa0aa);font-size:14px}
+.mh-stats{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.mh-stat{display:flex;align-items:center;gap:12px;padding:14px;border-radius:18px;background:var(--card,#16161b);border:1px solid var(--border,rgba(255,255,255,.08))}
+.mh-stat b{display:block;font-size:14.5px;font-weight:800}
+.mh-stat small{display:block;font-size:12px;color:var(--muted,#9aa0aa);margin-top:2px}
+.mh-stat .mh-ring{flex:none;margin:0}
+.mh-stat-icon{flex:none;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;font-size:24px;background:rgba(34,197,94,.12)}
+.mh-stat.warn .mh-stat-icon{background:rgba(245,158,11,.14)}
+@media(max-width:600px){.mh-stats{grid-template-columns:1fr}}

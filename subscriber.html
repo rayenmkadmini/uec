@@ -27,15 +27,23 @@
             <div class="mh-chips"><span id="statusBadge" class="badge">Chargement du statut…</span><span class="mh-chip" id="mhNumber">N° —</span><span class="mh-chip" id="mhSeason">Saison</span></div>
           </div>
         </div>
-        <div class="hero-actions mh-actions">
-          <a class="btn primary mh-card-btn" href="subscriber.html#carte">Ma carte membre</a><a class="btn secondary" href="https://staduim.ueclubistes.tn" target="_blank" rel="noopener noreferrer">Live du stade</a>
+        <div class="hero-actions mh-actions mh-actions-row">
+          <a class="btn primary mh-card-btn" href="subscriber.html#carte">Ma carte membre</a><a class="btn secondary" href="https://staduim.ueclubistes.tn" target="_blank" rel="noopener noreferrer">Live du stade 🔴</a>
         </div>
       </section>
-      <section class="mh-tiles" data-view="accueil" aria-label="En bref">
-        <a class="mh-tile" href="matchs.html"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8.2l3.4 2.5-1.3 4h-4.2l-1.3-4z"/><path d="M12 8.2V4.6M15.4 10.7l3.3-1.4M13.1 14.7l1.9 3.1M8.9 14.7L7 17.8M8.6 10.7L5.3 9.3"/></svg></span><small>Prochain match</small><b id="mhMatch">—</b><em id="mhMatchSub"></em></a>
-        <a class="mh-tile" href="subscriber.html#evenements"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg></span><small>Prochain événement</small><b id="mhEvent">—</b><em id="mhEventSub"></em></a>
-        <a class="mh-tile" href="subscriber.html#reunions"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg></span><small>Prochaine réunion</small><b id="mhMeeting">—</b><em id="mhMeetingSub"></em></a>
-        <a class="mh-tile mh-tile-rate" href="subscriber.html#evenements"><span class="mh-ring" id="mhRing" style="--p:0%"><b id="mhRate">—</b></span><small>Assiduité</small><em>réunions et événements</em></a>
+      <section class="mh-quick" data-view="accueil" aria-label="Accès rapides">
+        <a href="subscriber.html#carte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2"/><path d="M14 10h4.5M14 13.5h3"/></svg><span>Ma carte</span></a>
+        <a href="matchs.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20h18M5 20V9l7-5 7 5v11"/><path d="M9 20v-6h6v6"/></svg><span>Ma place</span></a>
+        <a href="subscriber.html#evenements"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Agenda</span></a>
+        <a href="https://discord.gg/chRj5Ycj" target="_blank" rel="noopener" class="mh-q-discord"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.3 4.4A19.6 19.6 0 0015.4 3l-.6 1.3a18.2 18.2 0 00-5.5 0L8.7 3a19.5 19.5 0 00-4.9 1.4C.7 9 0 13.6.3 18.1a19.7 19.7 0 006 3l1.3-2a12.7 12.7 0 01-2-1l.5-.4a14 14 0 0012 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.6 19.6 0 006-3c.4-5.2-.7-9.7-3.3-13.7zM8.7 15.3c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4zm6.6 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4z"/></svg><span>Discord</span></a>
+      </section>
+      <section class="panel mh-next" data-view="accueil" aria-labelledby="mhNextTitle">
+        <div class="panel-head"><div><span class="mini-label">AGENDA</span><h2 id="mhNextTitle">Prochainement</h2></div></div>
+        <div id="mhAgenda" class="mh-agenda"><div class="loading-state">Chargement…</div></div>
+      </section>
+      <section class="mh-stats" data-view="accueil" aria-label="Mes statistiques">
+        <div class="mh-stat"><span class="mh-ring" id="mhRing" style="--p:0%"><b id="mhRate">—</b></span><div><b>Assiduité</b><small id="mhRateSub">réunions et événements</small></div></div>
+        <div class="mh-stat"><span class="mh-stat-icon" id="mhCardIcon">💳</span><div><b id="mhCardState">Carte</b><small id="mhCardSub">saison en cours</small></div></div>
       </section>
       <section class="mc-wrap" data-view="carte" aria-labelledby="mcTitle">
         <div class="mc-head">
@@ -61,7 +69,7 @@
           <button type="button" class="btn secondary" id="manifestoShare"><span aria-hidden="true">↗</span> Partager</button>
         </div>
       </section>
-      <section class="panel" data-view="accueil">
+      <section class="panel" data-view="matchs-home">
         <div class="panel-head">
           <div><span class="mini-label">PROCHAINS MATCHS</span><h2>Agenda de la semaine</h2></div>
           <a class="btn secondary" href="matchs.html">Voir tous les matchs</a>
