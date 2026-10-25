@@ -8,9 +8,9 @@
 (function () {
   const root = document.querySelector(".member-views");
   if (!root) return;
-  const VIEWS = ["accueil", "profil", "evenements", "reunions"];
+  const VIEWS = ["accueil", "carte", "profil", "evenements", "reunions"];
   const ALIASES = { security: "profil" };
-  const TITLES = { accueil: "Mon espace", profil: "Mon profil", evenements: "Mes événements", reunions: "Mes réunions" };
+  const TITLES = { accueil: "Mon espace", carte: "Ma carte membre", profil: "Mon profil", evenements: "Mes événements", reunions: "Mes réunions" };
 
   function current() {
     const hash = location.hash.replace("#", "");
