@@ -1,6 +1,6 @@
 /* ============================================================
-   RÉUNIONS (bureau) — create / edit meetings with a pasted Google Meet
-   link, choose who is invited, follow attendance (present / late /
+   RÉUNIONS (bureau) — create / edit meetings held on the UEC Discord
+   server (or a pasted voice-channel link), choose who is invited, follow attendance (present / late /
    absent / excused). Every write goes through the checked RPCs of
    migration 20261025120000; the database decides who may do what.
 ============================================================ */
@@ -114,11 +114,11 @@ function renderMeetings() {
       <div class="mt-body">
         <div class="mt-top">${live ? '<span class="mt-live">● EN DIRECT</span>' : ""}${cancelled ? '<span class="mt-badge ko">Annulée</span>' : ""}<span class="mt-badge">${escapeHtml(audienceLabel(m))}</span></div>
         <h3>${escapeHtml(m.title)}</h3>
-        <p class="mt-meta">🕒 ${fmtTime(m.starts_at)} – ${fmtTime(meetingEnd(m))} · ${m.duration_min} min${m.meet_url ? "" : ' · <span class="mt-warn">lien Meet manquant</span>'}</p>
+        <p class="mt-meta">🕒 ${fmtTime(m.starts_at)} – ${fmtTime(meetingEnd(m))} · ${m.duration_min} min${` · <span class="dc-tag">${m.meet_url && isDiscordUrl(m.meet_url) ? "Salon Discord" : m.meet_url ? "Lien externe" : "Serveur Discord UEC"}</span>`}</p>
         <div class="mt-counts"><span>${c.total} invité(s)</span><span class="ok">${c.PRESENT} présent(s)</span><span class="warn">${c.LATE} retard(s)</span><span class="ko">${c.ABSENT} absent(s)</span>${c.EXCUSED ? `<span class="info">${c.EXCUSED} justifié(s)</span>` : ""}</div>
       </div>
       <div class="mt-actions">
-        ${m.meet_url && live ? `<button type="button" class="btn primary" data-act="join" data-id="${m.id}">Rejoindre</button>` : ""}
+        ${live ? `<button type="button" class="btn primary dc-btn" data-act="join" data-id="${m.id}">Rejoindre sur Discord</button>` : ""}
         <button type="button" class="btn secondary" data-act="attendance" data-id="${m.id}">Présences</button>
         <button type="button" class="icon-btn" data-act="more" data-id="${m.id}" aria-label="Plus d’actions">${typeof MORE_ICON !== "undefined" ? MORE_ICON : "⋯"}</button>
       </div>
@@ -135,7 +135,7 @@ async function onListClick(event) {
   if (button.dataset.act === "attendance") return openAttendance(m);
   const actions = [
     { label: "Modifier", run: () => openMeeting(m) },
-    m.meet_url ? { label: "Copier le lien Meet", run: () => navigator.clipboard?.writeText(m.meet_url).then(() => showAlert("#pageAlert", "Lien copié.", "success")) } : null,
+    { label: "Copier le lien Discord", run: () => navigator.clipboard?.writeText(m.meet_url || UEC_DISCORD_URL).then(() => showAlert("#pageAlert", "Lien copié.", "success")) },
     { label: m.status === "CANCELLED" ? "Rétablir la réunion" : "Annuler la réunion", run: () => cancelMeeting(m) },
     { label: "Supprimer", danger: true, run: () => deleteMeeting(m) }
   ].filter(Boolean);
@@ -224,7 +224,7 @@ async function saveMeeting(event) {
   const startsAt = new Date(`${$("#mtDate").value}T${$("#mtTime").value}`);
   if (Number.isNaN(startsAt.getTime())) return showAlert("#pageAlert", "Date ou heure invalide.", "error");
   const url = $("#mtUrl").value.trim();
-  if (url && !/^https:\/\/[A-Za-z0-9.-]+(\/\S*)?$/.test(url)) return showAlert("#pageAlert", "Le lien doit commencer par https:// (ex. https://meet.google.com/abc-defg-hij).", "error");
+  if (url && !/^https:\/\/[A-Za-z0-9.-]+(\/\S*)?$/.test(url)) return showAlert("#pageAlert", "Le lien doit commencer par https:// (ex. https://discord.com/channels/…).", "error");
   if (audience === "CUSTOM" && !mtPicked.size && !(await confirmDialog("Aucune personne sélectionnée : seul le bureau sera invité. Continuer ?", { confirmText: "Continuer" }))) return;
   const { error } = await sb.rpc("save_meeting", {
     p_id: $("#mtId").value || null,

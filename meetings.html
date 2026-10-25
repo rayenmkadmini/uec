@@ -12,8 +12,8 @@
 <label>Titre<input id="mtName" required maxlength="140" placeholder="Réunion du bureau"></label>
 <div class="mt-row"><label>Date<input id="mtDate" type="date" required></label><label>Heure<input id="mtTime" type="time" required></label></div>
 <div class="mt-row"><label>Durée (min)<input id="mtDuration" type="number" min="5" max="600" value="60" required></label><label>Retard après (min)<input id="mtLate" type="number" min="0" max="120" value="10" required></label></div>
-<label>Lien Google Meet<input id="mtUrl" type="url" placeholder="https://meet.google.com/abc-defg-hij" inputmode="url"></label>
-<p class="mt-help">Créez la réunion sur <a href="https://meet.google.com/new" target="_blank" rel="noopener">meet.google.com/new</a>, puis collez le lien ici. Vous pouvez l’ajouter plus tard.</p>
+<label>Salon Discord <span class="field-optional">Facultatif</span><input id="mtUrl" type="url" placeholder="https://discord.com/channels/…" inputmode="url"></label>
+<p class="mt-help"><b class="dc-mini">Discord</b> Laissez vide : les participants rejoignent le <a href="https://discord.gg/chRj5Ycj" target="_blank" rel="noopener">serveur Discord UEC</a>. Pour les envoyer directement dans un salon vocal : clic droit sur le salon → <b>Copier le lien</b>, puis collez-le ici.</p>
 <label>Participants<select id="mtAudience"><option value="BUREAU">Bureau uniquement</option><option value="ALL">Tous les membres</option><option value="FACULTY">Une faculté</option><option value="ZONE">Une zone</option><option value="CUSTOM">Sélection de personnes</option></select></label>
 <label id="mtRefWrap" hidden><span id="mtRefLabel">Faculté</span><select id="mtRef"></select></label>
 <div id="mtPickWrap" hidden><input id="mtPickSearch" class="search" placeholder="Rechercher une personne…"><div class="mt-pick" id="mtPick"></div></div>

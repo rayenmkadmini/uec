@@ -1,7 +1,7 @@
 /* ============================================================
    MES RÉUNIONS (member area) — the meetings the member is invited to.
-   "Rejoindre" records the attendance server-side (present / late, server
-   clock) and only then opens the Google Meet link. Row-level security
+   "Rejoindre sur Discord" records the attendance server-side (present /
+   late, server clock) and only then opens the Discord room. Row-level security
    returns only the meetings this account is invited to.
 ============================================================ */
 (function () {
@@ -42,7 +42,7 @@
         : open ? '<span class="mt-live">● EN COURS</span>' : "";
       const action = !cancelled && !isPast
         ? (open
-          ? `<button type="button" class="btn primary" data-join="${m.id}">${p.joined_at ? "Rouvrir Meet" : "Rejoindre"}</button>`
+          ? `<button type="button" class="btn primary dc-btn" data-join="${m.id}">${p.joined_at ? "Retourner sur Discord" : "Rejoindre sur Discord"}</button>`
           : `<span class="mt-soon">Ouverture ${new Date(start - 15 * 60000).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}</span>`)
         : "";
       return `<article class="mt-mine${open && !cancelled ? " live" : ""}">
@@ -54,6 +54,11 @@
     };
 
     box.innerHTML = `
+      <div class="dc-banner">
+        <span class="dc-logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.3 4.4A19.6 19.6 0 0015.4 3l-.6 1.3a18.2 18.2 0 00-5.5 0L8.7 3a19.5 19.5 0 00-4.9 1.4C.7 9 0 13.6.3 18.1a19.7 19.7 0 006 3l1.3-2a12.7 12.7 0 01-2-1l.5-.4a14 14 0 0012 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.6 19.6 0 006-3c.4-5.2-.7-9.7-3.3-13.7zM8.7 15.3c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4zm6.6 0c-1.2 0-2.1-1.1-2.1-2.4s.9-2.4 2.1-2.4 2.2 1.1 2.1 2.4c0 1.3-.9 2.4-2.1 2.4z"/></svg></span>
+        <div><b>Nos réunions se passent sur Discord</b><small>Rejoignez le serveur UEC une fois maintenant : le jour J, un clic suffit.</small></div>
+        <a class="btn secondary" href="${UEC_DISCORD_URL}" target="_blank" rel="noopener">Rejoindre le serveur</a>
+      </div>
       ${rate === null ? "" : `<div class="mt-rate"><span>Assiduité</span><b>${rate}%</b><i style="--p:${rate}%"></i></div>`}
       <h3 class="mt-sub">À venir</h3>
       ${upcoming.map(card).join("") || '<div class="empty-card">Aucune réunion prévue pour vous.</div>'}

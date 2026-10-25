@@ -211,6 +211,10 @@ function facultyShort(name) {
         : name.slice(0, index);
 }
 
+// UEC Discord server: meetings happen there unless a meeting has its own link.
+const UEC_DISCORD_URL = "https://discord.gg/chRj5Ycj";
+const isDiscordUrl = url => /^https:\/\/(discord\.gg|(www\.|ptb\.|canary\.)?discord(app)?\.com)\//i.test(String(url || ""));
+
 const BUILT_IN_CLUB_LOGOS = {
     "club africain": "assets/ca-crest.webp",
     "ca": "assets/ca-crest.webp",

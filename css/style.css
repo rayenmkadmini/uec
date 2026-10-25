@@ -1919,3 +1919,16 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
   .mh-actions .btn{width:100%}
 }
 @media(prefers-reduced-motion:reduce){.member-views.mv-enter > [data-view]{animation:none!important}}
+
+/* Discord meetings */
+.dc-btn{background:#5865F2!important;border-color:#5865F2!important;box-shadow:0 10px 22px -12px rgba(88,101,242,.9)}
+.dc-tag{color:#8b93ff;font-weight:700}
+.dc-mini{display:inline-block;padding:1px 7px;margin-right:4px;border-radius:6px;background:#5865F2;color:#fff;font-size:11px}
+.dc-banner{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;margin-bottom:6px;
+  background:linear-gradient(135deg,rgba(88,101,242,.22),rgba(88,101,242,.08));border:1px solid rgba(88,101,242,.4)}
+.dc-banner b{display:block;font-size:14.5px}
+.dc-banner small{display:block;font-size:12.5px;color:var(--muted,#9aa0aa);margin-top:2px}
+.dc-banner > div{flex:1;min-width:0}
+.dc-logo{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:#5865F2;color:#fff}
+.dc-logo svg{width:24px;height:24px}
+@media(max-width:760px){.dc-banner{flex-wrap:wrap}.dc-banner .btn{width:100%}}
