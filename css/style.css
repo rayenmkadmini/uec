@@ -2027,3 +2027,8 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
   .drawer-quick .side-logout{color:#ff6b7f}
   .drawer-foot{margin:10px 22px 0;text-align:left;color:#4b4f59}
 }
+@media(max-width:900px){
+  .sidebar{scrollbar-width:none;height:100dvh;top:0}
+  .sidebar::-webkit-scrollbar{display:none}
+  .drawer-profile{position:sticky;top:0;z-index:2;background:#101014}
+}

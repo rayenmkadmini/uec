@@ -641,7 +641,9 @@ function setupShell(ctx = null) {
             document.body.classList.add("nav-open");
             menuButton.setAttribute("aria-expanded", "true");
             menuButton.setAttribute("aria-label", "Fermer le menu");
-            sidebar.querySelector("nav a:not(.hidden)")?.focus();
+            // Always open at the top (header visible); focusing must not scroll it.
+            sidebar.scrollTop = 0;
+            sidebar.querySelector("nav a:not(.hidden)")?.focus({ preventScroll: true });
         };
 
         menuButton.addEventListener("click", () => {
