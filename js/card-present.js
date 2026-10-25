@@ -29,6 +29,15 @@
   window.addEventListener("hashchange", () => { if (window.speechSynthesis?.speaking) { speechSynthesis.cancel(); listen?.classList.remove("on"); } });
 })();
 
+// "Retourner" button + current season on the card view.
+(function () {
+  document.getElementById("flipCardBtn")?.addEventListener("click", () => document.querySelector("#subscriberMemberCard .vcard")?.classList.toggle("flipped"));
+  const now = new Date();
+  const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  const season = document.getElementById("mcSeason");
+  if (season) season.textContent = `Saison ${y}-${y + 1}`;
+})();
+
 (function () {
   const button = document.getElementById("presentCardBtn");
   if (!button) return;

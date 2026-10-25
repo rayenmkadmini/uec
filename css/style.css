@@ -258,9 +258,9 @@ tbody tr:hover{background:var(--hover)}
   @page{size:A5 portrait;margin:10mm}
   body{background:#fff}
   body *{visibility:hidden}
-  body.print-card-mode .panel.print-card-section,
-  body.print-card-mode .panel.print-card-section *{visibility:visible}
-  body.print-card-mode .panel.print-card-section{
+  body.print-card-mode .print-card-section,
+  body.print-card-mode .print-card-section *{visibility:visible}
+  body.print-card-mode .print-card-section{
     position:absolute;left:0;top:0;width:100%;margin:0;padding:0;border:none;box-shadow:none;background:transparent;overflow:visible
   }
   body.print-card-mode .panel.print-card-section .panel-head{display:none!important}
@@ -2118,3 +2118,28 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .um-actions{display:flex;gap:8px;margin-top:14px}
 .um-actions .btn{background:rgba(0,0,0,.22)!important;border-color:rgba(255,255,255,.35)!important;color:#fff!important}
 .um-actions .btn.on{background:#fff!important;color:#c8102e!important}
+
+/* ============================================================
+   MA CARTE v2 — card on a stage, icon actions
+============================================================ */
+.vcard-front{background-size:100% 100%!important;background-position:center!important}
+.mc-wrap{margin-bottom:16px}
+.mc-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:2px 2px 14px}
+.mc-head h2{margin:2px 0 0;font-size:24px;font-weight:900}
+.mc-season{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;color:#e51c3f;background:rgba(229,28,63,.1);border:1px solid rgba(229,28,63,.3)}
+.mc-stage{position:relative;padding:26px 16px 18px;border-radius:24px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(70% 70% at 50% 40%,rgba(229,28,63,.28),transparent 70%),linear-gradient(180deg,#141419,#0d0d11);
+  border:1px solid rgba(255,255,255,.06)}
+.mc-stage::before{content:"";position:absolute;left:50%;bottom:6px;width:70%;height:24px;transform:translateX(-50%);z-index:-1;
+  background:radial-gradient(closest-side,rgba(0,0,0,.65),transparent);filter:blur(4px)}
+.mc-stage .member-card-shell{display:flex;flex-direction:column;align-items:center}
+.mc-stage .vcard{width:min(100%,460px)}
+.mc-stage .vcard-hint{color:#8b909b}
+.mc-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px}
+.mc-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-height:74px;border-radius:18px;cursor:pointer;
+  background:var(--card,#16161b);border:1px solid var(--border,rgba(255,255,255,.08));color:inherit;font:700 13px/1 Inter,system-ui,sans-serif;transition:transform .15s,border-color .15s}
+.mc-action svg{width:22px;height:22px;color:#e51c3f}
+.mc-action:active{transform:scale(.97)}
+.mc-action.primary{background:linear-gradient(135deg,#e51c3f,#a30d27);border-color:transparent;color:#fff;box-shadow:0 14px 26px -14px rgba(229,28,63,.85)}
+.mc-action.primary svg{color:#fff}
+@media print{.mc-head,.mc-actions{display:none!important}.mc-stage{background:none;border:0;padding:0}}

@@ -155,7 +155,7 @@ async function withOwnPrivateFields(subscriber) {
   $("#editBtn").onclick=()=>{ setProfileEditable(true); $("#saveRow").classList.remove("hidden"); $("#editBtn").classList.add("hidden"); $("#nom").focus(); };
   $("#cancelBtn").onclick=()=>location.reload();
     await renderMemberCard(s);
-  const cardPanel = document.querySelector("#subscriberMemberCard")?.closest(".panel");
+  const cardPanel = document.querySelector("#subscriberMemberCard")?.closest(".mc-wrap, .panel");
   $("#printMemberCardBtn").onclick = () => {
     if (cardPanel) cardPanel.classList.add("print-card-section");
     document.body.classList.add("print-card-mode");

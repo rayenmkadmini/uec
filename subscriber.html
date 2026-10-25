@@ -37,12 +37,19 @@
         <a class="mh-tile" href="subscriber.html#reunions"><span class="mh-tile-icon"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10.5l5-3v9l-5-3"/></svg></span><small>Prochaine réunion</small><b id="mhMeeting">—</b><em id="mhMeetingSub"></em></a>
         <a class="mh-tile mh-tile-rate" href="subscriber.html#evenements"><span class="mh-ring" id="mhRing" style="--p:0%"><b id="mhRate">—</b></span><small>Assiduité</small><em>réunions et événements</em></a>
       </section>
-      <section class="panel mh-card-panel" data-view="carte">
-        <div class="panel-head">
-          <div><span class="mini-label">CARTE MEMBRE</span><h2>Carte d’abonné</h2></div>
-          <div class="card-head-actions"><button id="presentCardBtn" class="btn primary" type="button">Présenter ma carte</button><button id="printMemberCardBtn" class="btn secondary" type="button">Imprimer la carte</button></div>
+      <section class="mc-wrap" data-view="carte" aria-labelledby="mcTitle">
+        <div class="mc-head">
+          <div><span class="mini-label">CARTE MEMBRE OFFICIELLE</span><h2 id="mcTitle">Ma carte</h2></div>
+          <span class="mc-season" id="mcSeason">Saison</span>
         </div>
-        <div id="subscriberMemberCard" class="member-card-shell"><div class="loading-state">Chargement de votre carte membre…</div></div>
+        <div class="mc-stage">
+          <div id="subscriberMemberCard" class="member-card-shell"><div class="loading-state">Chargement de votre carte membre…</div></div>
+        </div>
+        <div class="mc-actions" role="group" aria-label="Actions de la carte">
+          <button id="presentCardBtn" class="mc-action primary" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg><span>Présenter</span></button>
+          <button id="flipCardBtn" class="mc-action" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0115.5-6.2L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 01-15.5 6.2L3 16"/><path d="M3 21v-5h5"/></svg><span>Retourner</span></button>
+          <button id="printMemberCardBtn" class="mc-action" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></svg><span>Imprimer</span></button>
+        </div>
       </section>
       <section class="panel uec-manifesto" data-view="carte" aria-labelledby="manifestoTitle">
         <div class="um-head"><span class="mini-label">NOTRE IDENTITÉ</span><span class="um-fino">Fino alla fine</span></div>
