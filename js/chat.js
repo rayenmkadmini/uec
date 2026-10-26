@@ -39,6 +39,8 @@ let chatIsManager = false;
 })();
 
 const list = () => document.getElementById("chatList");
+// Unread badge in the menus (common.js): this device has seen the room up to now.
+function markChatSeen() { try { localStorage.setItem("uec-chat-seen", String(Date.now())); } catch (_) {} document.querySelectorAll('a[href="chat.html"] .nav-badge').forEach(b => b.remove()); }
 const nearBottom = () => { const l = list(); return l.scrollHeight - l.scrollTop - l.clientHeight < 80; };
 function scrollBottom(smooth = false) { const l = list(); l.scrollTo({ top: l.scrollHeight, behavior: smooth ? "smooth" : "auto" }); document.getElementById("chatNewer").classList.add("hidden"); }
 
@@ -53,6 +55,7 @@ async function openChannel() {
     return;
   }
   chatMessages = (data || []).reverse();
+  markChatSeen();
   render();
   scrollBottom();
   chatSub = sb.channel(`chat-${chatChannel}`)
@@ -62,6 +65,7 @@ async function openChannel() {
       const i = chatMessages.findIndex(m => m.id === row.id);
       const stick = nearBottom() || row.user_id === chatCtx.user.id;
       if (i >= 0) chatMessages[i] = row; else chatMessages.push(row);
+      markChatSeen();
       render();
       if (stick) scrollBottom(true); else if (i < 0) document.getElementById("chatNewer").classList.remove("hidden");
     })

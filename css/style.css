@@ -2287,3 +2287,43 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .ann-empty span{font-size:40px}
 .ann-empty b{color:var(--text,#fff);font-size:16px}
 @media(min-width:900px){.ann-list{grid-template-columns:repeat(2,minmax(0,1fr))}.ann-card.featured{grid-column:1/-1;display:grid;grid-template-columns:1.1fr 1fr}.ann-card.featured:not(.has-img){display:block}.ann-card.featured .ann-media img{height:100%;max-height:none;aspect-ratio:auto}}
+
+/* ============================================================
+   PROFIL — readable sheet (values as text until "Modifier")
+============================================================ */
+.pf-head{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;padding-bottom:16px;margin-bottom:6px;border-bottom:1px solid var(--border,rgba(255,255,255,.08))}
+.pf-photo{width:84px;height:84px;border-radius:24px;display:grid;place-items:center;font-size:34px;font-weight:900;color:#fff;
+  background:linear-gradient(135deg,#e51c3f,#8c0b20);box-shadow:0 14px 28px -14px rgba(229,28,63,.8)}
+.pf-photo.has-photo{border:3px solid rgba(255,255,255,.85)}
+.pf-id{min-width:0;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.pf-id b{font-size:19px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pf-id small{font-size:13px;color:var(--muted,#9aa0aa)}
+.pf-file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.pf-photo-btn{display:none!important;align-items:center;gap:6px;margin-top:6px;padding:7px 12px;border-radius:999px;cursor:pointer;
+  font-size:12.5px!important;font-weight:700;color:#e51c3f;background:rgba(229,28,63,.1);border:1px solid rgba(229,28,63,.35)}
+.pf-photo-btn svg{width:15px;height:15px}
+.pf-panel.editing .pf-photo-btn{display:inline-flex!important}
+.pf-panel.editing .pf-edit{display:none}
+.pf-form{display:flex;flex-direction:column;gap:6px}
+.pf-group{margin:0;padding:12px 0 4px;border:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px}
+.pf-group legend{padding:0;margin-bottom:6px;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#e51c3f}
+.pf-group label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:700;color:var(--muted,#9aa0aa);padding:8px 0}
+.pf-group .pf-wide{grid-column:1/-1}
+/* read mode: values look like text */
+.pf-panel:not(.editing) .pf-group :is(input,select):disabled{border:0!important;background:transparent!important;padding:0!important;min-height:0;height:auto;
+  font-size:15px;font-weight:600;color:var(--text,#f4f4f6)!important;opacity:1;-webkit-text-fill-color:var(--text,#f4f4f6);appearance:none;-webkit-appearance:none;box-shadow:none!important}
+.pf-panel:not(.editing) .pf-group input:disabled::placeholder{color:var(--muted,#6f7480);-webkit-text-fill-color:var(--muted,#6f7480);font-weight:500}
+.pf-panel:not(.editing) .pf-group label{border-bottom:1px solid var(--border,rgba(255,255,255,.06))}
+.pf-panel.editing .pf-group label{border-bottom:0}
+@media(max-width:600px){
+  .pf-head{grid-template-columns:auto 1fr}
+  .pf-edit{grid-column:1/-1;width:100%}
+  .pf-photo{width:72px;height:72px;border-radius:20px;font-size:28px}
+  .pf-group{grid-template-columns:1fr}
+}
+/* unread badges */
+.nav-badge{min-width:18px;height:18px;padding:0 5px;border-radius:999px;display:inline-grid;place-items:center;background:#e51c3f;color:#fff;font-size:10.5px;font-weight:900;margin-left:auto}
+.mobile-tabbar .tab-item{position:relative}
+.mobile-tabbar .nav-badge{position:absolute;top:4px;left:calc(50% + 6px);margin:0;box-shadow:0 0 0 2px var(--side-bg,#101014)}
+.sidebar nav a{position:relative}
+@media(max-width:900px){.sidebar nav .nav-badge{position:absolute;top:0;right:calc(50% - 32px);box-shadow:0 0 0 2px #121217}}

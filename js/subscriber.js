@@ -123,16 +123,11 @@ async function withOwnPrivateFields(subscriber) {
   };
 }
 
-// Profile photo in the home hero, the top bar and the menu (initial as fallback).
+// Profile photo everywhere (common.js applyAvatarPhoto), including the profile sheet.
 function showProfilePhoto(url) {
   if (!url) return;
-  document.querySelectorAll("#mhAvatar, .top-user .avatar, .drawer-avatar").forEach(node => {
-    const img = new Image();
-    img.alt = "";
-    img.className = "avatar-photo";
-    img.onload = () => { node.textContent = ""; node.appendChild(img); node.classList.add("has-photo"); };
-    img.src = url;
-  });
+  rememberOwnPhoto(url);
+  applyAvatarPhoto(url);
 }
 
 (async function init() {
@@ -167,6 +162,12 @@ function showProfilePhoto(url) {
   fillProfileForm(s);
   $("#editBtn").onclick=()=>{ setProfileEditable(true); $("#saveRow").classList.remove("hidden"); $("#editBtn").classList.add("hidden"); $("#nom").focus(); };
   $("#cancelBtn").onclick=()=>location.reload();
+  $("#photoFile").addEventListener("change", e => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!$(".pf-panel").classList.contains("editing")) $("#editBtn").click();
+    applyAvatarPhoto(URL.createObjectURL(f), "#pfPhoto");
+  });
     await renderMemberCard(s);
   const cardPanel = document.querySelector("#subscriberMemberCard")?.closest(".mc-wrap, .panel");
   $("#printMemberCardBtn").onclick = () => {
@@ -250,10 +251,15 @@ const EDITABLE_PROFILE_FIELDS = ["nom", "prenom", "cin", "gender", "dateNaissanc
 
 function setProfileEditable(on) {
   EDITABLE_PROFILE_FIELDS.forEach(id => { const el = $("#" + id); if (el) el.disabled = !on; });
+  document.querySelector(".pf-panel")?.classList.toggle("editing", on);
   $("#numero").disabled = true;
 }
 
 function fillProfileForm(s) {
+  const name = `${s.prenom || ""} ${s.nom || ""}`.trim() || "Membre";
+  const pfName = document.getElementById("pfName"); if (pfName) pfName.textContent = name;
+  const pfMeta = document.getElementById("pfMeta"); if (pfMeta) pfMeta.textContent = `N° ${s.numero_abonnement || "—"} · ${s.status === "ACTIVE" ? "Membre actif" : "Membre"}`;
+  const pfPhoto = document.getElementById("pfPhoto"); if (pfPhoto && !pfPhoto.classList.contains("has-photo")) pfPhoto.textContent = name.charAt(0).toUpperCase();
   $("#nom").value = s.nom || ""; $("#prenom").value = s.prenom || ""; $("#numero").value = s.numero_abonnement || "";
   $("#phone").value = s.phone || ""; $("#email").value = s.email || ""; $("#adresse").value = s.adresse || "";
   $("#cin").value = s.cin || ""; $("#gender").value = s.gender || "";

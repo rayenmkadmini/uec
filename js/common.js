@@ -239,6 +239,70 @@ async function uploadCommunityImage(file, folder = "misc") {
     return sb.storage.from("community-media").getPublicUrl(path).data.publicUrl;
 }
 
+/* ---------- own profile photo: shown instead of the initial everywhere ---------- */
+const AVATAR_TARGETS = "#mhAvatar, #pfPhoto, .top-user .avatar, .drawer-avatar";
+const OWN_PHOTO_KEY = "uec-own-photo";
+
+function applyAvatarPhoto(url, selector = AVATAR_TARGETS) {
+    if (!url) return;
+    document.querySelectorAll(selector).forEach(node => {
+        const current = node.querySelector("img.avatar-photo");
+        if (current?.src === url) return;
+        const img = new Image();
+        img.alt = "";
+        img.className = "avatar-photo";
+        img.onload = () => { node.textContent = ""; node.appendChild(img); node.classList.add("has-photo"); };
+        img.src = url;
+    });
+}
+
+// Signed URLs last one hour: cached for 50 minutes in this tab session.
+function rememberOwnPhoto(url) {
+    try { sessionStorage.setItem(OWN_PHOTO_KEY, JSON.stringify({ url, until: Date.now() + 50 * 60000 })); } catch (_) {}
+}
+
+async function loadOwnPhoto(ctx) {
+    try {
+        const cached = JSON.parse(sessionStorage.getItem(OWN_PHOTO_KEY) || "null");
+        if (cached?.url && cached.until > Date.now()) return applyAvatarPhoto(cached.url);
+    } catch (_) {}
+    if (!ctx?.user?.id) return;
+    const { data: me } = await sb.from("subscribers").select("id").eq("user_id", ctx.user.id).maybeSingle();
+    if (!me?.id) return;
+    const { data } = await sb.rpc("get_member_private_fields", { p_subscriber_id: me.id });
+    const url = await getSubscriberPhotoUrl((data || [])[0]?.photo_url);
+    if (url) { rememberOwnPhoto(url); applyAvatarPhoto(url); }
+}
+
+/* ---------- unread badges: announcements and chat (since the last visit on this device) ---------- */
+async function showCommunityBadges() {
+    const seen = key => { try { return new Date(Number(localStorage.getItem(key) || 0)).toISOString(); } catch (_) { return new Date(0).toISOString(); } };
+    const onPage = name => location.pathname.endsWith("/" + name);
+    const count = async (table, key, extra) => {
+        let q = sb.from(table).select("id", { count: "exact", head: true }).gt("created_at", seen(key));
+        if (extra) q = extra(q);
+        const { count: n, error } = await q;
+        return error ? 0 : n || 0;
+    };
+    const [ann, chat] = await Promise.all([
+        onPage("annonces.html") ? 0 : count("announcements", "uec-announcements-seen"),
+        onPage("chat.html") ? 0 : count("chat_messages", "uec-chat-seen", q => q.eq("channel", "GENERAL").is("deleted_at", null))
+    ]);
+    const put = (href, n) => {
+        if (!n) return;
+        document.querySelectorAll(`.sidebar nav a[href="${href}"], .mobile-tabbar a[href="${href}"]`).forEach(link => {
+            if (link.querySelector(".nav-badge")) return;
+            const b = document.createElement("span");
+            b.className = "nav-badge";
+            b.textContent = n > 9 ? "9+" : String(n);
+            b.setAttribute("aria-label", `${n} non lu(s)`);
+            link.appendChild(b);
+        });
+    };
+    put("annonces.html", ann);
+    put("chat.html", chat);
+}
+
 const BUILT_IN_CLUB_LOGOS = {
     "club africain": "assets/ca-crest.webp",
     "ca": "assets/ca-crest.webp",
@@ -738,6 +802,21 @@ function setupShell(ctx = null) {
     }
 
     setupMobileTabbar(sidebar, menuButton);
+    if (ctx) {
+        loadOwnPhoto(ctx).catch(() => {});
+        showCommunityBadges().catch(() => {});
+        // The avatar in the top bar opens the profile.
+        const topUser = document.querySelector(".top-user");
+        if (topUser && !topUser.dataset.linked) {
+            topUser.dataset.linked = "1";
+            topUser.setAttribute("role", "link");
+            topUser.setAttribute("tabindex", "0");
+            topUser.setAttribute("aria-label", "Mon profil");
+            const go = () => { location.href = can(ctx, "useMemberArea") ? "subscriber.html#profil" : "profile.html"; };
+            topUser.addEventListener("click", go);
+            topUser.addEventListener("keydown", e => { if (e.key === "Enter") go(); });
+        }
+    }
     setupResponsiveTables();
     setupAccessibleDialogs();
 }

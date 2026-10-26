@@ -38,6 +38,12 @@
 
   window.addEventListener("hashchange", show);
   show();
+  // The browser jumps to the section whose id matches the hash (#profil...)
+  // after load, hiding its header under the sticky top bar: views always
+  // start at the top.
+  const toTop = () => { if (location.hash.replace("#", "") !== "security") window.scrollTo(0, 0); };
+  window.addEventListener("load", () => { toTop(); requestAnimationFrame(toTop); });
+  window.addEventListener("hashchange", () => requestAnimationFrame(toTop));
   // The mobile tab bar is built after this script by setupShell: sync it once ready.
   new MutationObserver((_, observer) => { if (document.querySelector(".mobile-tabbar")) { observer.disconnect(); show(); } })
     .observe(document.body, { childList: true });
