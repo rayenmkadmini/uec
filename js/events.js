@@ -20,6 +20,7 @@ let evCandidates = null;
 let evPicked = new Set();
 let evRefs = { FACULTY: [], ZONE: [] };
 let evCurrent = null;
+let evPhotoUrl = null; // photo of the event being edited ("" = removed)
 
 (async () => {
   const ctx = await requirePermission("manageMeetings");
@@ -32,6 +33,8 @@ let evCurrent = null;
   $("#evAudience").onchange = syncEvAudience;
   $("#evPickSearch").oninput = renderEvPick;
   $("#evForm").onsubmit = saveEvent;
+  $("#evPhoto").onchange = e => { const f = e.target.files?.[0]; if (f) showEvPhoto(URL.createObjectURL(f)); };
+  $("#evPhotoRemove").onclick = () => { evPhotoUrl = ""; $("#evPhoto").value = ""; showEvPhoto(null); };
   document.querySelectorAll(".mt-tab").forEach(tab => tab.onclick = () => {
     evTab = tab.dataset.tab;
     document.querySelectorAll(".mt-tab").forEach(t => t.classList.toggle("active", t === tab));
@@ -58,7 +61,7 @@ const evTime = d => new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", m
 async function loadEvents() {
   $("#evList").innerHTML = '<div class="loading-state">Chargement…</div>';
   const [events, participants] = await Promise.all([
-    sb.from("club_events").select("id,title,description,category,location,starts_at,duration_min,late_after_min,capacity,audience,audience_ref,status").order("starts_at", { ascending: false }),
+    sb.from("club_events").select("id,title,description,category,location,starts_at,duration_min,late_after_min,capacity,audience,audience_ref,status,image_url").order("starts_at", { ascending: false }),
     sb.from("club_event_participants").select("event_id,status,rsvp")
   ]);
   if (events.error) {
@@ -110,7 +113,7 @@ function renderEvents() {
     const d = new Date(e.starts_at);
     const past = evPast(e);
     return `<article class="mt-card${cancelled ? " cancelled" : ""}${live ? " live" : ""}">
-      <div class="mt-date"><small>${d.toLocaleDateString("fr-FR", { weekday: "short" })}</small><b>${String(d.getDate()).padStart(2, "0")}</b><small>${d.toLocaleDateString("fr-FR", { month: "short" })}</small></div>
+      ${e.image_url ? `<img class="ev-thumb" src="${escapeHtml(e.image_url)}" alt="" loading="lazy">` : ""}<div class="mt-date"><small>${d.toLocaleDateString("fr-FR", { weekday: "short" })}</small><b>${String(d.getDate()).padStart(2, "0")}</b><small>${d.toLocaleDateString("fr-FR", { month: "short" })}</small></div>
       <div class="mt-body">
         <div class="mt-top">${live ? '<span class="mt-live">● EN COURS</span>' : ""}${cancelled ? '<span class="mt-badge ko">Annulé</span>' : ""}<span class="mt-badge ev-cat">${escapeHtml(EV_CATEGORY[e.category] || e.category)}</span></div>
         <h3>${escapeHtml(e.title)}</h3>
@@ -188,6 +191,9 @@ async function openEvent(e = null) {
   $("#evDuration").value = e?.duration_min ?? 120;
   $("#evLate").value = e?.late_after_min ?? 15;
   $("#evDesc").value = e?.description || "";
+  evPhotoUrl = e?.image_url || null;
+  $("#evPhoto").value = "";
+  showEvPhoto(evPhotoUrl);
   $("#evAudience").value = e?.audience || "ALL";
   evPicked = new Set();
   if (e?.audience === "CUSTOM") {
@@ -197,6 +203,11 @@ async function openEvent(e = null) {
   await syncEvAudience(e?.audience_ref);
   $("#evModal").classList.remove("hidden");
   $("#evName").focus();
+}
+
+function showEvPhoto(src) {
+  $("#evPhotoPreview").classList.toggle("hidden", !src);
+  if (src) $("#evPhotoPreview img").src = src;
 }
 
 async function syncEvAudience(ref) {
@@ -232,7 +243,13 @@ async function saveEvent(event) {
   const startsAt = new Date(`${$("#evDate").value}T${$("#evTime").value}`);
   if (Number.isNaN(startsAt.getTime())) return showAlert("#pageAlert", "Date ou heure invalide.", "error");
   const capacity = $("#evCapacity").value ? Number($("#evCapacity").value) : null;
-  const { error } = await sb.rpc("save_club_event", {
+  const file = $("#evPhoto").files?.[0];
+  let uploaded = null;
+  if (file) {
+    try { uploaded = await uploadCommunityImage(file, "events"); }
+    catch (err) { return showAlert("#pageAlert", err.message, "error"); }
+  }
+  const { data: savedId, error } = await sb.rpc("save_club_event", {
     p_id: $("#evId").value || null,
     p_title: $("#evName").value.trim(),
     p_description: $("#evDesc").value.trim(),
@@ -247,6 +264,11 @@ async function saveEvent(event) {
     p_users: audience === "CUSTOM" ? [...evPicked] : null
   });
   if (error) return showAlert("#pageAlert", error.message, "error");
+  // Photo: new upload, or removed ("" ), otherwise unchanged.
+  if (uploaded || evPhotoUrl === "") {
+    const photo = await sb.rpc("set_club_event_image", { p_id: savedId, p_url: uploaded || "" });
+    if (photo.error) showAlert("#pageAlert", `Événement enregistré, mais la photo n’a pas pu être ajoutée : ${photo.error.message}`, "error");
+  }
   $("#evModal").classList.add("hidden");
   showAlert("#pageAlert", "Événement enregistré. Les invités le voient dans leur espace et peuvent répondre.", "success");
   loadEvents();

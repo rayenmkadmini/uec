@@ -23,6 +23,8 @@
           <input type="hidden" id="annId">
           <label>Titre<input id="annTitle" required maxlength="140" placeholder="Déplacement à Sfax : départ 7h"></label>
           <label>Message<textarea id="annBody" required rows="4" maxlength="4000" placeholder="Toutes les informations utiles…"></textarea></label>
+          <label>Photo <span class="field-optional">Facultatif</span><input id="annPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label>
+          <div class="ann-photo-preview hidden" id="annPhotoPreview"><img alt=""><button type="button" class="btn secondary" id="annPhotoRemove">Retirer la photo</button></div>
           <label class="ann-pin"><input type="checkbox" id="annPinned"> Épingler en haut</label>
           <div class="form-actions"><button type="button" class="btn secondary hidden" id="annCancel">Annuler</button><button class="btn primary" type="submit">Publier</button></div>
         </form>

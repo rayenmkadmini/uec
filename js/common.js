@@ -215,6 +215,30 @@ function facultyShort(name) {
 const UEC_DISCORD_URL = "https://discord.gg/chRj5Ycj";
 const isDiscordUrl = url => /^https:\/\/(discord\.gg|(www\.|ptb\.|canary\.)?discord(app)?\.com)\//i.test(String(url || ""));
 
+// Optional photo for announcements and events: public bucket "community-media"
+// (migration 20261029120000). Images are resized in the browser (max 1600 px,
+// WebP) before upload. Returns the public URL.
+async function uploadCommunityImage(file, folder = "misc") {
+    if (!file) return null;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error("Format accepté : JPG, PNG ou WebP.");
+    if (file.size > 15 * 1024 * 1024) throw new Error("Image trop lourde (15 Mo maximum).");
+    let blob = file;
+    try {
+        const bitmap = await createImageBitmap(file);
+        const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
+        canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+        blob = await new Promise(resolve => canvas.toBlob(resolve, "image/webp", 0.85)) || file;
+    } catch (_) { /* keep the original file */ }
+    if (blob.size > 5 * 1024 * 1024) throw new Error("Image trop lourde après compression (5 Mo maximum).");
+    const path = `${folder}/${crypto.randomUUID()}.${blob.type === "image/webp" ? "webp" : file.name.split(".").pop().toLowerCase()}`;
+    const { error } = await sb.storage.from("community-media").upload(path, blob, { contentType: blob.type || file.type, upsert: false });
+    if (error) throw new Error(`Envoi de la photo impossible : ${error.message}`);
+    return sb.storage.from("community-media").getPublicUrl(path).data.publicUrl;
+}
+
 const BUILT_IN_CLUB_LOGOS = {
     "club africain": "assets/ca-crest.webp",
     "ca": "assets/ca-crest.webp",

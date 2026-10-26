@@ -18,7 +18,7 @@
     const userId = auth?.user?.id;
     if (!userId) return;
     const [list, mine] = await Promise.all([
-      sb.from("club_events").select("id,title,description,category,location,starts_at,duration_min,late_after_min,capacity,status").order("starts_at", { ascending: true }),
+      sb.from("club_events").select("id,title,description,category,location,starts_at,duration_min,late_after_min,capacity,status,image_url").order("starts_at", { ascending: true }),
       sb.from("club_event_participants").select("event_id,status,rsvp,checked_in_at").eq("user_id", userId)
     ]);
     if (list.error) { document.getElementById("evenements")?.classList.add("hidden"); return; }
@@ -45,7 +45,7 @@
           <button type="button" class="${e.me.rsvp === "GOING" ? "on ok" : ""}" data-rsvp="${e.id}" data-going="1">✓ Je participe</button>
           <button type="button" class="${e.me.rsvp === "NOT_GOING" ? "on ko" : ""}" data-rsvp="${e.id}" data-going="0">✕ Absent</button>
         </div>`;
-      return `<article class="mt-mine${open && !cancelled ? " live" : ""}">
+      return `<article class="mt-mine${e.image_url ? " has-cover" : ""}${open && !cancelled ? " live" : ""}">${e.image_url ? `<img class="ev-cover" src="${escapeHtml(e.image_url)}" alt="" loading="lazy">` : ""}
         <div><span class="mt-badge ev-cat">${escapeHtml(CAT[e.category] || e.category)}</span> <b>${escapeHtml(e.title)}</b>
         <small>${new Date(e.starts_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} · ${time(e.starts_at)} – ${time(end(e))}</small>
         ${e.location ? `<small>📍 ${escapeHtml(e.location)}</small>` : ""}

@@ -17,6 +17,8 @@
 <label>Participants<select id="evAudience"><option value="ALL">Tous les membres</option><option value="BUREAU">Bureau uniquement</option><option value="FACULTY">Une faculté</option><option value="ZONE">Une zone</option><option value="CUSTOM">Sélection de personnes</option></select></label>
 <label id="evRefWrap" hidden><span id="evRefLabel">Faculté</span><select id="evRef"></select></label>
 <div id="evPickWrap" hidden><input id="evPickSearch" class="search" placeholder="Rechercher une personne…"><div class="mt-pick" id="evPick"></div></div>
+<label>Photo / affiche <span class="field-optional">Facultatif</span><input id="evPhoto" type="file" accept="image/jpeg,image/png,image/webp"></label>
+<div class="ann-photo-preview hidden" id="evPhotoPreview"><img alt=""><button type="button" class="btn secondary" id="evPhotoRemove">Retirer la photo</button></div>
 <label>Description<textarea id="evDesc" rows="3" maxlength="2000" placeholder="Programme, consignes, tenue…"></textarea></label>
 <button class="btn primary" type="submit">Enregistrer</button></form></div></div>
 <div id="evDetail" class="modal hidden"><div class="modal-box"><div class="modal-head"><h2 id="evDetailTitle">Présences</h2><button class="close" id="evDetailClose" type="button" aria-label="Fermer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div id="evDetailBody"></div></div></div>
