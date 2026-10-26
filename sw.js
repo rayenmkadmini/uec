@@ -1,7 +1,7 @@
 // UEC21 service worker: makes the site installable and gives a minimal offline fallback.
 // Network first for every same-origin GET (so a deploy is always picked up); the cache is
 // only used when the network fails. Supabase and other origins are never touched.
-const CACHE = "uec21-v4";
+const CACHE = "uec21-v5";
 const SHELL = ["index.html", "css/style.css", "js/splash.js", "js/install.js", "assets/uec-logo-192.webp", "assets/app-icon-192.png"];
 
 self.addEventListener("install", event => {
