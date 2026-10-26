@@ -2258,3 +2258,32 @@ body[data-page="login"] .install-app-btn,body:not(:has(.mobile-tabbar)) .install
 .mt-mine.has-cover{flex-wrap:wrap;padding-top:0;overflow:hidden}
 .ev-cover{display:block;flex:0 0 calc(100% + 28px);width:calc(100% + 28px);margin:0 -14px 4px;max-height:200px;object-fit:cover}
 @media(max-width:760px){.mt-card:has(.ev-thumb){grid-template-columns:auto 1fr}.ev-thumb{display:none}}
+
+/* ============================================================
+   ANNONCES v2 — feed
+============================================================ */
+.ann-hero{position:relative;overflow:hidden;isolation:isolate;display:flex;gap:14px;align-items:center;padding:20px;border-radius:22px;margin-bottom:16px;color:#fff;
+  background:linear-gradient(135deg,#d7142f,#7d0716)}
+.ann-hero::after{content:"";position:absolute;inset:0;z-index:-1;opacity:.22;background:url("../assets/uec-mascot.webp") right -30px center/auto 150% no-repeat}
+.ann-hero > span{font-size:34px}
+.ann-hero small{font-size:11px;font-weight:800;letter-spacing:.14em;color:#ffd6dc}
+.ann-hero h2{margin:2px 0 4px;color:#fff;font-size:21px;font-weight:900}
+.ann-hero p{margin:0;font-size:13.5px;color:#ffe3e7}
+.ann-list{display:grid;gap:14px}
+.ann-card{padding:0!important;overflow:hidden}
+.ann-content{padding:16px 18px}
+.ann-media img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover}
+.ann-card.featured .ann-media img{aspect-ratio:4/3;max-height:420px}
+.ann-card.featured h3{font-size:21px}
+.ann-author{display:flex;align-items:center;gap:9px}
+.ann-author img{border-radius:50%}
+.ann-author b{display:block;font-size:13.5px}
+.ann-author time{display:block;font-size:12px;color:var(--muted,#9aa0aa);margin:0}
+.ann-tags{margin-left:auto;display:flex;gap:6px}
+.ann-top time{margin-left:0}
+.ann-card p.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.ann-more{border:0;background:none;color:#e51c3f;font:700 13.5px/1 Inter,system-ui,sans-serif;padding:8px 0 0;cursor:pointer}
+.ann-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:40px 16px;text-align:center;color:var(--muted,#9aa0aa)}
+.ann-empty span{font-size:40px}
+.ann-empty b{color:var(--text,#fff);font-size:16px}
+@media(min-width:900px){.ann-list{grid-template-columns:repeat(2,minmax(0,1fr))}.ann-card.featured{grid-column:1/-1;display:grid;grid-template-columns:1.1fr 1fr}.ann-card.featured:not(.has-img){display:block}.ann-card.featured .ann-media img{height:100%;max-height:none;aspect-ratio:auto}}

@@ -34,19 +34,33 @@ async function load() {
   if (error) { box.innerHTML = '<div class="empty">Les annonces ne sont pas encore disponibles (migration 20261028120000 à appliquer).</div>'; return; }
   annAll = data || [];
   const seen = lastSeen();
-  box.innerHTML = annAll.length ? annAll.map(a => {
+  const ago = d => {
+    const m = Math.round((Date.now() - new Date(d).getTime()) / 60000);
+    if (m < 1) return "à l’instant";
+    if (m < 60) return `il y a ${m} min`;
+    if (m < 1440) return `il y a ${Math.round(m / 60)} h`;
+    if (m < 10080) return `il y a ${Math.round(m / 1440)} j`;
+    return new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+  };
+  const text = a => escapeHtml(a.body).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener nofollow">${u}</a>`);
+  box.innerHTML = annAll.length ? annAll.map((a, i) => {
     const isNew = new Date(a.created_at).getTime() > seen;
-    return `<article class="ann-card${a.pinned ? " pinned" : ""}">
-      <div class="ann-top">
-        ${a.pinned ? '<span class="ann-tag pin">📌 Épinglée</span>' : ""}${isNew ? '<span class="ann-tag new">Nouveau</span>' : ""}
-        <time datetime="${a.created_at}">${new Date(a.created_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "long" })} · ${new Date(a.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</time>
+    const featured = i === 0;
+    const long = a.body.length > 260;
+    return `<article class="ann-card${featured ? " featured" : ""}${a.pinned ? " pinned" : ""}${a.image_url ? " has-img" : ""}">
+      ${a.image_url ? `<div class="ann-media"><img src="${escapeHtml(a.image_url)}" alt="" loading="lazy"></div>` : ""}
+      <div class="ann-content">
+        <div class="ann-top">
+          <span class="ann-author"><img src="assets/uec-logo-96.webp" alt="" width="28" height="28"><span><b>Bureau UEC</b><time datetime="${a.created_at}" title="${new Date(a.created_at).toLocaleString("fr-FR")}">${ago(a.created_at)}</time></span></span>
+          <span class="ann-tags">${a.pinned ? '<span class="ann-tag pin">📌 Épinglée</span>' : ""}${isNew ? '<span class="ann-tag new">Nouveau</span>' : ""}</span>
+        </div>
+        <h3>${escapeHtml(a.title)}</h3>
+        <p class="${long ? "clamp" : ""}">${text(a)}</p>
+        ${long ? '<button type="button" class="ann-more" data-more>Lire la suite</button>' : ""}
+        ${annManager ? `<div class="ann-actions"><button type="button" class="btn secondary" data-edit="${a.id}">Modifier</button><button type="button" class="btn secondary" data-pin="${a.id}">${a.pinned ? "Désépingler" : "Épingler"}</button><button type="button" class="btn secondary danger" data-del="${a.id}">Supprimer</button></div>` : ""}
       </div>
-      ${a.image_url ? `<img class="ann-img" src="${escapeHtml(a.image_url)}" alt="" loading="lazy">` : ""}
-      <h3>${escapeHtml(a.title)}</h3>
-      <p>${escapeHtml(a.body).replace(/https?:\/\/[^\s<]+/g, u => `<a href="${u}" target="_blank" rel="noopener nofollow">${u}</a>`)}</p>
-      ${annManager ? `<div class="ann-actions"><button type="button" class="btn secondary" data-edit="${a.id}">Modifier</button><button type="button" class="btn secondary" data-pin="${a.id}">${a.pinned ? "Désépingler" : "Épingler"}</button><button type="button" class="btn secondary danger" data-del="${a.id}">Supprimer</button></div>` : ""}
     </article>`;
-  }).join("") : '<div class="empty-card">Aucune annonce pour le moment.</div>';
+  }).join("") : '<div class="ann-empty"><span aria-hidden="true">📣</span><b>Aucune annonce pour le moment</b><small>Les nouvelles du bureau apparaîtront ici.</small></div>';
   try { localStorage.setItem(ANN_SEEN, String(Date.now())); } catch (_) {}
 }
 
@@ -84,6 +98,13 @@ async function save(event) {
 }
 
 async function onClick(event) {
+  const more = event.target.closest("[data-more]");
+  if (more) {
+    const p = more.previousElementSibling;
+    p.classList.toggle("clamp");
+    more.textContent = p.classList.contains("clamp") ? "Lire la suite" : "Réduire";
+    return;
+  }
   const edit = event.target.closest("[data-edit]");
   const pin = event.target.closest("[data-pin]");
   const del = event.target.closest("[data-del]");
