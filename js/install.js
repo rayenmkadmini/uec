@@ -57,7 +57,8 @@
         "Ouvrez le site dans <b>Chrome</b>.",
         "Appuyez sur le menu <b>⋮</b> en haut à droite.",
         "Choisissez <b>« Installer l’application »</b> ou <b>« Ajouter à l’écran d’accueil »</b>.",
-        "Confirmez avec <b>Installer</b> : l’icône UEC21 apparaît sur votre téléphone."
+        "Confirmez avec <b>Installer</b> : l’icône UEC21 apparaît sur votre téléphone.",
+        "Déjà une icône UEC21 avec le petit logo Chrome ? Supprimez-la d’abord (appui long → Supprimer), puis recommencez."
       ] };
     }
     return { title: "Installer sur ordinateur", items: [
@@ -104,12 +105,18 @@
     sheet.querySelector(".ia-ok").focus();
   }
 
+  // Native prompt when Chrome offers one; otherwise (no prompt, prompt
+  // refused or failing, already used) the step-by-step sheet, so a tap
+  // never does "nothing".
   async function install() {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      try { await deferredPrompt.userChoice; } catch (_) {}
-      deferredPrompt = null;
-      return;
+    const event = deferredPrompt;
+    deferredPrompt = null;
+    if (event) {
+      try {
+        await event.prompt();
+        const choice = await event.userChoice;
+        if (choice?.outcome === "accepted") return;
+      } catch (_) { /* fall back to the guide */ }
     }
     openSheet();
   }
