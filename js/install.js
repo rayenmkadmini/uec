@@ -80,7 +80,7 @@
     sheet.innerHTML = `
       <div class="ia-sheet" role="dialog" aria-modal="true" aria-labelledby="iaTitle">
         <div class="ia-head">
-          <img src="assets/app-icon-192.png" alt="">
+          <img src="assets/uec-app-192.png" alt="">
           <div><small>Application UEC21</small><h2 id="iaTitle">${title}</h2></div>
           <button type="button" class="ia-close" aria-label="Fermer">✕</button>
         </div>
